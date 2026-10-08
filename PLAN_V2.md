@@ -59,6 +59,7 @@ working tree). Add ideas freely; promote to a real plan when v1 is stable.
 - Label/type → spell presets (bug → debug spell).
 - Git spellbooks with pinning; spell editor.
 - Prompt presets catalog per campaign.
+- Per-campaign custom spell buttons (v1 has global custom buttons only, `PLAN_UI.md` §6.2).
 
 ## Release / distribution
 
@@ -67,6 +68,16 @@ working tree). Add ideas freely; promote to a real plan when v1 is stable.
 - Homebrew cask via GoReleaser tap.
 - Linux deb/rpm (nfpm), Arch AUR.
 - Windows WebView2 shell, built-in updater.
+
+## Theme packs (initiative)
+
+v1 ships the Dungeon and Neutral packs and the seams for more (`PLAN_UI.md` §6.5). Later:
+
+- New packs, such as a starship pack (sectors, missions, crew, a star-chart map skin, its own icons and palettes).
+- Per-pack component variants (framed panels, button shapes) through named variants and tokens, not forked components.
+- Richer map skins per pack (art, portraits, animated tokens; `PLAN_MAP.md` directions E and F).
+- User-installable packs: data only (words, tokens, sanitised SVGs), no scripts or arbitrary CSS.
+- A pack gallery with previews.
 
 ## Polish / ideas
 

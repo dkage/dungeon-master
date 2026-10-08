@@ -175,6 +175,50 @@ campaign, and a camp for a real campaign never blocks the sample.
 The panel already shows "Showing older data" when a refresh fails. The camp banner, the stale banner and offline mode
 are three messages for one situation. Use one pattern: what happened, until when, what the user sees meanwhile.
 
+### 2.9 Plain-words mode: promote it from "later" to M3.6
+
+`PLAN_EXPERIENCE.md` §6 already has the hover help (a `Term` with a popover that gives the plain meaning) and the
+single table `words.ts`. It only mentions a plain-words switch as "possible later, not built now". The switch is cheap
+only if the table is shaped for it from the first commit, so it is better specified now, even if the switch itself
+ships a little after the popovers.
+
+Each entry in `words.ts` carries three things, not two:
+
+| Field     | Example (campaign)                                  | Used for                                          |
+|-----------|-----------------------------------------------------|---------------------------------------------------|
+| `themed`  | Campaign                                            | the default label                                 |
+| `plain`   | Project                                             | the label in plain mode, and the first-sight hint |
+| `meaning` | A folder you added; issues come from its git remote | the popover text                                  |
+
+Display modes, stored in the local settings (never on GitHub):
+
+| Mode              | What the user sees                                 | Default for                    |
+|-------------------|----------------------------------------------------|--------------------------------|
+| Themed with hints | Campaign, with "(project)" on first sight, popover | a new user                     |
+| Themed            | Campaign, popover only                             | after the intro is dismissed   |
+| Plain             | Project, no theme words, popover still available   | anyone who turns the theme off |
+
+What the plan must also say:
+
+- The switch changes text only. Layout, shortcuts, URLs, data and the map's drawing are identical in every mode.
+- The hover help works in every mode, including plain, because plain words can be unclear too ("expedition" becomes
+  "session", which still needs a sentence).
+- Hover alone is not enough. The popover opens on keyboard focus and on tap, closes on Escape, and the definition is
+  also in the accessible name, so touch and screen-reader users get it.
+- Sentences need grammar, not just words: singular and plural, and templates ("No quests match", "Start with Opus").
+  Entries carry `plural`, and UI strings are built from templates over entries, never by joining words by hand.
+- All user-facing text lives in the web app. The server returns codes and data (the quest errors already have codes
+  such as `no_repo`) and the client renders the sentence. Today some server strings contain themed words ("this
+  campaign has no GitHub repository"), so they would ignore the mode. New server messages use plain wording only, and a
+  test fails if a themed word appears in a server string.
+- Safety and error text is plain in every mode, as already required in 2.1.
+- The same table feeds the Help page, the glossary check and the mode switch, so a word added once appears everywhere.
+- A unit test walks the table and fails if any entry lacks `plain` or `meaning`, or if a `meaning` is made only of other
+  themed words.
+
+Where it sits in M3.6: popovers and the table first, the settings switch in the same milestone if it is under a day of
+work once the table exists, otherwise the very next one. It does not need a second glossary file, only the extra field.
+
 ## 3. A docs check
 
 A small `make docs-check` keeps this from drifting again. It stays tiny and reads only tracked files.
@@ -196,3 +240,4 @@ Skip it if it grows beyond a short script; the reconciliation pass is the valuab
 4. Are plan statuses moved out of the plans into the `CLAUDE.md` line?
 5. Should the scope picker live inside the Start-here checklist?
 6. Does M3.7 run as one docs commit after M3.5 A/B and M3.6, or in pieces as each lands?
+7. Does the plain-words switch ship with the hover help in M3.6, or right after it?
