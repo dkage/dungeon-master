@@ -23,6 +23,10 @@ disk and nothing surprises the user.
   | Campaign | a project root |
   ```
 
+- **Number ordered lists 1, 2, 3, ...** with no gaps or repeats. Markdown renders from the first number upward whatever
+  you type, so a `10.` after `3.` shows as 4 and PhpStorm flags it. The formatter renumbers a wrong list (keeping its
+  start number, its `.` or `)` and an all-same `1. 1. 1.` style), but write it right so references in prose such as
+  "step 3" stay true.
 - Keep table cells short. A table row cannot be wrapped, so a 300-character cell makes a 300-character line. When a
   cell needs a paragraph, use a list or a section under a heading instead.
 - Do not break inline code, links or URLs across lines. Do not hard-wrap code blocks.

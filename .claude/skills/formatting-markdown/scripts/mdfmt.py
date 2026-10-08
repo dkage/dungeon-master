@@ -23,6 +23,7 @@ HEADING_RE = re.compile(r"^ {0,3}#{1,6}(\s|$)")
 HR_RE = re.compile(r"^ {0,3}([-*_])( *\1){2,} *$")
 LIST_RE = re.compile(r"^( {0,3})([-+*]|\d{1,9}[.)])( +|$)(.*)$")
 QUOTE_RE = re.compile(r"^ {0,3}> ?")
+ORDERED_RE = re.compile(r"^( {0,3})(\d{1,9})([.)])( |$)")
 SETEXT_RE = re.compile(r"^ {0,3}(=+|-+) *$")
 HTML_RE = re.compile(r"^ {0,3}<[A-Za-z/!?]")
 REFDEF_RE = re.compile(r"^ {0,3}\[\^?[^\]]+\]:\s")
@@ -206,11 +207,25 @@ def interrupts_paragraph(lines, i):
     return table_starts(lines, i)
 
 
+def list_numbers(lines, i, ind, delim):
+    """Numbers of the ordered items of the list that starts at lines[i] (same indent and delimiter)."""
+    nums = []
+    for k in range(i, len(lines)):
+        line = lines[k].replace("\t", "    ")
+        m = ORDERED_RE.match(line)
+        if m and len(m.group(1)) == ind and m.group(3) == delim:
+            nums.append(int(m.group(2)))
+        elif line.strip() and indent_of(line) <= ind:
+            break
+    return nums
+
+
 def format_lines(lines, width, reflow=False):
     width = max(width, 30)
     out, i, n = [], 0, len(lines)
     pending_blank = False
     force_blank = False
+    olist = None  # the ordered list being numbered: indent, delimiter, first number, same-number style, count
 
     def begin(separate=False):
         nonlocal pending_blank, force_blank
@@ -231,6 +246,9 @@ def format_lines(lines, width, reflow=False):
             pending_blank = True
             i += 1
             continue
+
+        if not ORDERED_RE.match(line):
+            olist = None  # anything but an ordered item ends the list being numbered
 
         m = FENCE_RE.match(line)
         if m:
@@ -316,10 +334,24 @@ def format_lines(lines, width, reflow=False):
                     break
                 inner.append(cur.lstrip())  # lazy continuation
                 j += 1
-            new_off = ind + len(marker) + 1
+            out_marker = marker
+            om = ORDERED_RE.match(line)
+            if om:
+                number, delim = int(om.group(2)), om.group(3)
+                if olist and olist["ind"] == ind and olist["delim"] == delim:
+                    olist["count"] += 1
+                else:
+                    nums = list_numbers(lines, i, ind, delim)
+                    same = len(nums) > 1 and len(set(nums)) == 1  # "1. 1. 1." style: every number alike
+                    olist = {"ind": ind, "delim": delim, "first": number, "same": same, "count": 0}
+                shown = olist["first"] + (0 if olist["same"] else olist["count"])
+                out_marker = f"{shown}{delim}"
+            else:
+                olist = None
+            new_off = ind + len(out_marker) + 1
             body = format_lines(inner, width - new_off, reflow)
             begin()
-            head = " " * ind + marker
+            head = " " * ind + out_marker
             if not body:
                 out.append(head)
             else:

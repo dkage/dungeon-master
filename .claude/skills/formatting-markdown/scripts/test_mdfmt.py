@@ -44,7 +44,8 @@ class Wrapping(unittest.TestCase):
         self.assertTrue(out[1].startswith("  word"))
 
     def test_ordered_item_hangs_under_text(self):
-        out = fmt("1. " + LONG + "\n10. " + LONG + "\n").split("\n")
+        items = "".join(f"{n}. {LONG if n in (1, 10) else 'x'}\n" for n in range(1, 11))
+        out = fmt(items).split("\n")
         self.assertTrue(out[1].startswith("   word"))  # width of "1. "
         ten = next(i for i, l in enumerate(out) if l.startswith("10. "))
         self.assertTrue(out[ten + 1].startswith("    word"))  # width of "10. "
@@ -189,6 +190,73 @@ class JoiningLines(unittest.TestCase):
     def test_reflow_does_not_touch_code_tables_or_headings(self):
         text = "# H\n\n```\na\nb\n```\n\n| a |\n|---|\n| 1 |\n"
         self.assertEqual(fmt(text, reflow=True), text)
+
+
+class Numbering(unittest.TestCase):
+    """Ordered lists are renumbered when the numbers are wrong; the rendered list does not change."""
+
+    def test_out_of_order_item_is_renumbered(self):
+        self.assertEqual(fmt("1. a\n2. b\n3. c\n10. d\n"), "1. a\n2. b\n3. c\n4. d\n")
+
+    def test_correct_list_is_untouched(self):
+        self.assertEqual(fmt("1. a\n2. b\n3. c\n"), "1. a\n2. b\n3. c\n")
+
+    def test_duplicates_and_gaps_are_fixed(self):
+        self.assertEqual(fmt("1. a\n1. b\n2. c\n"), "1. a\n2. b\n3. c\n")  # not all alike: sequential
+        self.assertEqual(fmt("1. a\n2. b\n2. c\n"), "1. a\n2. b\n3. c\n")
+        self.assertEqual(fmt("1. a\n3. b\n7. c\n"), "1. a\n2. b\n3. c\n")
+
+    def test_all_same_number_style_is_kept(self):
+        self.assertEqual(fmt("1. a\n1. b\n1. c\n"), "1. a\n1. b\n1. c\n")
+        self.assertEqual(fmt("0. a\n0. b\n"), "0. a\n0. b\n")
+
+    def test_start_number_is_kept(self):
+        self.assertEqual(fmt("5. a\n9. b\n"), "5. a\n6. b\n")
+
+    def test_delimiter_is_kept(self):
+        self.assertEqual(fmt("1) a\n5) b\n"), "1) a\n2) b\n")
+
+    def test_blank_lines_between_items_keep_one_list(self):
+        self.assertEqual(fmt("1. a\n\n2. b\n\n9. c\n"), "1. a\n\n2. b\n\n3. c\n")
+
+    def test_item_with_nested_content_does_not_split_the_list(self):
+        text = "1. a\n   - x\n   - y\n2. b\n7. c\n"
+        self.assertEqual(fmt(text), "1. a\n   - x\n   - y\n2. b\n3. c\n")
+
+    def test_nested_ordered_list_is_numbered_on_its_own(self):
+        text = "1. a\n   1. x\n   5. y\n2. b\n"
+        self.assertEqual(fmt(text), "1. a\n   1. x\n   2. y\n2. b\n")
+
+    def test_paragraph_between_ends_the_list(self):
+        self.assertEqual(fmt("1. a\n\ntext\n\n4. b\n"), "1. a\n\ntext\n\n4. b\n")
+
+    def test_bullet_list_between_ends_the_list(self):
+        self.assertEqual(fmt("1. a\n- x\n3. b\n"), "1. a\n- x\n3. b\n")
+
+    def test_heading_between_ends_the_list(self):
+        self.assertEqual(fmt("1. a\n\n# H\n\n6. b\n"), "1. a\n\n# H\n\n6. b\n")
+
+    def test_renumbering_to_two_digits_widens_the_hanging_indent(self):
+        text = "".join(f"{n}. x\n" for n in range(1, 9)) + "99. " + LONG + "\n"
+        out = fmt(text).split("\n")
+        self.assertTrue(out[8].startswith("9. "))
+        self.assertTrue(out[9].startswith("   word"))  # "9. " is 3 wide
+        text = "".join(f"{n}. x\n" for n in range(1, 10)) + "50. " + LONG + "\n"
+        out = fmt(text).split("\n")
+        self.assertTrue(out[9].startswith("10. "))
+        self.assertTrue(out[10].startswith("    word"))
+
+    def test_continuation_text_follows_the_new_marker_width(self):
+        text = "".join(f"{n}. x\n" for n in range(1, 10)) + "10. a\n    more\n"
+        self.assertEqual(fmt(text).rstrip("\n").split("\n")[-2:], ["10. a", "    more"])
+
+    def test_idempotent_and_crlf_safe(self):
+        once = fmt("1. a\n2. b\n3. c\n10. d\n")
+        self.assertEqual(fmt(once), once)
+        self.assertEqual(format_bytes(b"1. a\r\n7. b\r\n", W), b"1. a\r\n2. b\r\n")
+
+    def test_reflow_keeps_numbering_right(self):
+        self.assertEqual(fmt("1. a\n   more\n5. b\n", reflow=True), "1. a more\n2. b\n")
 
 
 class Invariants(unittest.TestCase):
