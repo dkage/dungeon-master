@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  ApiError, addCampaign, createSession, deleteSession, getState, removeCampaign, termUrl, updateCampaign,
+  ApiError, addCampaign, createSession, deleteSession, getQuest, getQuests, getState, removeCampaign, termUrl, updateCampaign,
 } from './api'
 
 function mockFetch(status: number, body?: unknown) {
@@ -59,6 +59,29 @@ describe('api', () => {
     expect(JSON.parse(calls[0][1].body as string)).toEqual({ dir: '/p', name: 'P' })
     expect(JSON.parse(calls[1][1].body as string)).toEqual({ labels: ['a'] })
     for (const [, init] of calls) expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+  })
+
+  it('quest calls use GET with escaped ids and an optional refresh flag', async () => {
+    const f = mockFetch(200, {})
+    await getQuests('c/1')
+    await getQuests('c1', true)
+    await getQuest('c1', 42)
+    const urls = (f.mock.calls as unknown as [string, RequestInit][]).map(([u, i]) => `${i.method} ${u}`)
+    expect(urls).toEqual([
+      'GET /api/campaigns/c%2F1/quests',
+      'GET /api/campaigns/c1/quests?refresh=1',
+      'GET /api/campaigns/c1/quests/42',
+    ])
+    for (const [, init] of f.mock.calls as unknown as [string, RequestInit][]) expect(init.headers).toEqual({})
+  })
+
+  it('keeps the machine-readable error code', async () => {
+    mockFetch(503, { error: 'No GitHub credentials found.', code: 'no_token' })
+    const err = await getQuests('c1').catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect(err).toMatchObject({ status: 503, code: 'no_token', message: 'No GitHub credentials found.' })
+    mockFetch(500, { error: 'x' })
+    expect(await getQuests('c1').catch((e) => e)).toMatchObject({ code: undefined })
   })
 
   it('surfaces the server error message', async () => {

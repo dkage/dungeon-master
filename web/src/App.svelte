@@ -4,6 +4,7 @@
   import Sidebar from './lib/Sidebar.svelte'
   import Toolbar from './lib/Toolbar.svelte'
   import Terminal from './lib/Terminal.svelte'
+  import QuestsPanel from './lib/QuestsPanel.svelte'
 
   let { store = new AppStore() }: { store?: AppStore } = $props()
 
@@ -35,4 +36,5 @@
       {/if}
     </main>
   </div>
+  <QuestsPanel {store} />
 </div>

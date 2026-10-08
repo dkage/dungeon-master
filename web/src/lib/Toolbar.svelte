@@ -32,6 +32,9 @@
     <button type="button" class="shell" disabled={!canLaunch} onclick={() => store.launch({ shell: true })}>
       Shell
     </button>
+    <button type="button" class="quests-toggle" aria-pressed={store.questsOpen} onclick={() => (store.questsOpen = !store.questsOpen)}>
+      Quests
+    </button>
   </div>
 </header>
 

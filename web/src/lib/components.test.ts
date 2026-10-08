@@ -3,10 +3,12 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte'
 import Toolbar from './Toolbar.svelte'
 import Sidebar from './Sidebar.svelte'
 import { AppStore } from './store.svelte'
-import type { Campaign, SessionInfo } from './api'
+import type { Campaign, Quest, QuestDetail as QuestDetailT, QuestResult, SessionInfo } from './api'
+import QuestsPanel from './QuestsPanel.svelte'
+import QuestDetail from './QuestDetail.svelte'
 
 const camp = (id: string, over: Partial<Campaign> = {}): Campaign => ({
-  id, name: `Camp ${id}`, dir: `/p/${id}`, remote: 'origin', labels: [], repo: `acme/${id}`, ...over,
+  id, name: `Camp ${id}`, dir: `/p/${id}`, remote: 'origin', labels: [], demo: false, repo: `acme/${id}`, ...over,
 })
 const sess = (id: string, campaign: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   id, kind: 'hero', title: `T-${id}`, campaign, dir: '/d', created: '', exited: false, exitCode: 0, ...over,
@@ -16,6 +18,7 @@ function store(setup: (s: AppStore) => void = () => {}) {
   const s = new AppStore({
     getState: vi.fn(), createSession: vi.fn(), deleteSession: vi.fn(),
     addCampaign: vi.fn(), updateCampaign: vi.fn(), removeCampaign: vi.fn(),
+    getQuests: vi.fn(), getQuest: vi.fn(),
   })
   s.heroes = [{ id: 'opus', label: 'Opus' }, { id: 'sonnet', label: 'Sonnet' }]
   s.campaigns = [camp('c1'), camp('c2', { repo: undefined })]
@@ -158,5 +161,266 @@ describe('Sidebar', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Remove campaign Camp c1' }))
     await fireEvent.click(screen.getByRole('button', { name: 'Remove?' }))
     expect(remove).toHaveBeenCalledWith('c1')
+  })
+})
+
+const quest = (number: number, over: Partial<Quest> = {}): Quest => ({
+  number, title: `Quest ${number}`, state: 'open', closed: false, url: `https://github.com/acme/c1/issues/${number}`,
+  labels: [], assignees: [], blockedBy: [], subTotal: 0, subDone: 0, comments: 0, prs: [],
+  updated: new Date().toISOString(), ...over,
+})
+
+const questResult = (quests: Quest[], over: Partial<QuestResult> = {}): QuestResult => ({
+  source: 'github', repo: 'acme/c1', quests, fetchedAt: new Date().toISOString(), stale: false, ...over,
+})
+
+function questStore(result: QuestResult | null, setup: (s: AppStore) => void = () => {}) {
+  return store((s) => {
+    s.quests = result
+    s.questsFor = 'c1'
+    setup(s)
+  })
+}
+
+describe('QuestsPanel', () => {
+  const sample = [
+    quest(1, { title: 'Epic', subTotal: 2, subDone: 1, labels: [{ name: 'epic', color: '5319e7' }] }),
+    quest(2, { title: 'Child done', parent: 1, closed: true, state: 'cleared' }),
+    quest(3, { title: 'Child locked', parent: 1, state: 'locked', blockedBy: [{ number: 4, closed: false }] }),
+    quest(5, { title: 'Mine', state: 'claimed', assignees: ['alice'], prs: [{ number: 9, url: 'u', state: 'open' }] }),
+  ]
+
+  it('lists quests with state, labels, progress, blockers, assignees and pull requests', () => {
+    render(QuestsPanel, { store: questStore(questResult(sample)) })
+    expect(screen.getByText('acme/c1')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /#1 Epic/ })).toBeInTheDocument()
+    expect(screen.getByText('epic')).toBeInTheDocument()
+    expect(screen.getByTitle('Sub-issues done')).toHaveTextContent('1/2')
+    expect(screen.getByText('blocked by #4')).toBeInTheDocument()
+    expect(screen.getByText('@alice')).toBeInTheDocument()
+    expect(screen.getByText('PR #9 open')).toBeInTheDocument()
+    // Accessible state text for each row.
+    expect(screen.getAllByText(/^(Open|Locked|In progress|Cleared):$/).map((e) => e.textContent)).toEqual([
+      'Open:', 'Cleared:', 'Locked:', 'In progress:',
+    ])
+  })
+
+  it('shows state counts', () => {
+    render(QuestsPanel, { store: questStore(questResult(sample)) })
+    const tally = screen.getByLabelText('Quest counts')
+    expect(tally).toHaveTextContent('1 open')
+    expect(tally).toHaveTextContent('1 in progress')
+    expect(tally).toHaveTextContent('1 locked')
+    expect(tally).toHaveTextContent('1 cleared')
+  })
+
+  it('nests children under their parent', () => {
+    render(QuestsPanel, { store: questStore(questResult(sample)) })
+    const items = screen.getAllByRole('listitem')
+    const depth = (el: HTMLElement) => el.getAttribute('style')
+    expect(depth(items[0])).toMatch(/--depth:\s*0/)
+    expect(depth(items[1])).toMatch(/--depth:\s*1/)
+    expect(items[1]).toHaveTextContent('Child done')
+  })
+
+  it('filters by text and can hide cleared quests', async () => {
+    render(QuestsPanel, { store: questStore(questResult(sample)) })
+    await fireEvent.input(screen.getByLabelText('Filter quests'), { target: { value: 'locked' } })
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
+    expect(screen.getByText('Child locked')).toBeInTheDocument()
+    await fireEvent.input(screen.getByLabelText('Filter quests'), { target: { value: 'zzz' } })
+    expect(screen.getByText('No quests match.')).toBeInTheDocument()
+    await fireEvent.input(screen.getByLabelText('Filter quests'), { target: { value: '' } })
+    await fireEvent.click(screen.getByLabelText('Hide cleared'))
+    expect(screen.queryByText('Child done')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+  })
+
+  it('opens a quest when clicked', async () => {
+    const s = questStore(questResult(sample))
+    const select = vi.spyOn(s, 'selectQuest').mockResolvedValue()
+    render(QuestsPanel, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: /#5 Mine/ }))
+    expect(select).toHaveBeenCalledWith(5)
+  })
+
+  it('refreshes on demand and disables the button while loading', async () => {
+    const s = questStore(questResult(sample))
+    const load = vi.spyOn(s, 'loadQuests').mockResolvedValue()
+    const { unmount } = render(QuestsPanel, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: 'Refresh quests' }))
+    expect(load).toHaveBeenCalledWith(true)
+    unmount()
+    render(QuestsPanel, { store: questStore(questResult(sample), (st) => (st.questsLoading = true)) })
+    expect(screen.getByRole('button', { name: 'Refresh quests' })).toBeDisabled()
+  })
+
+  it('labels demo data and lets you switch back to real issues', async () => {
+    const s = questStore(questResult(sample, { source: 'demo', repo: undefined }), (st) => (st.campaigns[0].demo = true))
+    const setDemo = vi.spyOn(s, 'setDemo').mockResolvedValue(true)
+    render(QuestsPanel, { store: s })
+    expect(screen.getByText('demo data')).toBeInTheDocument()
+    expect(screen.getByText(/Showing sample quests/)).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Use real issues' }))
+    expect(setDemo).toHaveBeenCalledWith(false)
+  })
+
+  it('warns when showing stale data', () => {
+    render(QuestsPanel, { store: questStore(questResult(sample, { stale: true, warning: 'GitHub rate limit reached' })) })
+    expect(screen.getByRole('status')).toHaveTextContent('Showing older data. GitHub rate limit reached')
+  })
+
+  it('offers demo quests when the campaign has no repository', async () => {
+    const s = questStore(null, (st) => (st.questsError = { code: 'no_repo', message: 'This campaign has no GitHub repository.' }))
+    const setDemo = vi.spyOn(s, 'setDemo').mockResolvedValue(true)
+    render(QuestsPanel, { store: s })
+    expect(screen.getByRole('alert')).toHaveTextContent('no GitHub repository')
+    await fireEvent.click(screen.getByRole('button', { name: 'Load demo quests' }))
+    expect(setDemo).toHaveBeenCalledWith(true)
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+  })
+
+  it('offers retry (and demo) for credential problems, retry only for other failures', async () => {
+    const s = questStore(null, (st) => (st.questsError = { code: 'no_token', message: 'No GitHub credentials found.' }))
+    const load = vi.spyOn(s, 'loadQuests').mockResolvedValue()
+    const { unmount } = render(QuestsPanel, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(load).toHaveBeenCalledWith(true)
+    expect(screen.getByRole('button', { name: 'Load demo quests' })).toBeInTheDocument()
+    unmount()
+    render(QuestsPanel, { store: questStore(null, (st) => (st.questsError = { code: 'rate_limited', message: 'Rate limit.' })) })
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Load demo quests' })).not.toBeInTheDocument()
+  })
+
+  it('has sensible empty and loading states', () => {
+    const { unmount } = render(QuestsPanel, { store: questStore(questResult([])) })
+    expect(screen.getByText('No issues in this repository yet.')).toBeInTheDocument()
+    unmount()
+    const { unmount: u2 } = render(QuestsPanel, { store: questStore(null, (st) => (st.questsLoading = true)) })
+    expect(screen.getByText('Loading quests…')).toBeInTheDocument()
+    u2()
+    render(QuestsPanel, { store: store((st) => { st.campaigns = []; st.campaignId = null }) })
+    expect(screen.getByText('Select a campaign to see its quests.')).toBeInTheDocument()
+  })
+
+  it('shows the detail view in place of the list while a quest is open', () => {
+    render(QuestsPanel, { store: questStore(questResult(sample), (st) => (st.questNumber = 5)) })
+    expect(screen.getByRole('button', { name: /← Quests/ })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Filter quests')).not.toBeInTheDocument()
+  })
+
+  it('closes the drawer on narrow screens', async () => {
+    const s = questStore(questResult(sample), (st) => (st.questsOpen = true))
+    render(QuestsPanel, { store: s })
+    expect(screen.getByRole('complementary', { name: 'Quests' })).toHaveClass('open')
+    await fireEvent.click(screen.getByRole('button', { name: 'Close quests' }))
+    expect(s.questsOpen).toBe(false)
+  })
+})
+
+describe('QuestDetail', () => {
+  const detail = (over: Partial<QuestDetailT> = {}): QuestDetailT => ({
+    ...quest(3, { title: 'Build the form', state: 'locked', labels: [{ name: 'feature', color: '0e8a16' }], assignees: ['bob'], milestone: 'v1', parent: 1,
+      blockedBy: [{ number: 2, title: 'Design', closed: true }, { number: 9, title: 'Copy', closed: false }],
+      prs: [{ number: 21, url: 'u', state: 'merged' }], subTotal: 2, subDone: 1, comments: 2 }),
+    author: 'alice', body: '## Steps\n\n1. one\n2. two\n\n<script>window.pwned=1</script>', created: '',
+    blocking: [{ number: 4, title: 'Validate', closed: false }], subIssues: [{ number: 8, title: 'Sub', closed: true }],
+    parentTitle: 'The epic',
+    commentList: [{ author: 'carol', body: 'looks **good**', created: new Date().toISOString() }],
+    ...over,
+  })
+
+  function open(d: QuestDetailT | null, setup: (s: AppStore) => void = () => {}) {
+    return store((s) => {
+      s.questNumber = 3
+      s.detail = d
+      setup(s)
+    })
+  }
+
+  it('shows the quest with its metadata, relations, markdown body and comments', () => {
+    render(QuestDetail, { store: open(detail()) })
+    expect(screen.getByRole('heading', { name: /#3 Build the form/ })).toBeInTheDocument()
+    expect(screen.getByText('Locked')).toBeInTheDocument()
+    expect(screen.getByText('opened by @alice')).toBeInTheDocument()
+    expect(screen.getByText('feature')).toBeInTheDocument()
+    expect(screen.getByText('@bob')).toBeInTheDocument()
+    expect(screen.getByText('milestone: v1')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '#1 The epic' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /#2 Design/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /#9 Copy/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /#4 Validate/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /#8 Sub/ })).toBeInTheDocument()
+    expect(screen.getByText('Sub-issues (1/2)')).toBeInTheDocument()
+    expect(screen.getByText('PR #21 merged')).toBeInTheDocument()
+    const body = screen.getByLabelText('Description')
+    expect(body.querySelector('h2')?.textContent).toBe('Steps')
+    expect(body.querySelectorAll('ol li')).toHaveLength(2)
+    expect(screen.getByLabelText('Comments').querySelector('.md strong')?.textContent).toBe('good')
+  })
+
+  it('never renders script from an issue body', () => {
+    const { container } = render(QuestDetail, { store: open(detail()) })
+    expect(container.querySelector('script')).toBeNull()
+    expect((window as unknown as { pwned?: number }).pwned).toBeUndefined()
+  })
+
+  it('navigates to related quests and back to the list', async () => {
+    const s = open(detail())
+    const select = vi.spyOn(s, 'selectQuest').mockResolvedValue()
+    const close = vi.spyOn(s, 'closeQuest')
+    render(QuestDetail, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: '#1 The epic' }))
+    await fireEvent.click(screen.getByRole('button', { name: /#9 Copy/ }))
+    await fireEvent.click(screen.getByRole('button', { name: /#4 Validate/ }))
+    expect(select.mock.calls.map((c) => c[0])).toEqual([1, 9, 4])
+    await fireEvent.click(screen.getByRole('button', { name: /← Quests/ }))
+    expect(close).toHaveBeenCalled()
+  })
+
+  it('links to GitHub only for real https issues, never for demo data', () => {
+    const { unmount } = render(QuestDetail, { store: open(detail({ url: 'https://github.com/acme/c1/issues/3' })) })
+    const link = screen.getByRole('link', { name: 'Open on GitHub' })
+    expect(link).toHaveAttribute('href', 'https://github.com/acme/c1/issues/3')
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+    unmount()
+    const { unmount: u2 } = render(QuestDetail, { store: open(detail(), (s) => (s.campaigns[0].demo = true)) })
+    expect(screen.queryByRole('link', { name: 'Open on GitHub' })).not.toBeInTheDocument()
+    u2()
+    render(QuestDetail, { store: open(detail({ url: 'javascript:alert(1)' })) })
+    expect(screen.queryByRole('link', { name: 'Open on GitHub' })).not.toBeInTheDocument()
+  })
+
+  it('handles an empty description, no comments and a closed quest with a reason', () => {
+    render(QuestDetail, { store: open(detail({ body: '', commentList: [], comments: 0, state: 'cleared', closed: true, reason: 'not planned', blockedBy: [], blocking: [], subIssues: [], subTotal: 0, subDone: 0, prs: [], parent: undefined, parentTitle: undefined })) })
+    expect(screen.getByText('No description.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Comments')).not.toBeInTheDocument()
+    expect(screen.getByText('Cleared · not planned')).toBeInTheDocument()
+    expect(screen.queryByText('Blocked by')).not.toBeInTheDocument()
+  })
+
+  it('shows loading and error states, with retry', async () => {
+    const { unmount } = render(QuestDetail, { store: open(null) })
+    expect(screen.getByRole('status')).toHaveTextContent('Loading #3…')
+    unmount()
+    const s = open(null, (st) => (st.detailError = { code: 'not_found', message: 'That issue was not found.' }))
+    const select = vi.spyOn(s, 'selectQuest').mockResolvedValue()
+    render(QuestDetail, { store: s })
+    expect(screen.getByRole('alert')).toHaveTextContent('That issue was not found.')
+    await fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(select).toHaveBeenCalledWith(3)
+  })
+})
+
+describe('Toolbar quests toggle', () => {
+  it('toggles the quest drawer', async () => {
+    const s = store()
+    render(Toolbar, { store: s })
+    const btn = screen.getByRole('button', { name: 'Quests' })
+    expect(btn).toHaveAttribute('aria-pressed', 'false')
+    await fireEvent.click(btn)
+    expect(s.questsOpen).toBe(true)
+    expect(btn).toHaveAttribute('aria-pressed', 'true')
   })
 })

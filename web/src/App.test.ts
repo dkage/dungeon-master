@@ -9,12 +9,22 @@ import App from './App.svelte'
 
 interface Call { method: string; path: string; body?: unknown }
 
+const mkQuest = (number: number, title: string, over: Record<string, unknown> = {}) => ({
+  number, title, state: 'open', closed: false, url: `https://github.com/acme/demo/issues/${number}`, labels: [], assignees: [],
+  blockedBy: [], subTotal: 0, subDone: 0, comments: 0, prs: [], updated: new Date().toISOString(), ...over,
+})
+const realQuests = [
+  mkQuest(10, 'Real first issue'),
+  mkQuest(11, 'Real blocked issue', { state: 'locked', blockedBy: [{ number: 10, title: 'Real first issue', closed: false }] }),
+]
+const demoQuests = [mkQuest(100, 'Sample quest one'), mkQuest(101, 'Sample quest two', { state: 'cleared', closed: true })]
+
 // A tiny in-memory server behind fetch, so the real api client and store run.
-function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: boolean } = {}) {
+function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: boolean; noRepo?: boolean } = {}) {
   const calls: Call[] = []
   let next = 0
   const campaigns: Record<string, unknown>[] =
-    opts.campaigns === false ? [] : [{ id: 'c1', name: 'demo', dir: '/work/demo', remote: 'origin', labels: [], repo: 'acme/demo' }]
+    opts.campaigns === false ? [] : [{ id: 'c1', name: 'demo', dir: '/work/demo', remote: 'origin', labels: [], demo: false, ...(opts.noRepo ? {} : { repo: 'acme/demo' }) }]
   const sessions: Record<string, unknown>[] = opts.lost
     ? [{ id: 'old', kind: 'hero', title: 'Opus', campaign: 'c1', dir: '/work/demo', created: '', exited: true, exitCode: -1, lost: true }]
     : []
@@ -29,9 +39,31 @@ function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: b
         heroes: [{ id: 'opus', label: 'Opus' }], campaigns, sessions,
       })
     }
+    const qm = path.match(/^\/api\/campaigns\/([^/]+)\/quests(?:\/(\d+))?(\?refresh=1)?$/)
+    if (method === 'GET' && qm) {
+      const camp = campaigns.find((c) => c.id === qm[1]) as { demo?: boolean; repo?: string } | undefined
+      if (!camp) return json(404, { error: 'no such campaign' })
+      if (!camp.demo && !camp.repo) return json(409, { code: 'no_repo', error: 'This campaign has no GitHub repository.' })
+      const pool = camp.demo ? demoQuests : realQuests
+      if (qm[2]) {
+        const q = pool.find((x) => String(x.number) === qm[2])
+        if (!q) return json(404, { code: 'not_found', error: 'That issue was not found.' })
+        return json(200, { ...q, author: 'alice', body: `## About #${q.number}\n\nSome **markdown**.`, created: '', blocking: [], subIssues: [], commentList: [{ author: 'bob', body: 'a comment', created: new Date().toISOString() }] })
+      }
+      return json(200, {
+        source: camp.demo ? 'demo' : 'github', repo: camp.demo ? undefined : camp.repo,
+        quests: pool, fetchedAt: new Date().toISOString(), stale: false,
+      })
+    }
+    if (method === 'PATCH' && path.startsWith('/api/campaigns/')) {
+      const c = campaigns.find((x) => path.endsWith(String(x.id))) as { demo?: boolean } | undefined
+      if (!c) return json(404, { error: 'no such campaign' })
+      if (typeof body.demo === 'boolean') c.demo = body.demo
+      return json(200, c)
+    }
     if (method === 'POST' && path === '/api/campaigns') {
       if (body.dir === '/dup') return json(409, { error: 'that directory is already a campaign' })
-      const c = { id: `c${campaigns.length + 1}`, name: body.name ?? 'new', dir: body.dir, remote: 'origin', labels: [] }
+      const c = { id: `c${campaigns.length + 1}`, name: body.name ?? 'new', dir: body.dir, remote: 'origin', labels: [], demo: false }
       campaigns.push(c)
       return json(201, c)
     }
@@ -175,5 +207,70 @@ describe('App', () => {
     render(App)
     expect(await screen.findByRole('alert')).toHaveTextContent(/Claude Code was not found/)
     expect(screen.getByRole('button', { name: 'Opus' })).toBeDisabled()
+  })
+
+  describe('quests', () => {
+    it('shows the selected campaign\'s issues in the right panel and opens one', async () => {
+      const calls = fakeServer()
+      render(App)
+      const panel = await screen.findByRole('complementary', { name: 'Quests' })
+      expect(await within(panel).findByText('Real first issue')).toBeInTheDocument()
+      expect(within(panel).getByText('acme/demo')).toBeInTheDocument()
+      expect(calls.some((c) => c.path === '/api/campaigns/c1/quests')).toBe(true)
+
+      await fireEvent.click(within(panel).getByRole('button', { name: /#11 Real blocked issue/ }))
+      expect(await within(panel).findByRole('heading', { name: /#11 Real blocked issue/ })).toBeInTheDocument()
+      expect(within(panel).getByRole('button', { name: /#10 Real first issue/ })).toBeInTheDocument() // the blocker
+      expect(await within(panel).findByRole('heading', { name: 'About #11' })).toBeInTheDocument() // body rendered as markdown
+      expect(within(panel).getByText('markdown').tagName).toBe('STRONG')
+      expect(within(panel).getByText('a comment')).toBeInTheDocument()
+
+      // Follow the blocker, then go back to the list.
+      await fireEvent.click(within(panel).getByRole('button', { name: /#10 Real first issue/ }))
+      expect(await within(panel).findByRole('heading', { name: /#10 Real first issue/ })).toBeInTheDocument()
+      await fireEvent.click(within(panel).getByRole('button', { name: /← Quests/ }))
+      expect(await within(panel).findByLabelText('Filter quests')).toBeInTheDocument()
+    })
+
+    it('refreshes with the refresh flag', async () => {
+      const calls = fakeServer()
+      render(App)
+      const panel = await screen.findByRole('complementary', { name: 'Quests' })
+      await within(panel).findByText('Real first issue')
+      await fireEvent.click(within(panel).getByRole('button', { name: 'Refresh quests' }))
+      await waitFor(() => expect(calls.some((c) => c.path === '/api/campaigns/c1/quests?refresh=1')).toBe(true))
+    })
+
+    it('guides a campaign without a repository to the demo quests and back', async () => {
+      const calls = fakeServer({ noRepo: true })
+      render(App)
+      const panel = await screen.findByRole('complementary', { name: 'Quests' })
+      expect(await within(panel).findByRole('alert')).toHaveTextContent('no GitHub repository')
+
+      await fireEvent.click(within(panel).getByRole('button', { name: 'Load demo quests' }))
+      expect(await within(panel).findByText('Sample quest one')).toBeInTheDocument()
+      expect(within(panel).getByText('demo data')).toBeInTheDocument()
+      expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({ demo: true })
+
+      await fireEvent.click(within(panel).getByRole('button', { name: 'Use real issues' }))
+      expect(await within(panel).findByRole('alert')).toHaveTextContent('no GitHub repository')
+      expect(within(panel).queryByText('Sample quest one')).not.toBeInTheDocument()
+    })
+
+    it('shows each campaign\'s own quests when switching, never the previous one\'s', async () => {
+      fakeServer()
+      render(App)
+      const panel = await screen.findByRole('complementary', { name: 'Quests' })
+      await within(panel).findByText('Real first issue')
+
+      await fireEvent.input(screen.getByPlaceholderText('/absolute/path/to/project'), { target: { value: '/work/other' } })
+      await fireEvent.click(screen.getByRole('button', { name: 'Add campaign' }))
+      // The new campaign has no repo: the real campaign's issues must be gone at once.
+      expect(await within(panel).findByRole('alert')).toHaveTextContent('no GitHub repository')
+      expect(within(panel).queryByText('Real first issue')).not.toBeInTheDocument()
+
+      await fireEvent.click(within(screen.getByRole('navigation', { name: 'Campaigns' })).getByRole('button', { name: /^demo/ }))
+      expect(await within(panel).findByText('Real first issue')).toBeInTheDocument()
+    })
   })
 })

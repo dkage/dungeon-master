@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, type AppState, type Campaign, type SessionInfo } from './api'
+import { ApiError, type AppState, type Campaign, type Quest, type QuestDetail, type QuestResult, type SessionInfo } from './api'
 import { AppStore, type Client } from './store.svelte'
 
 const camp = (id: string, over: Partial<Campaign> = {}): Campaign => ({
-  id, name: `C-${id}`, dir: `/p/${id}`, remote: 'origin', labels: [], repo: 'acme/x', ...over,
+  id, name: `C-${id}`, dir: `/p/${id}`, remote: 'origin', labels: [], demo: false, repo: 'acme/x', ...over,
 })
 const sess = (id: string, campaign = 'c1', over: Partial<SessionInfo> = {}): SessionInfo => ({
   id, kind: 'hero', hero: 'opus', title: 'Opus', campaign, dir: '/p', created: '', exited: false, exitCode: 0, ...over,
@@ -26,11 +26,30 @@ function fakeClient(over: Partial<Client> = {}, state: Partial<AppState> = {}): 
     addCampaign: vi.fn(async (i) => camp('cnew', { dir: i.dir, name: i.name ?? 'new' })),
     updateCampaign: vi.fn(async (id, p) => camp(id, { name: p.name ?? 'C' })),
     removeCampaign: vi.fn(async () => undefined),
+    getQuests: vi.fn(async () => result([quest(1)])),
+    getQuest: vi.fn(async (_c, n) => detailOf(n)),
     ...over,
   }
 }
 
-const err = (status: number, msg: string) => vi.fn(async () => { throw new ApiError(status, msg) })
+const quest = (number: number, over: Partial<Quest> = {}): Quest => ({
+  number, title: `Q${number}`, state: 'open', closed: false, url: '', labels: [], assignees: [],
+  blockedBy: [], subTotal: 0, subDone: 0, comments: 0, prs: [], updated: '', ...over,
+})
+const result = (quests: Quest[], over: Partial<QuestResult> = {}): QuestResult => ({
+  source: 'github', repo: 'acme/x', quests, fetchedAt: '2026-10-08T12:00:00Z', stale: false, ...over,
+})
+const detailOf = (n: number): QuestDetail => ({
+  ...quest(n), author: 'alice', body: `body ${n}`, created: '', blocking: [], subIssues: [], commentList: [],
+})
+const deferred = <T>() => {
+  let resolve!: (v: T) => void
+  let reject!: (e: unknown) => void
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej })
+  return { promise, resolve, reject }
+}
+
+const err = (status: number, msg: string, code?: string) => vi.fn(async () => { throw new ApiError(status, msg, code) })
 
 beforeEach(() => localStorage.clear())
 
@@ -225,5 +244,192 @@ describe('sessions', () => {
     s.markExited('b', 3)
     expect(s.sessions[0].exited).toBe(false)
     expect(s.sessions[1]).toMatchObject({ exited: true, exitCode: 3 })
+  })
+})
+
+describe('quests', () => {
+  it('loads the selected campaign\'s quests on startup', async () => {
+    const c = fakeClient()
+    const s = new AppStore(c)
+    await s.refresh()
+    await vi.waitFor(() => expect(s.quests).not.toBeNull())
+    expect(c.getQuests).toHaveBeenCalledWith('c1', false)
+    expect(s.questsFor).toBe('c1')
+    expect(s.quests?.quests.map((q) => q.number)).toEqual([1])
+    expect(s.questsLoading).toBe(false)
+    expect(s.questsError).toBeNull()
+  })
+
+  it('reloads when another campaign is selected, and clears the old quests at once', async () => {
+    const d = deferred<QuestResult>()
+    const getQuests = vi.fn()
+      .mockResolvedValueOnce(result([quest(1)]))
+      .mockReturnValueOnce(d.promise)
+    const s = new AppStore(fakeClient({ getQuests }))
+    await s.refresh()
+    await vi.waitFor(() => expect(s.quests).not.toBeNull())
+    s.selectQuest(1)
+    s.selectCampaign('c2')
+    expect(s.quests).toBeNull() // nothing of c1 under c2
+    expect(s.questNumber).toBeNull()
+    expect(s.questsLoading).toBe(true)
+    expect(getQuests).toHaveBeenLastCalledWith('c2', false)
+    d.resolve(result([quest(9)]))
+    await vi.waitFor(() => expect(s.quests?.quests[0].number).toBe(9))
+    expect(s.questsFor).toBe('c2')
+  })
+
+  it('drops a slow response that arrives after the campaign changed', async () => {
+    const slow = deferred<QuestResult>()
+    const getQuests = vi.fn()
+      .mockReturnValueOnce(slow.promise) // c1, slow
+      .mockResolvedValueOnce(result([quest(2)])) // c2, fast
+    const s = new AppStore(fakeClient({ getQuests }))
+    await s.refresh()
+    s.selectCampaign('c2')
+    await vi.waitFor(() => expect(s.quests?.quests[0].number).toBe(2))
+    slow.resolve(result([quest(1)])) // c1's answer finally lands
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(s.quests?.quests[0].number).toBe(2)
+    expect(s.questsLoading).toBe(false)
+  })
+
+  it('drops a slow failure too', async () => {
+    const slow = deferred<QuestResult>()
+    const getQuests = vi.fn()
+      .mockReturnValueOnce(slow.promise)
+      .mockResolvedValueOnce(result([quest(2)]))
+    const s = new AppStore(fakeClient({ getQuests }))
+    await s.refresh()
+    s.selectCampaign('c2')
+    await vi.waitFor(() => expect(s.quests).not.toBeNull())
+    slow.reject(new ApiError(502, 'late failure', 'upstream'))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(s.questsError).toBeNull()
+  })
+
+  it('keeps the server\'s error code so the panel can offer the right action', async () => {
+    const s = new AppStore(fakeClient({ getQuests: err(409, 'no repository', 'no_repo') }))
+    await s.refresh()
+    await vi.waitFor(() => expect(s.questsError).not.toBeNull())
+    expect(s.questsError).toEqual({ code: 'no_repo', message: 'no repository' })
+    expect(s.quests).toBeNull()
+    expect(s.questsLoading).toBe(false)
+    const plain = new AppStore(fakeClient({ getQuests: vi.fn(async () => { throw new Error('network down') }) }))
+    await plain.refresh()
+    await vi.waitFor(() => expect(plain.questsError?.code).toBe('error'))
+  })
+
+  it('refresh asks the server to bypass its cache', async () => {
+    const c = fakeClient()
+    const s = new AppStore(c)
+    await s.refresh()
+    await s.loadQuests(true)
+    expect(c.getQuests).toHaveBeenLastCalledWith('c1', true)
+  })
+
+  it('opens a quest, loads its detail, and can close it', async () => {
+    const c = fakeClient()
+    const s = new AppStore(c)
+    await s.refresh()
+    await s.selectQuest(7)
+    expect(c.getQuest).toHaveBeenCalledWith('c1', 7)
+    expect(s.questNumber).toBe(7)
+    expect(s.detail?.body).toBe('body 7')
+    expect(s.detailLoading).toBe(false)
+    s.closeQuest()
+    expect(s.questNumber).toBeNull()
+    expect(s.detail).toBeNull()
+  })
+
+  it('shows detail errors and ignores a slow detail after a newer click', async () => {
+    const bad = new AppStore(fakeClient({ getQuest: err(404, 'That issue was not found.', 'not_found') }))
+    await bad.refresh()
+    await bad.selectQuest(3)
+    expect(bad.detailError).toEqual({ code: 'not_found', message: 'That issue was not found.' })
+    expect(bad.detail).toBeNull()
+
+    const slow = deferred<QuestDetail>()
+    const getQuest = vi.fn().mockReturnValueOnce(slow.promise).mockResolvedValueOnce(detailOf(2))
+    const s = new AppStore(fakeClient({ getQuest }))
+    await s.refresh()
+    const first = s.selectQuest(1)
+    await s.selectQuest(2)
+    slow.resolve(detailOf(1))
+    await first
+    expect(s.questNumber).toBe(2)
+    expect(s.detail?.number).toBe(2)
+  })
+
+  it('closing the quest view cancels a detail still loading', async () => {
+    const slow = deferred<QuestDetail>()
+    const s = new AppStore(fakeClient({ getQuest: vi.fn().mockReturnValue(slow.promise) }))
+    await s.refresh()
+    const pending = s.selectQuest(1)
+    s.closeQuest()
+    slow.resolve(detailOf(1))
+    await pending
+    expect(s.detail).toBeNull()
+    expect(s.questNumber).toBeNull()
+  })
+
+  it('setDemo patches the campaign then reloads from the new source', async () => {
+    const c = fakeClient({
+      updateCampaign: vi.fn(async (id, p) => camp(id, { demo: p.demo })),
+      getQuests: vi.fn()
+        .mockResolvedValueOnce(result([quest(1)]))
+        .mockResolvedValueOnce(result([quest(100)], { source: 'demo', repo: undefined })),
+    })
+    const s = new AppStore(c)
+    await s.refresh()
+    await vi.waitFor(() => expect(s.quests).not.toBeNull())
+    expect(await s.setDemo(true)).toBe(true)
+    expect(c.updateCampaign).toHaveBeenCalledWith('c1', { demo: true })
+    expect(s.campaign?.demo).toBe(true)
+    expect(s.quests?.source).toBe('demo')
+    expect(s.quests?.quests[0].number).toBe(100)
+  })
+
+  it('setDemo reports failure without touching the quests', async () => {
+    const s = new AppStore(fakeClient({ updateCampaign: err(400, 'nope') }))
+    await s.refresh()
+    await vi.waitFor(() => expect(s.quests).not.toBeNull())
+    expect(await s.setDemo(true)).toBe(false)
+    expect(s.error).toBe('nope')
+    expect(s.quests).not.toBeNull()
+    const none = new AppStore(fakeClient({}, { campaigns: [] }))
+    await none.refresh()
+    expect(await none.setDemo(true)).toBe(false)
+  })
+
+  it('has nothing to load without a campaign', async () => {
+    const c = fakeClient({}, { campaigns: [] })
+    const s = new AppStore(c)
+    await s.refresh()
+    expect(c.getQuests).not.toHaveBeenCalled()
+    expect(s.quests).toBeNull()
+  })
+
+  it('removing the selected campaign loads the next one\'s quests', async () => {
+    const c = fakeClient()
+    const s = new AppStore(c)
+    await s.refresh()
+    await vi.waitFor(() => expect(s.questsFor).toBe('c1'))
+    await s.removeCampaign('c1')
+    await vi.waitFor(() => expect(s.questsFor).toBe('c2'))
+    expect(c.getQuests).toHaveBeenLastCalledWith('c2', false)
+  })
+
+  it('selecting a session of another campaign switches the quest list', async () => {
+    const c = fakeClient({}, { sessions: [sess('z', 'c2')] })
+    const s = new AppStore(c)
+    await s.refresh()
+    await vi.waitFor(() => expect(s.questsFor).not.toBeNull())
+    s.selectCampaign('c1')
+    s.selectSession('z')
+    expect(s.campaignId).toBe('c2')
+    expect(s.questsFor).toBe('c2')
   })
 })
