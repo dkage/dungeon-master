@@ -2,7 +2,7 @@
 
 A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents against GitHub issues. One button starts an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native webview shell.
 
-Status: M0-M3 done (skeleton, heroes and terminal, campaigns, GitHub quests list and detail). Next: M4 (start a hero from a quest). `PLAN_EXPERIENCE.md`, if present, reorders upcoming work; read it first. Plans: `PLAN.md` (v1), `PLAN_SKILLS.md` (skills), `release/PLAN_RELEASE.md` (releases), `PLAN_V2.md` (parking lot, not in v1). Read the relevant plan before building a milestone.
+Status: M0-M3 done; M3.5 (GitHub budget, local copy, scope) in progress, see `PLAN_M3_5.md` and `GLOSSARY.md`; M0-M3 are (skeleton, heroes and terminal, campaigns, GitHub quests list and detail). Next: M4 (start a hero from a quest). `PLAN_EXPERIENCE.md`, if present, reorders upcoming work; read it first. Plans: `PLAN.md` (v1), `PLAN_SKILLS.md` (skills), `release/PLAN_RELEASE.md` (releases), `PLAN_V2.md` (parking lot, not in v1). Read the relevant plan before building a milestone.
 
 ## Scope and principles
 
