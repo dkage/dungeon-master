@@ -4,25 +4,42 @@ import { fileURLToPath } from 'node:url'
 import { expect, test, type Page } from '@playwright/test'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const { url, workdir } = JSON.parse(readFileSync(join(here, '.url.json'), 'utf8')) as {
+const { url, workdir, subdir } = JSON.parse(readFileSync(join(here, '.url.json'), 'utf8')) as {
   url: string
   workdir: string
+  subdir: string
 }
 
+const nav = (page: Page) => page.getByRole('navigation', { name: 'Campaigns' })
+const hero = (page: Page, name: string) => page.getByRole('button', { name, exact: true })
+const screenText = (page: Page) => page.locator('.pane:not([hidden]) .xterm-rows')
+const expeditions = (page: Page, campaign = 'demo') =>
+  page.getByRole('list', { name: `Expeditions in ${campaign}` })
+
+async function addCampaign(page: Page, dir: string, name: string) {
+  await page.getByPlaceholder('/absolute/path/to/project').fill(dir)
+  await page.getByPlaceholder(/defaults to the folder/).fill(name)
+  await page.getByRole('button', { name: 'Add campaign' }).click()
+}
+
+// Opens the app signed in, with the "demo" campaign registered and selected,
+// and no leftover sessions. The tests share one server, so each starts clean.
 async function open(page: Page) {
   await page.goto(url) // exchanges the token for a cookie and redirects
-  await expect(page.getByRole('button', { name: 'Opus', exact: true })).toBeEnabled()
-  // The tests share one server, so start each from a clean slate.
-  const close = page.getByRole('button', { name: /^Close/ })
+  await expect(hero(page, 'Opus')).toBeVisible()
+  if ((await nav(page).getByRole('button', { name: /^demo/ }).count()) === 0) {
+    await addCampaign(page, workdir, 'demo')
+    await expect(nav(page).getByText('acme/demo')).toBeVisible()
+  }
+  await nav(page).getByRole('button', { name: /^demo/ }).click()
+  await expect(hero(page, 'Opus')).toBeEnabled()
+  const close = page.getByRole('button', { name: /^Close / })
   while ((await close.count()) > 0) {
     const before = await close.count()
     await close.first().click()
     await expect(close).toHaveCount(before - 1)
   }
-  await page.getByPlaceholder('/absolute/path/to/project').fill(workdir)
 }
-
-const screenText = (page: Page) => page.locator('.pane:not([hidden]) .xterm-rows')
 
 test('unauthenticated API access is refused, the page itself loads', async ({ playwright, baseURL }) => {
   const anon = await playwright.request.newContext({ baseURL })
@@ -31,15 +48,46 @@ test('unauthenticated API access is refused, the page itself loads', async ({ pl
   await anon.dispose()
 })
 
+test('a campaign shows the GitHub repo resolved from its git remote', async ({ page }) => {
+  await open(page)
+  await expect(nav(page).getByText('acme/demo')).toBeVisible()
+  await expect(page.locator('.toolbar')).toContainText('acme/demo')
+  await expect(page.locator('.toolbar')).toContainText(workdir)
+})
+
+test('a monorepo subfolder runs agents in the subfolder but uses the repository remote', async ({ page }) => {
+  await open(page)
+  await addCampaign(page, subdir, 'api')
+  await expect(page.locator('.toolbar')).toContainText('api')
+  await expect(page.locator('.toolbar')).toContainText('acme/demo') // from the git root's remote
+
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await expect(screenText(page)).toContainText('apps/api') // cwd is the subfolder
+
+  // Clean up so later tests start from one campaign.
+  await page.getByRole('button', { name: /^Close / }).click()
+  await page.getByRole('button', { name: 'Remove campaign api' }).click()
+  await page.getByRole('button', { name: 'Remove?' }).click()
+  await expect(nav(page).getByRole('button', { name: /^api/ })).toHaveCount(0)
+})
+
+test('adding the same directory twice is refused', async ({ page }) => {
+  await open(page)
+  await addCampaign(page, workdir, 'again')
+  await expect(page.getByRole('alert')).toContainText('already a campaign')
+  await expect(nav(page).getByRole('button', { name: /^again/ })).toHaveCount(0)
+})
+
 test('launch a hero, see its output, type to it', async ({ page }) => {
   await open(page)
-  await page.getByRole('button', { name: 'Opus', exact: true }).click()
+  await hero(page, 'Opus').click()
 
   const term = screenText(page)
   await expect(term).toContainText('FAKE-CLAUDE')
   await expect(term).toContainText('arg=[--model]')
   await expect(term).toContainText('arg=[claude-opus-5-5]')
-  await expect(term).toContainText(`cwd=`)
+  await expect(term).toContainText('cwd=')
 
   await page.locator('.pane:not([hidden]) .xterm').click()
   await page.keyboard.type('hello dungeon')
@@ -47,57 +95,69 @@ test('launch a hero, see its output, type to it', async ({ page }) => {
   await expect(term).toContainText('echo:hello dungeon')
 })
 
-test('two sessions are independent and a shell exit marks its tab', async ({ page }) => {
+test('two expeditions are independent and a shell exit is shown in the list', async ({ page }) => {
   await open(page)
-  await page.getByRole('button', { name: 'Opus', exact: true }).click()
+  await hero(page, 'Opus').click()
   await expect(screenText(page)).toContainText('FAKE-CLAUDE')
 
-  await page.getByRole('button', { name: 'Shell', exact: true }).click()
-  await expect(page.getByRole('tab')).toHaveCount(2)
+  await hero(page, 'Shell').click()
+  await expect(expeditions(page).getByRole('listitem')).toHaveCount(2)
   await page.locator('.pane:not([hidden]) .xterm').click()
   await page.keyboard.type('echo shell-only-marker')
   await page.keyboard.press('Enter')
   await expect(screenText(page)).toContainText('shell-only-marker')
   await expect(screenText(page)).not.toContainText('FAKE-CLAUDE')
 
-  // Back to the hero tab: its own output, none of the shell's.
-  await page.getByRole('tab', { name: /Opus/ }).click()
+  // Back to the hero: its own output, none of the shell's.
+  await expeditions(page).getByRole('button', { name: /^Opus/ }).click()
   await expect(screenText(page)).toContainText('FAKE-CLAUDE')
   await expect(screenText(page)).not.toContainText('shell-only-marker')
 
-  // Exit the shell: the tab is marked and keeps its scrollback.
-  await page.getByRole('tab', { name: /shell/ }).click()
+  // Exit the shell: it is marked in the list and keeps its scrollback.
+  await expeditions(page).getByRole('button', { name: /^shell/ }).click()
   await page.locator('.pane:not([hidden]) .xterm').click()
   await page.keyboard.type('exit 3')
   await page.keyboard.press('Enter')
-  await expect(page.getByText('exited 3')).toBeVisible()
+  await expect(expeditions(page).getByText('exit 3')).toBeVisible()
+  await expect(expeditions(page).getByText('exited with code 3')).toBeAttached()
   await expect(screenText(page)).toContainText('shell-only-marker')
 })
 
-test('closing a tab ends the session on the server', async ({ page }) => {
+test('a campaign with a running expedition cannot be removed', async ({ page }) => {
   await open(page)
-  await page.getByRole('button', { name: 'Shell', exact: true }).click()
-  await expect(page.getByRole('tab')).toHaveCount(1)
-  await page.getByRole('button', { name: /^Close/ }).click()
-  await expect(page.getByRole('tab')).toHaveCount(0)
-  await page.reload()
-  await expect(page.getByRole('button', { name: 'Opus', exact: true })).toBeEnabled()
-  await expect(page.getByRole('tab')).toHaveCount(0)
+  await addCampaign(page, subdir, 'busy')
+  await hero(page, 'Shell').click()
+  await expect(expeditions(page, 'busy').getByRole('listitem')).toHaveCount(1)
+
+  await page.getByRole('button', { name: 'Remove campaign busy' }).click()
+  await page.getByRole('button', { name: 'Remove?' }).click()
+  await expect(page.getByRole('alert')).toContainText('running sessions')
+  await expect(nav(page).getByRole('button', { name: /^busy/ })).toBeVisible()
+
+  // Close the expedition, then removal succeeds.
+  await page.getByRole('button', { name: /^Close / }).click()
+  await page.getByRole('button', { name: 'Remove campaign busy' }).click()
+  await page.getByRole('button', { name: 'Remove?' }).click()
+  await expect(nav(page).getByRole('button', { name: /^busy/ })).toHaveCount(0)
 })
 
-test('sessions survive a page reload and replay their scrollback', async ({ page }) => {
+test('closing an expedition ends it on the server', async ({ page }) => {
   await open(page)
-  await page.getByRole('button', { name: 'Opus', exact: true }).click()
-  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await hero(page, 'Shell').click()
+  await expect(expeditions(page).getByRole('listitem')).toHaveCount(1)
+  await page.getByRole('button', { name: /^Close / }).click()
+  await expect(page.getByRole('list', { name: /^Expeditions in/ })).toHaveCount(0)
   await page.reload()
-  await expect(page.getByRole('tab', { name: /Opus/ })).toBeVisible()
-  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await expect(hero(page, 'Opus')).toBeEnabled()
+  await expect(page.getByRole('list', { name: /^Expeditions in/ })).toHaveCount(0)
 })
 
-test('a bad directory is reported in the page', async ({ page }) => {
+test('campaigns and expeditions survive a page reload, with scrollback replayed', async ({ page }) => {
   await open(page)
-  await page.getByPlaceholder('/absolute/path/to/project').fill('/definitely/not/here')
-  await page.getByRole('button', { name: 'Opus', exact: true }).click()
-  await expect(page.getByRole('alert')).toContainText('not an existing directory')
-  await expect(page.getByRole('tab')).toHaveCount(0)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await page.reload()
+  await expect(nav(page).getByRole('button', { name: /^demo/ })).toBeVisible()
+  await expect(expeditions(page).getByRole('button', { name: /^Opus/ })).toBeVisible()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
 })
