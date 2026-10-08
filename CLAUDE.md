@@ -1,24 +1,46 @@
 # Dungeon Master
 
-A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents against GitHub issues. One button starts an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native webview shell.
+A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents against GitHub issues. One button starts
+an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native
+webview shell.
 
-Status: M0-M3 done. M3.5 (GitHub budget and scope, `PLAN_M3_5.md`) is in progress, in parallel with M3.6 (first run and words, `PLAN_EXPERIENCE.md`); then M4. Themed words: `GLOSSARY.md`.
+Status: M0-M3 done. M3.5 (GitHub budget and scope, `PLAN_M3_5.md`) is in progress, in parallel with M3.6 (first run and
+words, `PLAN_EXPERIENCE.md`); then M4. Themed words: `GLOSSARY.md`.
 
 ## Scope and principles
 
-- **v1 is Claude Code only.** Keep one `Launcher` seam; do not build an adapter registry, typed-prompt fallback or per-agent detection until the later multi-agent plan.
-- **Invisible to the team.** All config is local (user state dir). No committed config files and no `.dungeon/` folder in user repos. The RPG theme exists only in the app UI; anything written to git or GitHub uses neutral wording. GitHub write-back is opt-in, off by default.
-- **State files** (`campaigns.json`, `sessions.json`, `party.toml`) live in the user config dir (`DUNGEON_HOME` overrides it), written atomically with 0600/0700 permissions. Derived data (git root, owner/repo) is recomputed on load, never persisted.
-- **Execution config stays local.** Heroes (model, flags, env, binary path) live in the user's `party.toml`, never in anything a repo can supply.
-- **GitHub credentials** come from `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`; they are used for GitHub requests only and never stored, logged, put in an error or sent to the browser. `DUNGEON_GITHUB_ENDPOINT` (tests only) accepts loopback URLs and nothing else.
-- **Issue text is untrusted.** Markdown is cut to a bare-tag allowlist, then sanitised; never pass anything but `renderMarkdown` output to `{@html}`.
-- **Localhost is an attack surface.** Loopback bind only, an access token kept in the config dir (0600) so a signed-in browser survives restarts, rotated with `dungeon serve --new-token`; strict Host/Origin checks, JSON-only writes. Tests must never touch the real config dir (`cmd/dungeon` has a `TestMain` that redirects `DUNGEON_HOME`). Treat any weakening of `internal/server/guard.go` as a release blocker. The CSP deliberately allows inline *styles* (xterm.js builds its font, colour and selection rules as `<style>` elements; blocking them breaks the terminal) but never inline or foreign scripts; both are covered by tests. Issue text is untrusted input to agents.
-- **Own as little as possible for skills.** Use Matt Pocock's skills (MIT) as a pinned external source; fork only on a real gap, keeping his notice and credits.
-- **Independent design.** Write from the behaviour in the plans; do not copy code, prose or assets from other projects. `private/` is gitignored local notes: never commit it, never quote from it in tracked files.
+- **v1 is Claude Code only.** Keep one `Launcher` seam; do not build an adapter registry, typed-prompt fallback or
+  per-agent detection until the later multi-agent plan.
+- **Invisible to the team.** All config is local (user state dir). No committed config files and no `.dungeon/` folder
+  in user repos. The RPG theme exists only in the app UI; anything written to git or GitHub uses neutral wording. GitHub
+  write-back is opt-in, off by default.
+- **State files** (`campaigns.json`, `sessions.json`, `party.toml`) live in the user config dir (`DUNGEON_HOME`
+  overrides it), written atomically with 0600/0700 permissions. Derived data (git root, owner/repo) is recomputed on
+  load, never persisted.
+- **Execution config stays local.** Heroes (model, flags, env, binary path) live in the user's `party.toml`, never in
+  anything a repo can supply.
+- **GitHub credentials** come from `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`; they are used for GitHub requests only
+  and never stored, logged, put in an error or sent to the browser. `DUNGEON_GITHUB_ENDPOINT` (tests only) accepts
+  loopback URLs and nothing else.
+- **Issue text is untrusted.** Markdown is cut to a bare-tag allowlist, then sanitised; never pass anything but
+  `renderMarkdown` output to `{@html}`.
+- **Localhost is an attack surface.** Loopback bind only, an access token kept in the config dir (0600) so a signed-in
+  browser survives restarts, rotated with `dungeon serve --new-token`; strict Host/Origin checks, JSON-only writes.
+  Tests must never touch the real config dir (`cmd/dungeon` has a `TestMain` that redirects `DUNGEON_HOME`). Treat any
+  weakening of `internal/server/guard.go` as a release blocker. The CSP deliberately allows inline *styles* (xterm.js
+  builds its font, colour and selection rules as `<style>` elements; blocking them breaks the terminal) but never inline
+  or foreign scripts; both are covered by tests. Issue text is untrusted input to agents.
+- **Own as little as possible for skills.** Use Matt Pocock's skills (MIT) as a pinned external source; fork only on a
+  real gap, keeping his notice and credits.
+- **Independent design.** Write from the behaviour in the plans; do not copy code, prose or assets from other projects.
+  `private/` is gitignored local notes: never commit it, never quote from it in tracked files.
 
 ## Vocabulary (UI only)
 
-Campaign = registered working directory (issues come from the git root's remote). Quest = GitHub issue. Hero = a registered Claude configuration. Spell = skill. Expedition = live session. Briefing = generated context file. Dungeon Master = the room graph of quests. Keep these terms out of GitHub-facing text and out of Go identifiers where a neutral name is clearer.
+Campaign = registered working directory (issues come from the git root's remote). Quest = GitHub issue. Hero = a
+registered Claude configuration. Spell = skill. Expedition = live session. Briefing = generated context file. Dungeon
+Master = the room graph of quests. Keep these terms out of GitHub-facing text and out of Go identifiers where a neutral
+name is clearer.
 
 ## Layout
 
@@ -53,15 +75,25 @@ make test-linux # Go tests in a Linux container (needs Docker); PTY behaviour di
 make test-e2e  # browser tests against bin/dungeon (needs `npx playwright install chromium` once)
 ```
 
-`go build` and `go test` must work on a fresh clone with no frontend toolchain (the server falls back to a built-in page). Frontend dev: run `dungeon serve`, open its URL once (sets the cookie), then `cd web && npm run dev` and browse http://127.0.0.1:5173 (the Vite proxy forwards /api and websockets). The future native webview shell needs cgo and is built separately, never by the portable build.
+`go build` and `go test` must work on a fresh clone with no frontend toolchain (the server falls back to a built-in
+page). Frontend dev: run `dungeon serve`, open its URL once (sets the cookie), then `cd web && npm run dev` and browse
+http://127.0.0.1:5173 (the Vite proxy forwards /api and websockets). The future native webview shell needs cgo and is
+built separately, never by the portable build.
 
 ## Conventions
 
 - Go 1.26, stdlib first. Dependencies must be permissive-licensed and justified. Run `gofmt`; keep `go vet ./...` clean.
-- **Test everything, at two levels.** Every change ships with unit tests (pure logic, parsing, validation) and feature tests that drive the real behaviour end to end: HTTP + websocket against `httptest`, a real PTY running a stub program, the frontend through its public UI. No feature is done without both. Security-relevant behaviour (guard, path confinement, argv building, env scrubbing) always has tests, including the hostile cases.
-- Tests live beside the code (`*_test.go`); shared fixtures and a fake `claude` stub go in `internal/testutil`. Never call the real `claude`, `gh` or the network in automated tests; real-CLI checks are manual probes in the gitignored `_probe/`.
+- **Test everything, at two levels.** Every change ships with unit tests (pure logic, parsing, validation) and feature
+  tests that drive the real behaviour end to end: HTTP + websocket against `httptest`, a real PTY running a stub
+  program, the frontend through its public UI. No feature is done without both. Security-relevant behaviour (guard, path
+  confinement, argv building, env scrubbing) always has tests, including the hostile cases.
+- Tests live beside the code (`*_test.go`); shared fixtures and a fake `claude` stub go in `internal/testutil`. Never
+  call the real `claude`, `gh` or the network in automated tests; real-CLI checks are manual probes in the gitignored
+  `_probe/`.
 - Never build a command line through a shell; exec argv directly.
-- Module path is `github.com/dkage/dungeon-master`. The product name "Dungeon Master" is provisional: it appears in prose and UI text only, while the binary, config directory and `DUNGEON_HOME` keep the short `dungeon` name so a later rename stays cheap.
+- Module path is `github.com/dkage/dungeon-master`. The product name "Dungeon Master" is provisional: it appears in
+  prose and UI text only, while the binary, config directory and `DUNGEON_HOME` keep the short `dungeon` name so a later
+  rename stays cheap.
 - Default branch is `master`.
 
 ## Git commits
@@ -79,18 +111,26 @@ design so the work can start from a shared reference.
 - PLAN_SKILLS.md: how skills map to quests and launch buttons.
 ```
 
-- Subject: `type: imperative lowercase summary`, no trailing period, about 50 characters (72 hard limit). Optional scope: `feat(server): ...`.
-- Types: `feat`, `fix`, `docs`, `chore` (scaffolding, deps), `build` (packaging, Makefile, release), `ci`, `test`, `refactor`, `perf`.
-- Blank line, then a body wrapped at 72 columns. Say what the change is and why; the diff already says how. Use `- file/area: note` bullets for multi-part commits.
+- Subject: `type: imperative lowercase summary`, no trailing period, about 50 characters (72 hard limit). Optional
+  scope: `feat(server): ...`.
+- Types: `feat`, `fix`, `docs`, `chore` (scaffolding, deps), `build` (packaging, Makefile, release), `ci`, `test`,
+  `refactor`, `perf`.
+- Blank line, then a body wrapped at 72 columns. Say what the change is and why; the diff already says how. Use
+  `- file/area: note` bullets for multi-part commits.
 - Breaking changes: `!` after the type and a `BREAKING CHANGE:` footer.
 - One logical change per commit. Commit only when asked.
-- **No attribution of any kind**: no `Co-Authored-By`, no `Claude-Session:` trailer, no "Generated with" line, in commits or PR bodies.
+- **No attribution of any kind**: no `Co-Authored-By`, no `Claude-Session:` trailer, no "Generated with" line, in
+  commits or PR bodies.
 - Do not amend or rewrite commits that have been pushed.
-- Releases are automated from these messages (release-please, see `release/PLAN_RELEASE.md` §3): the type decides the version bump and the changelog entry. PRs are squash-merged with a Conventional Commit PR title. Never hand-edit `CHANGELOG.md`, the release manifest or version numbers.
+- Releases are automated from these messages (release-please, see `release/PLAN_RELEASE.md` §3): the type decides the
+  version bump and the changelog entry. PRs are squash-merged with a Conventional Commit PR title. Never hand-edit
+  `CHANGELOG.md`, the release manifest or version numbers.
 
 ## Milestones
 
-M0 skeleton, M1 heroes and terminal, M2 campaigns, M3 GitHub quests, M4 briefing and launch from a quest, M5 spells, M6 dungeon map, M7 hooks status and notifications, M8 packaging and release. Details in `PLAN.md` §11 and `PLAN_SKILLS.md` §7.
+M0 skeleton, M1 heroes and terminal, M2 campaigns, M3 GitHub quests, M4 briefing and launch from a quest, M5 spells, M6
+dungeon map, M7 hooks status and notifications, M8 packaging and release. Details in `PLAN.md` §11 and `PLAN_SKILLS.md`
+§7.
 
 ## Open verifications (do early)
 

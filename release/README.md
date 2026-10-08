@@ -1,22 +1,24 @@
 # release/
 
-Everything about shipping Dungeon Master: plan, build scripts, packaging assets and release checks. Planned and mostly not built yet.
+Everything about shipping Dungeon Master: plan, build scripts, packaging assets and release checks. Planned and mostly
+not built yet.
 
 ## Index
 
-| File / dir | What it is | Status |
-|---|---|---|
-| [PLAN_RELEASE.md](PLAN_RELEASE.md) | The release plan: artifacts, pipeline, signing ladder, phases R0–R6 | written |
+| File / dir                                                    | What it is                                                                                               | Status       |
+|---------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|--------------|
+| [PLAN_RELEASE.md](PLAN_RELEASE.md)                            | The release plan: artifacts, pipeline, signing ladder, phases R0–R6                                      | written      |
 | `release-please-config.json`, `.release-please-manifest.json` | Automated versioning and `CHANGELOG.md` from Conventional Commits (config present, workflow lands in R0) | config ready |
-| `goreleaser.yaml` | Portable binaries, archives, checksums, changelog, Homebrew cask | R0 |
-| `macos/` | `.app` bundle and `.dmg` scripts, plist template, icons, first-launch README | R1 |
-| `linux/` | AppImage, nfpm (deb/rpm), desktop and metainfo files | R2 |
-| `windows/` | WebView2 shell packaging | later |
-| `scripts/` | Version stamping, asset-set verification, per-artifact smoke tests | R0–R2 |
+| `goreleaser.yaml`                                             | Portable binaries, archives, checksums, changelog, Homebrew cask                                         | R0           |
+| `macos/`                                                      | `.app` bundle and `.dmg` scripts, plist template, icons, first-launch README                             | R1           |
+| `linux/`                                                      | AppImage, nfpm (deb/rpm), desktop and metainfo files                                                     | R2           |
+| `windows/`                                                    | WebView2 shell packaging                                                                                 | later        |
+| `scripts/`                                                    | Version stamping, asset-set verification, per-artifact smoke tests                                       | R0–R2        |
 
 ## What lives elsewhere, and why
 
-- `.github/workflows/release.yml`, `ci.yml`: GitHub only reads workflows from there. Keep them thin; they call scripts here.
+- `.github/workflows/release.yml`, `ci.yml`: GitHub only reads workflows from there. Keep them thin; they call scripts
+  here.
 - `Makefile` (repo root): thin entry points (`make snapshot`, `make dmg`, ...) that delegate here.
 - `cmd/shell/` (planned): the cgo webview program that gets packaged; it is code, not release tooling.
 
@@ -26,7 +28,8 @@ Everything about shipping Dungeon Master: plan, build scripts, packaging assets 
 - No generated output is committed (`build/` and `dist/` are gitignored).
 - No secrets, certificates or tokens in the repo. Secrets are CI secrets only.
 - Artwork and templates here are our own; do not import third-party assets.
-- Scripts are POSIX `sh` or bash with `set -euo pipefail`, take everything as arguments or env vars, and print what they do.
+- Scripts are POSIX `sh` or bash with `set -euo pipefail`, take everything as arguments or env vars, and print what they
+  do.
 
 ## Cutting a release (once R0–R3 exist)
 

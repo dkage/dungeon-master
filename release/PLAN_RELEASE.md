@@ -1,8 +1,11 @@
 # Release plan
 
-How Dungeon Master is versioned, built, packaged, verified and distributed. Everything release-related lives in this directory; the only exceptions are files GitHub forces elsewhere (`.github/workflows/`) and thin `Makefile` entry points that delegate here.
+How Dungeon Master is versioned, built, packaged, verified and distributed. Everything release-related lives in this
+directory; the only exceptions are files GitHub forces elsewhere (`.github/workflows/`) and thin `Makefile` entry points
+that delegate here.
 
-Status: planned, nothing implemented. Aligns with milestone M8 in `../PLAN.md`, but the first pieces land much earlier (see §10).
+Status: planned, nothing implemented. Aligns with milestone M8 in `../PLAN.md`, but the first pieces land much earlier
+(see §10).
 
 ## 1. Goals
 
@@ -11,67 +14,84 @@ Status: planned, nothing implemented. Aligns with milestone M8 in `../PLAN.md`, 
 3. A broken release step is found by a dry run, not by the real tag.
 4. Trust is added in order of payoff: integrity first, then signing, then convenience.
 
-Non-goals for now: `go install` (the embedded frontend makes it unusable), auto-updating, Windows native shell, Intel macOS.
+Non-goals for now: `go install` (the embedded frontend makes it unusable), auto-updating, Windows native shell, Intel
+macOS.
 
 ## 2. Artifacts
 
-| Artifact | Built by | Where | Needs cgo | Phase |
-|---|---|---|---|---|
-| Portable binary (`dungeon serve`, browser mode), darwin/linux/windows × amd64/arm64, tar.gz/zip | GoReleaser, one Linux job | ubuntu | no | R0 |
-| `checksums.txt` | GoReleaser | ubuntu | no | R0 |
-| macOS app: `Dungeon Master.app` in a `.dmg` (arm64) + `.sha256` | script in `release/macos/` | macos arm64 runner | yes | R1 |
-| Linux AppImage (amd64, arm64) | script in `release/linux/` | ubuntu + ubuntu-arm | yes | R2 |
-| `.deb` / `.rpm` | nfpm | ubuntu | yes (shell) | later |
-| Windows shell (WebView2) | script in `release/windows/` | windows | yes | later |
-| Build provenance attestations for all of the above | GitHub Actions | any | no | R3 |
-| Homebrew cask | GoReleaser | ubuntu | no | R4 |
+| Artifact                                                                                        | Built by                     | Where               | Needs cgo   | Phase |
+|-------------------------------------------------------------------------------------------------|------------------------------|---------------------|-------------|-------|
+| Portable binary (`dungeon serve`, browser mode), darwin/linux/windows × amd64/arm64, tar.gz/zip | GoReleaser, one Linux job    | ubuntu              | no          | R0    |
+| `checksums.txt`                                                                                 | GoReleaser                   | ubuntu              | no          | R0    |
+| macOS app: `Dungeon Master.app` in a `.dmg` (arm64) + `.sha256`                                 | script in `release/macos/`   | macos arm64 runner  | yes         | R1    |
+| Linux AppImage (amd64, arm64)                                                                   | script in `release/linux/`   | ubuntu + ubuntu-arm | yes         | R2    |
+| `.deb` / `.rpm`                                                                                 | nfpm                         | ubuntu              | yes (shell) | later |
+| Windows shell (WebView2)                                                                        | script in `release/windows/` | windows             | yes         | later |
+| Build provenance attestations for all of the above                                              | GitHub Actions               | any                 | no          | R3    |
+| Homebrew cask                                                                                   | GoReleaser                   | ubuntu              | no          | R4    |
 
 The browser-mode portable binary is always the fallback: a broken native shell must never block a release.
 
 ## 3. Versioning, changelog, tags (automated)
 
-Tool: **release-please** (manifest mode, `release-type: go`). Config lives in `release/release-please-config.json` and `release/.release-please-manifest.json`; the workflow points at them with `config-file` / `manifest-file`.
+Tool: **release-please** (manifest mode, `release-type: go`). Config lives in `release/release-please-config.json` and
+`release/.release-please-manifest.json`; the workflow points at them with `config-file` / `manifest-file`.
 
 How it works:
 1. Commits land on `master` as Conventional Commits.
-2. On every push, release-please opens or updates one **release PR**: it computes the next version from the commits, rewrites `CHANGELOG.md`, and bumps the manifest.
+2. On every push, release-please opens or updates one **release PR**: it computes the next version from the commits,
+   rewrites `CHANGELOG.md`, and bumps the manifest.
 3. A human reviews and merges that PR. This is the release gate.
 4. On merge, release-please creates the tag `vX.Y.Z` and a **draft** GitHub release whose notes are the changelog entry.
 5. The build jobs (§4) run in the same workflow run, upload assets to the draft, and the final job publishes it.
 
 Version rules (pre-1.0, `bump-minor-pre-major: true`):
-| Commit | Bump |
-|---|---|
-| `fix`, `perf` | patch |
-| `feat` | minor |
-| `feat!` / `BREAKING CHANGE:` | minor while `0.x`, major after `1.0.0` |
-| `docs`, `chore`, `ci`, `test`, `refactor` | no release by themselves; hidden from the changelog |
-| `build` | shown in the changelog under "Build and packaging" |
 
-- The manifest starts at `0.0.0`, so the first `feat` proposes `0.1.0`. To force a version (for example `1.0.0` later), put a `Release-As: 1.0.0` footer in a commit.
-- Never edit `CHANGELOG.md`, the manifest or a version by hand; the release PR owns them. Fix a bad changelog line by editing the commit message or the release PR before merge.
+| Commit                                    | Bump                                                |
+|-------------------------------------------|-----------------------------------------------------|
+| `fix`, `perf`                             | patch                                               |
+| `feat`                                    | minor                                               |
+| `feat!` / `BREAKING CHANGE:`              | minor while `0.x`, major after `1.0.0`              |
+| `docs`, `chore`, `ci`, `test`, `refactor` | no release by themselves; hidden from the changelog |
+| `build`                                   | shown in the changelog under "Build and packaging"  |
+
+- The manifest starts at `0.0.0`, so the first `feat` proposes `0.1.0`. To force a version (for example `1.0.0` later),
+  put a `Release-As: 1.0.0` footer in a commit.
+- Never edit `CHANGELOG.md`, the manifest or a version by hand; the release PR owns them. Fix a bad changelog line by
+  editing the commit message or the release PR before merge.
 - Version, commit and date are stamped into both binaries with `-ldflags -X` from the tag.
-- Pipeline testing uses the dry-run workflow (§10). release-please has prerelease options (`prerelease`, `prerelease-type`); verify them before relying on an `-rc.N` flow.
+- Pipeline testing uses the dry-run workflow (§10). release-please has prerelease options (`prerelease`,
+  `prerelease-type`); verify them before relying on an `-rc.N` flow.
 
 Commit hygiene this depends on:
-- Merge PRs with **squash**, using the PR title as the commit subject, so the title must be a Conventional Commit. Enforce it with a PR-title check in CI.
+- Merge PRs with **squash**, using the PR title as the commit subject, so the title must be a Conventional Commit.
+  Enforce it with a PR-title check in CI.
 - One logical change per PR keeps changelog entries meaningful.
 
 ### Why not the alternatives
 
-| Option | Verdict |
-|---|---|
-| **release-please** | Chosen. No Node toolchain, the release PR is a human gate, writes `CHANGELOG.md`, supports draft releases and Go. |
-| semantic-release | Node-based plugin chain; releases straight from a push with no review gate. Works, but heavier and less control for a Go repo. |
+| Option                             | Verdict                                                                                                                                           |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
+| **release-please**                 | Chosen. No Node toolchain, the release PR is a human gate, writes `CHANGELOG.md`, supports draft releases and Go.                                 |
+| semantic-release                   | Node-based plugin chain; releases straight from a push with no review gate. Works, but heavier and less control for a Go repo.                    |
 | Manual tags + GoReleaser changelog | Simplest: you pick the version and push the tag, GoReleaser writes the notes from commits. No release PR and no changelog file. A valid fallback. |
-| `svu` + GoReleaser | Same, but the next tag is computed from commits. Good fallback if release-please becomes a burden. |
-| git-cliff | Changelog generator only; still needs something to decide versions and tag. |
+| `svu` + GoReleaser                 | Same, but the next tag is computed from commits. Good fallback if release-please becomes a burden.                                                |
+| git-cliff                          | Changelog generator only; still needs something to decide versions and tag.                                                                       |
 
 ### Known sharp edges (checked against the release-please docs)
-- With `draft: true`, GitHub does not create the tag until the release is published, which makes the next run lose track of the previous release and produce a changelog of the whole history. `force-tag-creation: true` (set in our config) creates the tag immediately and avoids this.
-- Anything release-please creates with the default `GITHUB_TOKEN` (the PR, the tag, the release) does **not** trigger other workflows. Consequences: (1) our build jobs must live in the same workflow as release-please and run off its outputs (`release_created`, `tag_name`), not on a `tag`/`release` trigger; (2) CI will not run on the release PR unless the action uses a PAT or GitHub App token (`RELEASE_PLEASE_TOKEN`). Start with `GITHUB_TOKEN`; switch only if branch protection requires checks on the release PR.
-- GoReleaser must not also create the release or write its own changelog: use it to build archives and checksums only (`--skip=publish`, `changelog.disable: true`), and upload to the existing draft with `gh release upload`.
-- Config paths: `packages` paths and `changelog-path` are relative to the repo root even though the config file sits in `release/`. Confirm on the first dry run.
+
+- With `draft: true`, GitHub does not create the tag until the release is published, which makes the next run lose track
+  of the previous release and produce a changelog of the whole history. `force-tag-creation: true` (set in our config)
+  creates the tag immediately and avoids this.
+- Anything release-please creates with the default `GITHUB_TOKEN` (the PR, the tag, the release) does **not** trigger
+  other workflows. Consequences: (1) our build jobs must live in the same workflow as release-please and run off its
+  outputs (`release_created`, `tag_name`), not on a `tag`/`release` trigger; (2) CI will not run on the release PR
+  unless the action uses a PAT or GitHub App token (`RELEASE_PLEASE_TOKEN`). Start with `GITHUB_TOKEN`; switch only if
+  branch protection requires checks on the release PR.
+- GoReleaser must not also create the release or write its own changelog: use it to build archives and checksums only
+  (`--skip=publish`, `changelog.disable: true`), and upload to the existing draft with `gh release upload`.
+- Config paths: `packages` paths and `changelog-path` are relative to the repo root even though the config file sits in
+  `release/`. Confirm on the first dry run.
 
 ## 4. Pipeline
 
@@ -89,11 +109,13 @@ push to master
 ```
 
 Rules:
-- All jobs live in one workflow (`release.yml`) and run only when `release_created` is true; see §3 for why they cannot trigger off the tag.
+- All jobs live in one workflow (`release.yml`) and run only when `release_created` is true; see §3 for why they cannot
+  trigger off the tag.
 - Jobs upload to the **draft**; only the final job publishes, and only if every required job succeeded.
 - Each job rebuilds the frontend (`make web`) from the same commit; no cross-job build artifacts besides uploads.
 - Best-effort jobs (Windows shell) may fail without blocking; required ones may not.
-- The final job checks the expected asset names exist before publishing, so a silently skipped job cannot ship a partial release.
+- The final job checks the expected asset names exist before publishing, so a silently skipped job cannot ship a partial
+  release.
 
 ## 5. Directory layout (target)
 
@@ -122,7 +144,8 @@ release/
     smoke-*.sh           launch the built artifact, hit /api/health
 ```
 
-Not here, by necessity: `.github/workflows/release.yml` and `ci.yml`. They stay thin: set up toolchains, then call scripts in `release/` or `make` targets, so a release step can be run locally.
+Not here, by necessity: `.github/workflows/release.yml` and `ci.yml`. They stay thin: set up toolchains, then call
+scripts in `release/` or `make` targets, so a release step can be run locally.
 
 The root `Makefile` keeps only entry points (`make snapshot`, `make dmg`, `make appimage`) that delegate to `release/`.
 
@@ -132,61 +155,74 @@ Build steps (script, on a macOS arm64 runner):
 1. Build the shell: `CGO_ENABLED=1 go build -tags webview -trimpath -ldflags "..."`.
 2. Assemble `Dungeon Master.app/Contents/{MacOS,Resources,Info.plist}`; the binary is `MacOS/dungeon`.
 3. Icon: render the source PNG to the required sizes with `sips`, bundle with `iconutil -c icns`.
-4. `Info.plist`: bundle id, display name, short version (strip pre-release suffix) and full version, minimum macOS read from the binary (`otool -l` → `minos`), `NSHighResolutionCapable`, category.
+4. `Info.plist`: bundle id, display name, short version (strip pre-release suffix) and full version, minimum macOS read
+   from the binary (`otool -l` → `minos`), `NSHighResolutionCapable`, category.
 5. Sign (see ladder below) and `codesign --verify --strict`.
-6. DMG: stage the app, an `/Applications` symlink and a plain-text README, `hdiutil create -format UDZO`, `hdiutil verify`, write `.sha256`. No styled window.
+6. DMG: stage the app, an `/Applications` symlink and a plain-text README, `hdiutil create -format UDZO`,
+   `hdiutil verify`, write `.sha256`. No styled window.
 7. Smoke: mount or unpack, launch, wait for the health endpoint, quit.
 
 Trust ladder:
-| Stage | Signing | User experience | When |
-|---|---|---|---|
-| 1 | ad-hoc (`codesign --sign -`) | Gatekeeper blocks first launch; Open Anyway in System Settings | R1 |
-| 2 | Developer ID Application cert, hardened runtime, `--timestamp` | still needs notarization to be quiet | R5 |
-| 3 | + `notarytool submit --wait` + `stapler staple` | opens normally, works offline | R5 |
 
-Architecture: arm64 only at first. The architecture is in the file name. Universal or Intel needs two cgo builds joined with `lipo`; decide later.
+| Stage | Signing                                                        | User experience                                                | When |
+|-------|----------------------------------------------------------------|----------------------------------------------------------------|------|
+| 1     | ad-hoc (`codesign --sign -`)                                   | Gatekeeper blocks first launch; Open Anyway in System Settings | R1   |
+| 2     | Developer ID Application cert, hardened runtime, `--timestamp` | still needs notarization to be quiet                           | R5   |
+| 3     | + `notarytool submit --wait` + `stapler staple`                | opens normally, works offline                                  | R5   |
+
+Architecture: arm64 only at first. The architecture is in the file name. Universal or Intel needs two cgo builds joined
+with `lipo`; decide later.
 
 ## 7. Linux and Windows
 
-- **AppImage** (bundles WebKitGTK): build on the oldest reasonable Ubuntu LTS runner for glibc compatibility; arm64 on an arm runner. Smoke on a bare container with no WebKit installed.
+- **AppImage** (bundles WebKitGTK): build on the oldest reasonable Ubuntu LTS runner for glibc compatibility; arm64 on
+  an arm runner. Smoke on a bare container with no WebKit installed.
 - **deb/rpm** via nfpm depend on the distro's WebKitGTK; smoke on Ubuntu LTS and Fedora containers.
-- **Windows:** ship the portable binary first. A ConPTY round-trip smoke test runs on `windows-latest` from the start, because PTY behaviour differs most there. The WebView2 shell comes later.
+- **Windows:** ship the portable binary first. A ConPTY round-trip smoke test runs on `windows-latest` from the start,
+  because PTY behaviour differs most there. The WebView2 shell comes later.
 
 ## 8. Supply chain and integrity
 
 From R0: `checksums.txt`; workflows declare least-privilege `permissions` per job; `govulncheck` in CI.
-From R3: GitHub artifact attestations (build provenance) for every released asset; third-party actions pinned to commit SHAs (kept updated by Dependabot); optional SBOM.
+From R3: GitHub artifact attestations (build provenance) for every released asset; third-party actions pinned to commit
+SHAs (kept updated by Dependabot); optional SBOM.
 Never: telemetry, hosted services, or user accounts; the README promise stays true.
 
-Secrets (added only when needed): `RELEASE_PLEASE_TOKEN` (PAT or GitHub App token, only if CI must run on the release PR), Developer ID certificate (base64) + password, notarization credentials (API key), tap repo token. None are needed before R5/R4.
+Secrets (added only when needed): `RELEASE_PLEASE_TOKEN` (PAT or GitHub App token, only if CI must run on the release
+PR), Developer ID certificate (base64) + password, notarization credentials (API key), tap repo token. None are needed
+before R5/R4.
 
 ## 9. Distribution
 
 1. GitHub Releases (always).
 2. Homebrew cask in a personal tap, generated by GoReleaser (R4): `brew install --cask`.
-3. In-app "new version available" notice reading the GitHub releases API, notify-only. Auto-install only after Developer ID signing exists.
+3. In-app "new version available" notice reading the GitHub releases API, notify-only. Auto-install only after Developer
+   ID signing exists.
 4. Later, on demand: AUR, winget, Linux repos.
 
 ## 10. Dry runs and testing
 
-- `goreleaser release --snapshot --clean --skip=publish` locally and in CI on every PR that touches `release/` or workflows.
-- `release.yml` has `workflow_dispatch` with a `dry_run` input: runs all build jobs, uploads artifacts to the run, creates no release.
+- `goreleaser release --snapshot --clean --skip=publish` locally and in CI on every PR that touches `release/` or
+  workflows.
+- `release.yml` has `workflow_dispatch` with a `dry_run` input: runs all build jobs, uploads artifacts to the run,
+  creates no release.
 - The first real release goes through at least one dry run on a branch or fork.
 - Every artifact has a smoke test that runs the built file and checks `/api/health` with the token flow.
 - `verify-assets.sh` runs in the publish job and in dry runs.
-- Walking skeleton: build the pipeline against the current placeholder so every later milestone ships through a pipeline that already works.
+- Walking skeleton: build the pipeline against the current placeholder so every later milestone ships through a pipeline
+  that already works.
 
 ## 11. Phases
 
-| Phase | Contents | Land alongside |
-|---|---|---|
-| R0 | `release.yml` with the release-please job, PR-title check, `release/goreleaser.yaml` (build only), snapshot in CI, portable archives + checksums uploaded to the draft, `govulncheck`, version stamping, dry-run workflow | M2 |
-| R1 | shell binary (`cmd/shell`, build tag `webview`), macOS `.app`/`.dmg` scripts, ad-hoc signing, smoke, draft→publish job | M2–M3 |
-| R2 | Linux AppImage + smoke, Windows ConPTY smoke | M4 |
-| R3 | attestations, SHA-pinned actions, Dependabot | before first public tag |
-| R4 | Homebrew cask tap | after first public tag |
-| R5 | Developer ID signing + notarization, then optional update notice | when others use the app |
-| R6 | deb/rpm, Windows shell, Intel/universal macOS | on demand |
+| Phase | Contents                                                                                                                                                                                                                  | Land alongside          |
+|-------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|
+| R0    | `release.yml` with the release-please job, PR-title check, `release/goreleaser.yaml` (build only), snapshot in CI, portable archives + checksums uploaded to the draft, `govulncheck`, version stamping, dry-run workflow | M2                      |
+| R1    | shell binary (`cmd/shell`, build tag `webview`), macOS `.app`/`.dmg` scripts, ad-hoc signing, smoke, draft→publish job                                                                                                    | M2–M3                   |
+| R2    | Linux AppImage + smoke, Windows ConPTY smoke                                                                                                                                                                              | M4                      |
+| R3    | attestations, SHA-pinned actions, Dependabot                                                                                                                                                                              | before first public tag |
+| R4    | Homebrew cask tap                                                                                                                                                                                                         | after first public tag  |
+| R5    | Developer ID signing + notarization, then optional update notice                                                                                                                                                          | when others use the app |
+| R6    | deb/rpm, Windows shell, Intel/universal macOS                                                                                                                                                                             | on demand               |
 
 First public release (`v0.1.0`, via the first release PR) needs R0–R3 and a clean dry run.
 
@@ -197,4 +233,5 @@ First public release (`v0.1.0`, via the first release PR) needs R0–R3 and a cl
 3. Do we have, or want, an Apple Developer account (and when)?
 4. Is Intel macOS needed by anyone who will actually use it?
 5. App icon source art (needs creating; avoid reusing anyone else's assets).
-6. Exact flags and tooling versions to confirm when R0 starts (GoReleaser config version, notarytool options, `actions/attest-build-provenance` inputs).
+6. Exact flags and tooling versions to confirm when R0 starts (GoReleaser config version, notarytool options,
+   `actions/attest-build-provenance` inputs).

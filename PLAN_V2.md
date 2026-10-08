@@ -26,7 +26,12 @@ working tree). Add ideas freely; promote to a real plan when v1 is stable.
   hero/exec config, paths confined to the repo.
 
 ## GitHub depth
-- GitHub App support: a registered App with installation tokens has its own, larger rate-limit bucket (up to 12,500 per hour, 15,000 on Enterprise Cloud) and lets a team attribute actions to one bot. It does not lift the secondary write limits, needs setup (create, install, store a private key) and makes issues appear authored by a bot. Only worth it for teams or very large organizations. The Quartermaster treats the token as an input, so this is another way to supply one.
+
+- GitHub App support: a registered App with installation tokens has its own, larger rate-limit bucket (up to 12,500 per
+  hour, 15,000 on Enterprise Cloud) and lets a team attribute actions to one bot. It does not lift the secondary write
+  limits, needs setup (create, install, store a private key) and makes issues appear authored by a bot. Only worth it
+  for teams or very large organizations. The Quartermaster treats the token as an input, so this is another way to
+  supply one.
 
 - Projects v2 status columns as dungeon floors.
 - Webhook-free live updates via `gh api` polling tuning, or optional relay.

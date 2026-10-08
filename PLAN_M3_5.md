@@ -14,15 +14,15 @@ every other tool on the same token (the `gh` CLI, scripts, agents).
 
 ## Decisions
 
-| #   | Decision                                                                                                                       |
-|-----|--------------------------------------------------------------------------------------------------------------------------------|
-| 1   | Storage, when a local copy is needed: **SQLite**, pure Go (`modernc.org/sqlite`, no cgo), in the config directory.            |
-| 2   | Scope marker is a **label named `tracked`** (neutral, configurable), not a Projects board. Kinds (`roadmap`, `bug`) stay ordinary labels. |
-| 3   | Pacing defaults: **3 s** between writes (plus jitter), **15 per rolling minute**, **150 per rolling hour**, keep **20%** of the hourly read budget for interactive use. About a quarter of GitHub's limits. |
-| 4   | Agent guard: **both** a rule in the agent's instructions and a `gh` shim for sessions the app starts.                          |
-| 5   | Order: see "Phases". Changed after a review (below); **the part after phase B is awaiting confirmation**.                     |
-| 6   | Token: `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`, as now. A fine-grained token limited to issues is documented as the safer option. **No GitHub Apps** for now (kept in `PLAN_V2.md`). |
-| 7   | Issue reads and writes use **GraphQL**; **REST only for the free change probe**.                                              |
+| # | Decision                                                                                                                                                                                                    |
+|---|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | Storage, when a local copy is needed: **SQLite**, pure Go (`modernc.org/sqlite`, no cgo), in the config directory.                                                                                          |
+| 2 | Scope marker is a **label named `tracked`** (neutral, configurable), not a Projects board. Kinds (`roadmap`, `bug`) stay ordinary labels.                                                                   |
+| 3 | Pacing defaults: **3 s** between writes (plus jitter), **15 per rolling minute**, **150 per rolling hour**, keep **20%** of the hourly read budget for interactive use. About a quarter of GitHub's limits. |
+| 4 | Agent guard: **both** a rule in the agent's instructions and a `gh` shim for sessions the app starts.                                                                                                       |
+| 5 | Order: see "Phases". Changed after a review (below); **the part after phase B is awaiting confirmation**.                                                                                                   |
+| 6 | Token: `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`, as now. A fine-grained token limited to issues is documented as the safer option. **No GitHub Apps** for now (kept in `PLAN_V2.md`).                  |
+| 7 | Issue reads and writes use **GraphQL**; **REST only for the free change probe**.                                                                                                                            |
 
 ### Review of the first order, and what changed
 
@@ -46,19 +46,20 @@ import command through the Quartermaster is enough; it needs no durable queue.
 ## 1. Facts (GitHub docs, checked 2026-10-08, and measured on the owner's account)
 
 Sources: [REST rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api),
-[GraphQL rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api),
+[GraphQL rate and node
+limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api),
 [REST best practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api).
 
-| Limit                            | Value                                                                                          |
-|----------------------------------|------------------------------------------------------------------------------------------------|
-| Primary, REST (`core`) / GraphQL | 5,000 per hour each, **separate buckets**. A GraphQL query costs `ceil(connection requests / 100)`, minimum 1 |
-| Secondary: concurrency           | no more than 100 concurrent requests                                                           |
-| Secondary: points per minute     | 900 per REST endpoint, 2,000 for GraphQL. Query = 1 point; mutation / POST / PATCH / PUT / DELETE = 5 |
-| Secondary: content creation      | about **80 per minute and 500 per hour** (issues, comments, ...), the same on REST and GraphQL |
-| Pacing advice                    | **serial requests; at least 1 s between mutating requests**                                    |
+| Limit                            | Value                                                                                                                                                                                                  |
+|----------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Primary, REST (`core`) / GraphQL | 5,000 per hour each, **separate buckets**. A GraphQL query costs `ceil(connection requests / 100)`, minimum 1                                                                                          |
+| Secondary: concurrency           | no more than 100 concurrent requests                                                                                                                                                                   |
+| Secondary: points per minute     | 900 per REST endpoint, 2,000 for GraphQL. Query = 1 point; mutation / POST / PATCH / PUT / DELETE = 5                                                                                                  |
+| Secondary: content creation      | about **80 per minute and 500 per hour** (issues, comments, ...), the same on REST and GraphQL                                                                                                         |
+| Pacing advice                    | **serial requests; at least 1 s between mutating requests**                                                                                                                                            |
 | On a limit                       | `retry-after`: wait that long. `x-ratelimit-remaining: 0`: wait until `x-ratelimit-reset`. Otherwise at least 1 minute, then exponential backoff. Retrying while limited can get an integration banned |
-| Conditional requests             | `304` does not count against the primary limit (REST). Measured: `core used` did not move      |
-| Change latency                   | measured: after a comment on an in-scope issue, the conditional probe flipped from 304 to 200 within about 10 s (`Cache-Control: max-age=60`) |
+| Conditional requests             | `304` does not count against the primary limit (REST). Measured: `core used` did not move                                                                                                              |
+| Change latency                   | measured: after a comment on an in-scope issue, the conditional probe flipped from 304 to 200 within about 10 s (`Cache-Control: max-age=60`)                                                          |
 
 **What `gh` uses** (traced with `GH_DEBUG=api`): every `gh issue` command is GraphQL (`POST /graphql`), not REST, and
 multiplies requests with lookups. `create` is an info query plus the `createIssue` mutation (more lookups per `--label`
@@ -79,7 +80,8 @@ An `http.RoundTripper` that every GitHub request of the app goes through, so no 
 - **Rations**: records `limit / remaining / reset / resource` from every response. Floors by request class: background
   reads stop below 20% remaining, interactive reads below 5%, writes below 10%.
 - **Camp (circuit breaker)**: on `403/429` with `retry-after`, `x-ratelimit-remaining: 0`, or a secondary-limit message,
-  stop **all** requests, wait `max(retry-after, reset, 60 s)`, double on repeats (cap 1 h), persist across restarts, tell
+  stop **all** requests, wait `max(retry-after, reset, 60 s)`, double on repeats (cap 1 h), persist across restarts,
+  tell
   the user. No retry storm.
 - **Visibility**: `GET /api/github` returns the rations and the camp, for a small chip in the quest panel.
 - **Reads only for now.** The app makes no writes today, so the write pacing described in decision 3 is built with the
@@ -89,27 +91,31 @@ An `http.RoundTripper` that every GitHub request of the app goes through, so no 
 ## 3. Scope (phase B)
 
 ### The defect fixed first
+
 M3 fetches the 300 most recently updated open issues and applies the campaign's label filter afterwards. In a large
 repository, tracked issues outside those 300 never appear. **Scope becomes part of the GitHub query.**
 
 ### Model
+
 Per campaign, stored locally:
 
-| Mode                 | Meaning                                                       | Query                                         |
-|----------------------|---------------------------------------------------------------|-----------------------------------------------|
-| `labels` (default `tracked`) | issues carrying any of the chosen labels               | `issues(labels: [...])`, one query per label, merged (GitHub ANDs a list) |
-| `assigned`           | open issues assigned to the token's user                      | `filterBy: {assignee}`                        |
-| `all`                | everything, paged and capped, with the cap shown              | paged                                         |
+| Mode                         | Meaning                                          | Query                                                                     |
+|------------------------------|--------------------------------------------------|---------------------------------------------------------------------------|
+| `labels` (default `tracked`) | issues carrying any of the chosen labels         | `issues(labels: [...])`, one query per label, merged (GitHub ANDs a list) |
+| `assigned`                   | open issues assigned to the token's user         | `filterBy: {assignee}`                                                    |
+| `all`                        | everything, paged and capped, with the cap shown | paged                                                                     |
 
 Kind is separate: the panel shows **type chips** (`roadmap`, `bug`, ...) built from the labels of the in-scope issues.
 A bug found mid-roadmap is still `tracked`.
 
 ### First connection
+
 A campaign with no scope yet shows one question, with counts that cost a few points: "312 open issues. Show: tracked
 (0) · assigned to me (3) · pick labels (list with counts) · everything (312)". If the marker label has items it is
 preselected. The header always reads **`tracked · 14 of 312 open`**, with one click to widen to everything.
 
 ### Creating issues
+
 Issues the app creates later get the marker label automatically (created once, with confirmation, if missing). Adopting
 an old issue means adding the label, in GitHub or from the panel. Several repos in one workspace later is a set of
 repos sharing the marker.
@@ -158,12 +164,12 @@ Needed when the app itself creates issues in bulk.
 
 ## 7. Phases and status
 
-| Phase             | Contents                                                                              | Status      |
-|-------------------|---------------------------------------------------------------------------------------|-------------|
-| A. Quartermaster  | RoundTripper, rations from headers, floors, serial, camp, persistence, `/api/github`, UI chip (reads only) | in progress |
-| B. Scope          | server-side scope, counts, first-connection picker, scope header, type chips, 300-cut fix | planned     |
-| E. Gatekeeper     | instruction rule, `gh` shim with a per-session token, and the write pacing         | planned, **confirm** |
-| C. Chronicle      | SQLite copy and sync                                                                  | deferred    |
-| D. Caravan        | paced bulk writes                                                                     | deferred    |
+| Phase            | Contents                                                                                                   | Status               |
+|------------------|------------------------------------------------------------------------------------------------------------|----------------------|
+| A. Quartermaster | RoundTripper, rations from headers, floors, serial, camp, persistence, `/api/github`, UI chip (reads only) | in progress          |
+| B. Scope         | server-side scope, counts, first-connection picker, scope header, type chips, 300-cut fix                  | planned              |
+| E. Gatekeeper    | instruction rule, `gh` shim with a per-session token, and the write pacing                                 | planned, **confirm** |
+| C. Chronicle     | SQLite copy and sync                                                                                       | deferred             |
+| D. Caravan       | paced bulk writes                                                                                          | deferred             |
 
 The first roadmap import goes through the Quartermaster (an idempotent import command), after phase B.
