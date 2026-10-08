@@ -1,6 +1,7 @@
 package quests
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -97,5 +98,15 @@ func TestRateLimitErrorMessage(t *testing.T) {
 	e := &RateLimitError{Reset: time.Date(2026, 1, 1, 15, 4, 0, 0, time.UTC)}
 	if got := e.Error(); got == (&RateLimitError{}).Error() {
 		t.Fatalf("reset time not mentioned: %q", got)
+	}
+}
+
+func TestPausedRateLimitErrorSaysSo(t *testing.T) {
+	e := &RateLimitError{Reset: time.Date(2026, 1, 1, 15, 4, 0, 0, time.UTC), Paused: true}
+	if got := e.Error(); !strings.Contains(got, "paused") {
+		t.Fatalf("%q", got)
+	}
+	if got := (&RateLimitError{Paused: true}).Error(); !strings.Contains(got, "rate limit") {
+		t.Fatalf("paused without a time: %q", got)
 	}
 }

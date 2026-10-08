@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dkage/dungeon-master/internal/quartermaster"
 	"github.com/dkage/dungeon-master/internal/quests"
 )
 
@@ -15,7 +16,12 @@ func (s *Server) handleQuests(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, http.StatusNotFound, "no such campaign")
 		return
 	}
-	res, err := s.cfg.Quests.List(r.Context(), c, r.URL.Query().Get("refresh") == "1")
+	ctx := r.Context()
+	if r.URL.Query().Get("background") == "1" {
+		// Polling nobody is waiting for keeps more of the GitHub budget in reserve.
+		ctx = quartermaster.WithClass(ctx, quartermaster.Background)
+	}
+	res, err := s.cfg.Quests.List(ctx, c, r.URL.Query().Get("refresh") == "1")
 	if err != nil {
 		questsErr(w, err, c.Repo)
 		return
@@ -64,6 +70,14 @@ func questsErr(w http.ResponseWriter, err error, repo string) {
 	case errors.Is(err, quests.ErrUnauthorized):
 		httpErrCode(w, http.StatusBadGateway, "github_unauthorized",
 			"GitHub rejected the credentials. Run `gh auth login` again, or check GH_TOKEN.")
+	case errors.As(err, &rl) && rl.Paused:
+		until := "a while"
+		if !rl.Reset.IsZero() {
+			until = rl.Reset.Local().Format("15:04")
+		}
+		httpErrCode(w, http.StatusTooManyRequests, "camp",
+			"To stay inside GitHub's limits the app is not sending requests until "+until+
+				". Anything already loaded stays available.")
 	case errors.As(err, &rl):
 		httpErrCode(w, http.StatusTooManyRequests, "rate_limited", rl.Error()+". Try again later.")
 	case errors.Is(err, quests.ErrNotFound):
@@ -74,4 +88,13 @@ func questsErr(w http.ResponseWriter, err error, repo string) {
 	default:
 		httpErrCode(w, http.StatusBadGateway, "upstream", err.Error())
 	}
+}
+
+// handleGitHub reports the GitHub budget and whether requests are paused.
+func (s *Server) handleGitHub(w http.ResponseWriter, _ *http.Request) {
+	if s.cfg.Quartermaster == nil {
+		writeJSON(w, http.StatusOK, quartermaster.Status{Rations: []quartermaster.Ration{}})
+		return
+	}
+	writeJSON(w, http.StatusOK, s.cfg.Quartermaster.Status())
 }

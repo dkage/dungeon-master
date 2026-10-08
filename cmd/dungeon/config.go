@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/history"
 	"github.com/dkage/dungeon-master/internal/launcher"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/quartermaster"
 	"github.com/dkage/dungeon-master/internal/quests"
 	"github.com/dkage/dungeon-master/internal/quests/demo"
 	"github.com/dkage/dungeon-master/internal/quests/github"
@@ -66,9 +69,24 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 	if err != nil {
 		return server.Config{}, err
 	}
+	// Every GitHub request goes through the Quartermaster; its pause survives
+	// restarts.
+	qm, err := quartermaster.New(quartermaster.Options{
+		Store: quartermaster.FileStore{Path: filepath.Join(dir, "quartermaster.json")},
+	})
+	if err != nil {
+		return server.Config{}, err
+	}
 	qsvc := quests.NewService(quests.ServiceOptions{
-		GitHub: github.New(github.Options{Endpoint: endpoint, Token: github.EnvOrGH(ghPath)}),
-		Demo:   demo.New(),
+		GitHub: github.New(github.Options{
+			Endpoint: endpoint,
+			Token:    github.EnvOrGH(ghPath),
+			HTTP:     &http.Client{Timeout: 20 * time.Second, Transport: qm.Transport(http.DefaultTransport)},
+			OnRateLimit: func(reset time.Time) {
+				qm.Trip(reset, "GitHub reported a rate limit")
+			},
+		}),
+		Demo: demo.New(),
 	})
 	cfg := server.Config{
 		Addr:    addr,
@@ -81,6 +99,8 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 		Campaigns: campaigns,
 		History:   hist,
 		Quests:    qsvc,
+
+		Quartermaster: qm,
 	}
 	if path, err := launcher.Resolve(ctx, p.Claude); err != nil {
 		cfg.ClaudeErr = err.Error()

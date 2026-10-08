@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dkage/dungeon-master/internal/quartermaster"
 	"github.com/dkage/dungeon-master/internal/quests"
 )
 
@@ -369,6 +370,84 @@ func TestStateReasonAndPullRequestMapping(t *testing.T) {
 		len(q.PRs) != 2 || q.PRs[0].State != "merged" || q.PRs[1].State != "open" {
 		t.Fatalf("%+v", q)
 	}
+}
+
+// stubTransport returns a fixed error, standing in for the Quartermaster refusing a request.
+type stubTransport struct{ err error }
+
+func (s stubTransport) RoundTrip(*http.Request) (*http.Response, error) { return nil, s.err }
+
+func TestQuartermasterRefusalsBecomePausedRateLimits(t *testing.T) {
+	until := time.Now().Add(7 * time.Minute)
+	for name, err := range map[string]error{
+		"camp":   &quartermaster.CampError{Until: until, Reason: "x"},
+		"ration": &quartermaster.RationError{Resource: "graphql", Remaining: 10, Floor: 250, Reset: until},
+	} {
+		c := New(Options{
+			Endpoint: "http://127.0.0.1:1",
+			Token:    func(context.Context) (string, error) { return "tok", nil },
+			HTTP:     &http.Client{Transport: stubTransport{err}},
+		})
+		_, gotErr := c.Get(context.Background(), demoRepo, 1)
+		var rl *quests.RateLimitError
+		if !errors.As(gotErr, &rl) || !rl.Paused || !rl.Reset.Equal(until) {
+			t.Errorf("%s: %v", name, gotErr)
+		}
+		if _, listErr := c.List(context.Background(), demoRepo); !errors.As(listErr, &rl) || !rl.Paused {
+			t.Errorf("%s (list): %v", name, listErr)
+		}
+	}
+}
+
+func TestGraphQLRateLimitInsideA200IsReportedToTheCaller(t *testing.T) {
+	var told []time.Time
+	reset := time.Now().Add(9 * time.Minute).Truncate(time.Second)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-RateLimit-Reset", itoa(reset.Unix()))
+		w.Write([]byte(`{"errors":[{"type":"RATE_LIMITED","message":"API rate limit exceeded"}]}`))
+	}))
+	defer srv.Close()
+	c := New(Options{
+		Endpoint:    srv.URL,
+		Token:       func(context.Context) (string, error) { return "tok", nil },
+		OnRateLimit: func(r time.Time) { told = append(told, r) },
+	})
+	_, err := c.Get(context.Background(), demoRepo, 1)
+	var rl *quests.RateLimitError
+	if !errors.As(err, &rl) || rl.Paused {
+		t.Fatalf("%v", err)
+	}
+	if len(told) != 1 || !told[0].Equal(reset) {
+		t.Fatalf("OnRateLimit calls: %v", told)
+	}
+}
+
+func TestHTTPLevelLimitsAreLeftToTheTransport(t *testing.T) {
+	// A 429 is seen (and acted on) by the Quartermaster in the transport, so the
+	// client must not trip a second time and double the backoff.
+	var told int
+	c := fakeGitHubWith(t, func(w http.ResponseWriter, r *http.Request, q gqlReq) {
+		w.Header().Set("Retry-After", "30")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}, func(o *Options) { o.OnRateLimit = func(time.Time) { told++ } })
+	_, err := c.Get(context.Background(), demoRepo, 1)
+	var rl *quests.RateLimitError
+	if !errors.As(err, &rl) || told != 0 {
+		t.Fatalf("err %v, OnRateLimit calls %d", err, told)
+	}
+}
+
+func fakeGitHubWith(t *testing.T, handler func(w http.ResponseWriter, r *http.Request, q gqlReq), mutate func(*Options)) *Client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var q gqlReq
+		_ = json.NewDecoder(r.Body).Decode(&q)
+		handler(w, r, q)
+	}))
+	t.Cleanup(srv.Close)
+	o := Options{Endpoint: srv.URL, Token: func(context.Context) (string, error) { return "tok", nil }}
+	mutate(&o)
+	return New(o)
 }
 
 func itoa(n int64) string {

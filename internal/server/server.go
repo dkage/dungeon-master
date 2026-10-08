@@ -21,6 +21,7 @@ import (
 	"github.com/dkage/dungeon-master/internal/fsutil"
 	"github.com/dkage/dungeon-master/internal/history"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/quartermaster"
 	"github.com/dkage/dungeon-master/internal/quests"
 	"github.com/dkage/dungeon-master/internal/quests/demo"
 	"github.com/dkage/dungeon-master/internal/session"
@@ -57,6 +58,9 @@ type Config struct {
 	History *history.Store
 	// Quests supplies issues. When nil, only the demo quests are available.
 	Quests *quests.Service
+	// Quartermaster is the gatekeeper for GitHub traffic; only its status is
+	// served here. May be nil.
+	Quartermaster *quartermaster.Quartermaster
 }
 
 // Server wires the handler, the guard and the listener together.

@@ -117,14 +117,23 @@ var (
 	ErrNoToken = errors.New("quests: no GitHub credentials found")
 )
 
-// RateLimitError is returned when GitHub's rate limit is exhausted.
-type RateLimitError struct{ Reset time.Time }
+// RateLimitError is returned when GitHub's rate limit is exhausted, or when
+// the app is holding back requests so that it does not get there.
+type RateLimitError struct {
+	Reset time.Time
+	// Paused is set when the app itself is not sending requests: GitHub asked
+	// it to slow down earlier, or the remaining budget is below the reserve.
+	Paused bool
+}
 
 func (e *RateLimitError) Error() string {
-	if e.Reset.IsZero() {
+	switch {
+	case e.Paused && !e.Reset.IsZero():
+		return "quests: requests to GitHub are paused until " + e.Reset.Local().Format("15:04")
+	case e.Reset.IsZero():
 		return "quests: GitHub rate limit reached"
 	}
-	return "quests: GitHub rate limit reached, resets at " + e.Reset.Format(time.Kitchen)
+	return "quests: GitHub rate limit reached, resets at " + e.Reset.Local().Format("15:04")
 }
 
 // Derive computes a quest's state from its own fields.

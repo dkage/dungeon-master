@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dkage/dungeon-master/internal/quartermaster"
 	"github.com/dkage/dungeon-master/internal/quests"
 )
 
@@ -36,6 +37,9 @@ type Options struct {
 	HTTP     *http.Client
 	Token    TokenFunc
 	Now      func() time.Time
+	// OnRateLimit is told about a limit that only shows up inside a 200
+	// response (a GraphQL error), which the transport cannot see.
+	OnRateLimit func(reset time.Time)
 }
 
 // Client implements quests.Source for GitHub.
@@ -44,6 +48,7 @@ type Client struct {
 	http     *http.Client
 	token    *cached
 	now      func() time.Time
+	onLimit  func(reset time.Time)
 }
 
 var _ quests.Source = (*Client)(nil)
@@ -66,6 +71,7 @@ func New(o Options) *Client {
 		endpoint: o.Endpoint,
 		http:     o.HTTP,
 		now:      o.Now,
+		onLimit:  o.OnRateLimit,
 		token:    &cached{src: o.Token, ttl: tokenLifetime, now: o.Now},
 	}
 }
@@ -350,6 +356,16 @@ func (c *Client) once(ctx context.Context, query string, vars map[string]any, ou
 
 	resp, err := c.http.Do(req)
 	if err != nil {
+		// The Quartermaster refuses requests without sending them while GitHub
+		// has asked us to slow down, or while the budget is under its reserve.
+		var camp *quartermaster.CampError
+		if errors.As(err, &camp) {
+			return &quests.RateLimitError{Reset: camp.Until, Paused: true}
+		}
+		var ration *quartermaster.RationError
+		if errors.As(err, &ration) {
+			return &quests.RateLimitError{Reset: ration.Reset, Paused: true}
+		}
 		// The error text of net/http can include the URL but never headers.
 		return fmt.Errorf("quests: reaching GitHub: %w", err)
 	}
@@ -386,7 +402,11 @@ func (c *Client) once(ctx context.Context, query string, vars map[string]any, ou
 			case "NOT_FOUND":
 				return quests.ErrNotFound
 			case "RATE_LIMITED":
-				return &quests.RateLimitError{Reset: resetTime(resp, c.now())}
+				reset := resetTime(resp, c.now())
+				if c.onLimit != nil {
+					c.onLimit(reset)
+				}
+				return &quests.RateLimitError{Reset: reset}
 			case "FORBIDDEN", "INSUFFICIENT_SCOPES":
 				return fmt.Errorf("quests: the token cannot read this repository: %s", e.Message)
 			}

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/quests"
 	"github.com/dkage/dungeon-master/internal/server"
 	"github.com/dkage/dungeon-master/internal/testutil"
 )
@@ -281,5 +283,56 @@ func TestServeRefusesABadAddressBeforeTouchingState(t *testing.T) {
 	}
 	if entries, _ := os.ReadDir(home); len(entries) != 0 {
 		t.Fatalf("a refused start left files behind: %v", entries)
+	}
+}
+
+func TestQuartermasterIsWiredAndItsPauseSurvivesARestart(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Retry-After", "600")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer srv.Close()
+	home := t.TempDir()
+	t.Setenv("DUNGEON_HOME", home)
+	t.Setenv("DUNGEON_GITHUB_ENDPOINT", srv.URL)
+	t.Setenv("GH_TOKEN", "tok")
+	t.Setenv("PATH", "/nonexistent")
+	t.Setenv("SHELL", "")
+	ctx := context.Background()
+	camp := campaign.Campaign{ID: "c", Repo: "acme/widgets"}
+
+	cfg, err := buildConfig(ctx, "127.0.0.1:0", "tok")
+	if err != nil || cfg.Quartermaster == nil {
+		t.Fatalf("not wired: %v", err)
+	}
+	// GitHub says slow down: the first request reaches it, the next ones do not.
+	if _, err := cfg.Quests.List(ctx, camp, true); err == nil {
+		t.Fatal("expected the rate limit")
+	}
+	if !cfg.Quartermaster.Status().Camp.Active {
+		t.Fatal("camp not entered")
+	}
+	before := hits.Load()
+	_, err = cfg.Quests.List(ctx, camp, true)
+	var rl *quests.RateLimitError
+	if !errors.As(err, &rl) || !rl.Paused || hits.Load() != before {
+		t.Fatalf("a request went out during camp: %v (hits %d -> %d)", err, before, hits.Load())
+	}
+	if fi, err := os.Stat(filepath.Join(home, "quartermaster.json")); err != nil || fi.Mode().Perm() != 0o600 {
+		t.Fatalf("pause not stored privately: %v %v", fi, err)
+	}
+
+	// A restart does not get around it.
+	cfg2, err := buildConfig(ctx, "127.0.0.1:0", "tok")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg2.Quartermaster.Status().Camp.Active {
+		t.Fatal("the pause was forgotten on restart")
+	}
+	if _, err := cfg2.Quests.List(ctx, camp, true); !errors.As(err, &rl) || !rl.Paused || hits.Load() != before {
+		t.Fatalf("restart bypassed the pause: %v", err)
 	}
 }

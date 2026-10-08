@@ -24,6 +24,7 @@ const (
 
 func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/state", s.handleState)
+	mux.HandleFunc("GET /api/github", s.handleGitHub)
 
 	mux.HandleFunc("POST /api/campaigns", s.handleCampaignAdd)
 	mux.HandleFunc("PATCH /api/campaigns/{id}", s.handleCampaignUpdate)

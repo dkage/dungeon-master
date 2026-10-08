@@ -1,0 +1,386 @@
+#!/usr/bin/env python3
+"""Format Markdown the way PhpStorm / GoLand like it.
+
+- prose, list items and block quotes wrapped at --width (default 120)
+- wrapped list items get a hanging indent
+- a blank line around headings, fenced code, tables and rules; no runs of blank lines
+- tables padded into aligned columns, separator row filled to the column width
+- code, front matter, HTML blocks and link definitions are left alone
+
+Usage: mdfmt.py [--width N] [--check] FILE...
+  --check  change nothing; exit 1 if any file would change.
+Standard library only. Idempotent.
+"""
+import argparse
+import re
+import sys
+import unicodedata
+
+FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+HEADING_RE = re.compile(r"^ {0,3}#{1,6}(\s|$)")
+HR_RE = re.compile(r"^ {0,3}([-*_])( *\1){2,} *$")
+LIST_RE = re.compile(r"^( {0,3})([-+*]|\d{1,9}[.)])( +|$)(.*)$")
+QUOTE_RE = re.compile(r"^ {0,3}> ?")
+SETEXT_RE = re.compile(r"^ {0,3}(=+|-+) *$")
+HTML_RE = re.compile(r"^ {0,3}<[A-Za-z/!?]")
+REFDEF_RE = re.compile(r"^ {0,3}\[\^?[^\]]+\]:\s")
+SEP_CELL_RE = re.compile(r"^:?-+:?$")
+RISKY_START_RE = re.compile(r"^([-+*>#]+|\d{1,9}[.)])$")
+PIPE_RE = re.compile(r"(?<!\\)\|")
+
+
+def width_of(s):
+    n = 0
+    for ch in s:
+        if unicodedata.combining(ch) or ch in "‍️︎":
+            continue
+        n += 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+    return n
+
+
+def indent_of(line):
+    return len(line) - len(line.lstrip(" "))
+
+
+# ---------------------------------------------------------------- tables
+
+def split_row(line):
+    s = line.strip()
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|") and not s.endswith("\\|"):
+        s = s[:-1]
+    return [c.strip() for c in PIPE_RE.split(s)]
+
+
+def is_separator(line):
+    if "-" not in line or "|" not in line and ":" not in line and not line.strip().startswith("-"):
+        return False
+    cells = split_row(line)
+    return bool(cells) and all(SEP_CELL_RE.match(c) for c in cells)
+
+
+def table_starts(lines, i):
+    return (
+        i + 1 < len(lines)
+        and "|" in lines[i]
+        and is_separator(lines[i + 1])
+        and len(split_row(lines[i])) == len(split_row(lines[i + 1]))
+    )
+
+
+def format_table(rows, aligns):
+    n = len(aligns)
+    rows = [(r + [""] * n)[:n] for r in rows]
+    widths = [max(1, *(width_of(r[c]) for r in rows)) for c in range(n)]
+
+    def pad(text, w, a):
+        gap = w - width_of(text)
+        if a == "right":
+            return " " * gap + text
+        if a == "center":
+            return " " * (gap // 2) + text + " " * (gap - gap // 2)
+        return text + " " * gap
+
+    def line(r):
+        return "|" + "|".join(" " + pad(r[c], widths[c], aligns[c]) + " " for c in range(n)) + "|"
+
+    def sep():
+        out = []
+        for c in range(n):
+            w = widths[c] + 2
+            a = aligns[c]
+            if a == "center":
+                out.append(":" + "-" * (w - 2) + ":")
+            elif a == "left-explicit":
+                out.append(":" + "-" * (w - 1))
+            elif a == "right":
+                out.append("-" * (w - 1) + ":")
+            else:
+                out.append("-" * w)
+        return "|" + "|".join(out) + "|"
+
+    return [line(rows[0]), sep()] + [line(r) for r in rows[1:]]
+
+
+def align_of(cell):
+    l, r = cell.startswith(":"), cell.endswith(":")
+    return "center" if l and r else "right" if r else "left-explicit" if l else "left"
+
+
+# ------------------------------------------------------------- paragraphs
+
+def tokenize(text):
+    """Split on spaces, keeping `code spans` whole."""
+    tokens, cur, i, n = [], [], 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == "`":
+            j = i
+            while j < n and text[j] == "`":
+                j += 1
+            run = text[i:j]
+            end = text.find(run, j)
+            if end != -1:
+                cur.append(text[i:end + len(run)])
+                i = end + len(run)
+            else:
+                cur.append(run)
+                i = j
+        elif ch == " ":
+            if cur:
+                tokens.append("".join(cur))
+                cur = []
+            i += 1
+        else:
+            cur.append(ch)
+            i += 1
+    if cur:
+        tokens.append("".join(cur))
+    merged = []
+    for t in tokens:  # never let a wrap start a line with `-`, `1.`, `#`, `>`
+        if merged and RISKY_START_RE.match(t):
+            merged[-1] += " " + t
+        else:
+            merged.append(t)
+    return merged
+
+
+def wrap(text, width):
+    lines, cur, cur_w = [], [], 0
+    for t in tokenize(text):
+        tw = width_of(t)
+        if cur and cur_w + 1 + tw > width:
+            lines.append(" ".join(cur))
+            cur, cur_w = [t], tw
+        else:
+            cur_w += tw + (1 if cur else 0)
+            cur.append(t)
+    if cur:
+        lines.append(" ".join(cur))
+    return lines
+
+
+def format_paragraph(raw, width):
+    """Wrap each line that is too long; never join lines the author kept apart."""
+    out = []
+    for line in raw:
+        hard = line.endswith("  ")
+        wrapped = wrap(line.strip(), width)
+        if hard and wrapped:
+            wrapped[-1] += "  "
+        out.extend(wrapped)
+    return out
+
+
+# ------------------------------------------------------------- blocks
+
+def interrupts_paragraph(lines, i):
+    line = lines[i]
+    if not line.strip():
+        return True
+    if FENCE_RE.match(line) or HEADING_RE.match(line) or HR_RE.match(line) or QUOTE_RE.match(line):
+        return True
+    m = LIST_RE.match(line)
+    if m and m.group(4).strip() and (m.group(2) in "-+*" or m.group(2)[:-1] == "1"):
+        return True
+    return table_starts(lines, i)
+
+
+def format_lines(lines, width):
+    width = max(width, 30)
+    out, i, n = [], 0, len(lines)
+    pending_blank = False
+    force_blank = False
+
+    def begin(separate=False):
+        nonlocal pending_blank, force_blank
+        if out and (pending_blank or force_blank or separate):
+            if out[-1] != "":
+                out.append("")
+        pending_blank = force_blank = False
+
+    def verbatim_block(block, around):
+        begin(around)
+        out.extend(block)
+        nonlocal force_blank
+        force_blank = around
+
+    while i < n:
+        line = lines[i].rstrip("\n").replace("\t", "    ") if not FENCE_RE.match(lines[i]) else lines[i].rstrip("\n")
+        if not line.strip():
+            pending_blank = True
+            i += 1
+            continue
+
+        m = FENCE_RE.match(line)
+        if m:
+            fence = m.group(1)
+            j = i + 1
+            while j < n and not re.match(r"^ {0,3}" + fence[0] + "{%d,} *$" % len(fence), lines[j].rstrip("\n")):
+                j += 1
+            block = [l.rstrip("\n") for l in lines[i:j + 1]]
+            verbatim_block(block, True)
+            i = j + 1
+            continue
+
+        if HEADING_RE.match(line):
+            verbatim_block([line.rstrip()], True)
+            i += 1
+            continue
+
+        if HR_RE.match(line) and not LIST_RE.match(line.replace("*", "-", 0)) or HR_RE.match(line):
+            verbatim_block([line.rstrip()], True)
+            i += 1
+            continue
+
+        if REFDEF_RE.match(line):
+            verbatim_block([line.rstrip()], False)
+            i += 1
+            continue
+
+        if HTML_RE.match(line):
+            j = i
+            while j < n and lines[j].strip():
+                j += 1
+            verbatim_block([l.rstrip("\n").rstrip() for l in lines[i:j]], False)
+            i = j
+            continue
+
+        if table_starts(lines, i):
+            header = split_row(lines[i])
+            aligns = [align_of(c) for c in split_row(lines[i + 1])]
+            rows = [header]
+            j = i + 2
+            while j < n and lines[j].strip() and "|" in lines[j] and not FENCE_RE.match(lines[j]) \
+                    and not HEADING_RE.match(lines[j]):
+                rows.append(split_row(lines[j]))
+                j += 1
+            verbatim_block(format_table(rows, aligns), True)
+            i = j
+            continue
+
+        if QUOTE_RE.match(line):
+            j = i
+            inner = []
+            while j < n and QUOTE_RE.match(lines[j]):
+                inner.append(QUOTE_RE.sub("", lines[j].rstrip("\n"), count=1))
+                j += 1
+            body = format_lines(inner, width - 2)
+            begin()
+            out.extend(("> " + l) if l else ">" for l in body)
+            i = j
+            continue
+
+        m = LIST_RE.match(line)
+        if m:
+            ind, marker, spaces, rest = len(m.group(1)), m.group(2), m.group(3), m.group(4)
+            offset = ind + len(marker) + (len(spaces) if 1 <= len(spaces) <= 4 else 1)
+            inner = [rest]
+            j = i + 1
+            while j < n:
+                cur = lines[j].rstrip("\n").replace("\t", "    ")
+                if not cur.strip():
+                    k = j
+                    while k < n and not lines[k].strip():
+                        k += 1
+                    if k < n and indent_of(lines[k].replace("\t", "    ")) >= offset:
+                        inner.extend([""] * (k - j))
+                        j = k
+                        continue
+                    break
+                if indent_of(cur) >= offset:
+                    inner.append(cur[offset:])
+                    j += 1
+                    continue
+                if inner[-1] == "" or interrupts_paragraph(lines, j) or LIST_RE.match(cur) or HTML_RE.match(cur):
+                    break
+                inner.append(cur.lstrip())  # lazy continuation
+                j += 1
+            new_off = ind + len(marker) + 1
+            body = format_lines(inner, width - new_off)
+            begin()
+            head = " " * ind + marker
+            if not body:
+                out.append(head)
+            else:
+                out.append(head + " " + body[0])
+                out.extend((" " * new_off + l) if l else "" for l in body[1:])
+            i = j
+            continue
+
+        # indented code block (only at block start, after a blank line or the start)
+        if indent_of(line) >= 4 and (not out or pending_blank):
+            j = i
+            while j < n and (not lines[j].strip() or indent_of(lines[j]) >= 4):
+                j += 1
+            while not lines[j - 1].strip():
+                j -= 1
+            verbatim_block([l.rstrip("\n") for l in lines[i:j]], False)
+            i = j
+            continue
+
+        # paragraph (with setext heading check)
+        j = i
+        raw = []
+        while j < n:
+            cur = lines[j].rstrip("\n").replace("\t", "    ")
+            if j > i and SETEXT_RE.match(cur):
+                break
+            if j > i and interrupts_paragraph(lines, j):
+                break
+            raw.append(cur)
+            j += 1
+        if j < n and SETEXT_RE.match(lines[j]) and j > i and not HR_RE.match(lines[j].rstrip("\n")) or \
+                (j < n and j > i and re.match(r"^ {0,3}=+ *$", lines[j])):
+            verbatim_block([r.rstrip() for r in raw] + [lines[j].rstrip()], True)
+            i = j + 1
+            continue
+        begin()
+        out.extend(format_paragraph(raw, width))
+        i = j
+
+    return out
+
+
+def format_text(text, width):
+    lines = text.split("\n")
+    head = []
+    if lines and lines[0].strip() == "---":  # front matter
+        for k in range(1, len(lines)):
+            if lines[k].strip() in ("---", "..."):
+                head, lines = [l.rstrip() for l in lines[:k + 1]], lines[k + 1:]
+                break
+    body = format_lines(lines, width)
+    out = head + ([""] if head and body else []) + body
+    return "\n".join(out) + "\n" if out else ""
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("files", nargs="+")
+    ap.add_argument("--width", type=int, default=120)
+    ap.add_argument("--check", action="store_true")
+    args = ap.parse_args()
+    dirty = False
+    for path in args.files:
+        with open(path, encoding="utf-8") as f:
+            old = f.read()
+        new = format_text(old, args.width)
+        if new != old:
+            dirty = True
+            if args.check:
+                print(f"would reformat {path}")
+            else:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(new)
+                print(f"reformatted {path}")
+        for no, l in enumerate(new.split("\n"), 1):
+            if width_of(l) > args.width and not FENCE_RE.match(l):
+                kind = "table row" if l.lstrip().startswith("|") else "line"
+                print(f"  {path}:{no}: {kind} is {width_of(l)} wide (cannot be wrapped)", file=sys.stderr)
+    return 1 if (dirty and args.check) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

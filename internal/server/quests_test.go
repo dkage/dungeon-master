@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/dkage/dungeon-master/internal/campaign"
+	"github.com/dkage/dungeon-master/internal/quartermaster"
 	"github.com/dkage/dungeon-master/internal/quests"
 )
 
@@ -34,6 +35,7 @@ func (fakeGit) RemoteURL(context.Context, string, string) (string, error) {
 
 // fakeQuests is the GitHub source: settable data and errors.
 type fakeQuests struct {
+	class  quartermaster.Class
 	mu     sync.Mutex
 	list   []quests.Quest
 	err    error
@@ -48,10 +50,11 @@ func (f *fakeQuests) set(list []quests.Quest, err error) {
 	f.list, f.err = list, err
 }
 
-func (f *fakeQuests) List(_ context.Context, repo quests.Repo) ([]quests.Quest, error) {
+func (f *fakeQuests) List(ctx context.Context, repo quests.Repo) ([]quests.Quest, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.repo = repo
+	f.class = quartermaster.ClassOf(ctx)
 	return append([]quests.Quest(nil), f.list...), f.err
 }
 
@@ -266,5 +269,73 @@ func TestServerWithoutQuestSourceOnlyOffersTheDemo(t *testing.T) {
 	e.req("PATCH", "/api/campaigns/"+e.campaign, map[string]any{"demo": true}, nil)
 	if resp, out := e.quests(""); resp.StatusCode != http.StatusOK || decodeResult(t, out).Source != "demo" {
 		t.Fatalf("%d %s", resp.StatusCode, out)
+	}
+}
+
+func TestPollingIsMarkedAsBackgroundWork(t *testing.T) {
+	e := startServer(t, nil)
+	e.gh.set([]quests.Quest{q(1)}, nil)
+	e.quests("")
+	if e.gh.class != quartermaster.Interactive {
+		t.Fatalf("a person's request was classed %v", e.gh.class)
+	}
+	e.quests("?background=1&refresh=1")
+	if e.gh.class != quartermaster.Background {
+		t.Fatalf("polling was classed %v", e.gh.class)
+	}
+}
+
+func TestCampIsReportedWithItsOwnCode(t *testing.T) {
+	e := startServer(t, nil)
+	until := time.Now().Add(20 * time.Minute)
+	e.gh.set(nil, &quests.RateLimitError{Reset: until, Paused: true})
+	resp, out := e.quests("?refresh=1")
+	var body map[string]string
+	_ = json.Unmarshal(out, &body)
+	if resp.StatusCode != http.StatusTooManyRequests || body["code"] != "camp" ||
+		!strings.Contains(body["error"], until.Local().Format("15:04")) {
+		t.Fatalf("%d %s", resp.StatusCode, out)
+	}
+	// An ordinary rate limit keeps its own code.
+	e.gh.set(nil, &quests.RateLimitError{Reset: until})
+	if _, out := e.quests("?refresh=1"); !strings.Contains(string(out), `"code":"rate_limited"`) {
+		t.Fatalf("%s", out)
+	}
+	// With data already loaded, camp serves the last copy instead.
+	e.gh.set([]quests.Quest{q(1)}, nil)
+	e.quests("?refresh=1")
+	e.gh.set(nil, &quests.RateLimitError{Reset: until, Paused: true})
+	_, out = e.quests("?refresh=1")
+	if r := decodeResult(t, out); !r.Stale || len(r.Quests) != 1 {
+		t.Fatalf("expected stale data during camp: %s", out)
+	}
+}
+
+func TestGitHubStatusEndpoint(t *testing.T) {
+	// Without a Quartermaster the endpoint still answers, with nothing known.
+	e := startServer(t, nil)
+	resp, out := e.req("GET", "/api/github", nil, nil)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(out), `"rations":[]`) || !strings.Contains(string(out), `"active":false`) {
+		t.Fatalf("%d %s", resp.StatusCode, out)
+	}
+
+	qm, err := quartermaster.New(quartermaster.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	until := time.Now().Add(15 * time.Minute)
+	qm.Trip(until, "GitHub sent Retry-After")
+	e2 := startServer(t, func(c *Config) { c.Quartermaster = qm })
+	resp, out = e2.req("GET", "/api/github", nil, nil)
+	var st quartermaster.Status
+	if err := json.Unmarshal(out, &st); err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("%v %s", err, out)
+	}
+	if !st.Camp.Active || st.Camp.Reason != "GitHub sent Retry-After" || st.Camp.Until.Before(time.Now()) {
+		t.Fatalf("%s", out)
+	}
+	// It needs the access token like every other API call.
+	if resp, _ := e2.req("GET", "/api/github", nil, func(r *http.Request) { r.Header.Del("Authorization") }); resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated: %d", resp.StatusCode)
 	}
 }

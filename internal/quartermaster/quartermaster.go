@@ -11,6 +11,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -275,8 +276,15 @@ func (q *Quartermaster) Trip(until time.Time, reason string) {
 
 func (q *Quartermaster) trip(now time.Time, wait time.Duration, reason string) {
 	q.mu.Lock()
-	// Repeated trips grow exponentially; a quiet spell resets the growth.
-	if q.state.LastTrip.IsZero() || now.Sub(q.state.LastTrip) > q.recovery {
+	// Repeated trips grow exponentially; a quiet spell resets the growth. The
+	// quiet spell is counted from the end of the last camp, not from the trip:
+	// waiting out a long camp is not recovery, and failing again right after
+	// it must make the next pause longer.
+	quietSince := q.state.LastTrip
+	if q.state.CampUntil.After(quietSince) {
+		quietSince = q.state.CampUntil
+	}
+	if q.state.LastTrip.IsZero() || now.Sub(quietSince) > q.recovery {
 		q.state.Level = 0
 	} else {
 		q.state.Level++
@@ -304,11 +312,30 @@ func (q *Quartermaster) Status() Status {
 	now := q.clock.Now()
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	// graphql and core first (the ones the UI shows), then anything else
+	// GitHub reported, by name.
 	st := Status{Rations: []Ration{}}
-	for _, name := range []string{"graphql", "core"} {
-		if r, ok := q.rations[name]; ok {
-			st.Rations = append(st.Rations, r)
+	names := make([]string, 0, len(q.rations))
+	for name := range q.rations {
+		names = append(names, name)
+	}
+	slices.SortFunc(names, func(a, b string) int {
+		rank := func(n string) int {
+			switch n {
+			case "graphql":
+				return 0
+			case "core":
+				return 1
+			}
+			return 2
 		}
+		if ra, rb := rank(a), rank(b); ra != rb {
+			return ra - rb
+		}
+		return strings.Compare(a, b)
+	})
+	for _, name := range names {
+		st.Rations = append(st.Rations, q.rations[name])
 	}
 	if q.state.CampUntil.After(now) {
 		st.Camp = Camp{Active: true, Until: q.state.CampUntil, Reason: q.state.Reason, Level: q.state.Level}
