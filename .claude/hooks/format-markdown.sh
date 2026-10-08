@@ -1,6 +1,7 @@
 #!/bin/bash
 # PostToolUse hook (Write|Edit|MultiEdit): format any Markdown file Claude just wrote.
-# Reads the hook JSON on stdin, runs mdfmt.py on the file when it is a .md/.markdown file.
+# Reads the hook JSON on stdin, runs mdfmt.py on the file when it is a .md/.markdown file, then reports "runt"
+# lines (short leftovers of an old wrap) back to Claude as context so it can fix them with a normal edit.
 # Never blocks: a formatter problem must not break the edit.
 file=$(python3 -c 'import sys,json
 try: print(json.load(sys.stdin).get("tool_input",{}).get("file_path",""))
@@ -16,5 +17,13 @@ case "$file" in
   */node_modules/*|*/.git/*|*/vendor/*) exit 0 ;;
 esac
 [ -f "$file" ] || exit 0
-python3 "${CLAUDE_PROJECT_DIR:-.}/.claude/skills/formatting-markdown/scripts/mdfmt.py" "$file" >/dev/null 2>&1
+mdfmt="${CLAUDE_PROJECT_DIR:-.}/.claude/skills/formatting-markdown/scripts/mdfmt.py"
+python3 "$mdfmt" "$file" >/dev/null 2>&1
+runts=$(python3 "$mdfmt" --runts "$file" 2>/dev/null)
+if [ -n "$runts" ]; then
+  python3 -c 'import sys,json
+print(json.dumps({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":
+  "Markdown formatter: these lines look like leftovers of an old wrap (short, then the sentence carries on in lowercase). "
+  "Join them into the line below with a normal edit, or run mdfmt.py --reflow on the file if it is yours to reflow:\n"+sys.argv[1]}}))' "$runts"
+fi
 exit 0

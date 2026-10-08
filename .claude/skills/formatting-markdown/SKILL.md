@@ -38,6 +38,17 @@ It rewrites the files in place (`--check` only reports). It leaves front matter,
 definitions alone, never joins lines you kept apart, and is idempotent. It reports lines it cannot wrap (wide table
 rows, long URLs) on stderr.
 
+Two extra modes, both opt-in:
+
+- `--runts` changes nothing and lists "runt" lines: short leftovers of an old wrap, such as a lone `copy` on a line
+  whose sentence carries on in lowercase below. The hook runs it after every formatting pass and hands the result to
+  you; fix each one by joining it into the next line with a normal edit.
+- `--reflow` joins the lines of every paragraph and list item and re-wraps them. It can merge lines the author kept
+  apart on purpose (a bold label above its text), so use it only on a file you own, when asked for a clean-up or
+  to remove runts, and read the diff afterwards. The hook never uses it.
+
+Tests for the formatter: `python3 -m unittest -v test_mdfmt` from `.claude/skills/formatting-markdown/scripts`.
+
 Run it by hand when the hook did not fire: a file written through Bash (`cat > x.md`), a file produced by a script, or a
 session on a machine without the hook.
 

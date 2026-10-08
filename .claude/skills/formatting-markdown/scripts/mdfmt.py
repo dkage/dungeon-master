@@ -7,8 +7,10 @@
 - tables padded into aligned columns, separator row filled to the column width
 - code, front matter, HTML blocks and link definitions are left alone
 
-Usage: mdfmt.py [--width N] [--check] FILE...
-  --check  change nothing; exit 1 if any file would change.
+Usage: mdfmt.py [--width N] [--check] [--reflow] [--runts] FILE...
+  --check   change nothing; exit 1 if any file would change.
+  --reflow  also join and re-wrap the lines of each paragraph (opt-in; never used by the hook).
+  --runts   only report short leftover lines of an old wrap; change nothing.
 Standard library only. Idempotent.
 """
 import argparse
@@ -161,9 +163,26 @@ def wrap(text, width):
     return lines
 
 
-def format_paragraph(raw, width):
-    """Wrap each line that is too long; never join lines the author kept apart."""
+def format_paragraph(raw, width, reflow=False):
+    """Wrap lines that are too long. With reflow, also join the lines of a paragraph and re-wrap them
+    (hard breaks stay). Without it no line the author kept apart is ever joined."""
+    raw = raw[:-1] + [raw[-1].rstrip()]  # a hard break after the last line breaks nothing
     out = []
+    if reflow:
+        segments, cur = [], []
+        for line in raw:
+            cur.append(line.strip())
+            if line.endswith("  "):
+                segments.append((cur, True))
+                cur = []
+        if cur:
+            segments.append((cur, False))
+        for seg, hard in segments:
+            wrapped = wrap(" ".join(seg), width)
+            if hard and wrapped:
+                wrapped[-1] += "  "
+            out.extend(wrapped)
+        return out
     for line in raw:
         hard = line.endswith("  ")
         wrapped = wrap(line.strip(), width)
@@ -187,7 +206,7 @@ def interrupts_paragraph(lines, i):
     return table_starts(lines, i)
 
 
-def format_lines(lines, width):
+def format_lines(lines, width, reflow=False):
     width = max(width, 30)
     out, i, n = [], 0, len(lines)
     pending_blank = False
@@ -266,7 +285,7 @@ def format_lines(lines, width):
             while j < n and QUOTE_RE.match(lines[j]):
                 inner.append(QUOTE_RE.sub("", lines[j].rstrip("\n"), count=1))
                 j += 1
-            body = format_lines(inner, width - 2)
+            body = format_lines(inner, width - 2, reflow)
             begin()
             out.extend(("> " + l) if l else ">" for l in body)
             i = j
@@ -298,7 +317,7 @@ def format_lines(lines, width):
                 inner.append(cur.lstrip())  # lazy continuation
                 j += 1
             new_off = ind + len(marker) + 1
-            body = format_lines(inner, width - new_off)
+            body = format_lines(inner, width - new_off, reflow)
             begin()
             head = " " * ind + marker
             if not body:
@@ -337,13 +356,13 @@ def format_lines(lines, width):
             i = j + 1
             continue
         begin()
-        out.extend(format_paragraph(raw, width))
+        out.extend(format_paragraph(raw, width, reflow))
         i = j
 
     return out
 
 
-def format_text(text, width):
+def format_text(text, width, reflow=False):
     lines = text.split("\n")
     head = []
     if lines and lines[0].strip() == "---":  # front matter
@@ -351,9 +370,32 @@ def format_text(text, width):
             if lines[k].strip() in ("---", "..."):
                 head, lines = [l.rstrip() for l in lines[:k + 1]], lines[k + 1:]
                 break
-    body = format_lines(lines, width)
+    body = format_lines(lines, width, reflow)
     out = head + ([""] if head and body else []) + body
     return "\n".join(out) + "\n" if out else ""
+
+
+def find_runts(text, width):
+    """Lines that look like leftovers of an old wrap: short, no closing punctuation, and the next line carries on
+    in lowercase. Returns [(line_number, line)]. Skips code, front matter, tables and headings."""
+    lines = text.split("\n")
+    found, in_fence, i0 = [], False, 0
+    if lines and lines[0].strip() == "---":
+        for k in range(1, len(lines)):
+            if lines[k].strip() in ("---", "..."):
+                i0 = k + 1
+                break
+    for i in range(i0, len(lines) - 1):
+        line, nxt = lines[i], lines[i + 1].strip()
+        if FENCE_RE.match(line):
+            in_fence = not in_fence
+            continue
+        s = line.strip()
+        if in_fence or not s or not nxt or HEADING_RE.match(line) or s.startswith(("|", ">")):
+            continue
+        if width_of(s) < 0.6 * width and s[-1] not in ".!?:;" and nxt[0].islower() and not line.endswith("  "):
+            found.append((i + 1, s))
+    return found
 
 
 def main():
@@ -361,12 +403,21 @@ def main():
     ap.add_argument("files", nargs="+")
     ap.add_argument("--width", type=int, default=120)
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--reflow", action="store_true",
+                    help="also join the lines of each paragraph and re-wrap them (review the diff afterwards)")
+    ap.add_argument("--runts", action="store_true",
+                    help="only report runt lines (short leftovers of an old wrap), as 'runt: FILE:LINE: text'; "
+                         "changes nothing")
     args = ap.parse_args()
     dirty = False
     for path in args.files:
         with open(path, encoding="utf-8") as f:
             old = f.read()
-        new = format_text(old, args.width)
+        if args.runts:
+            for no, l in find_runts(format_text(old, args.width), args.width):
+                print(f"runt: {path}:{no}: {l}")
+            continue
+        new = format_text(old, args.width, args.reflow)
         if new != old:
             dirty = True
             if args.check:
