@@ -1,237 +1,168 @@
-# M3.5: GitHub budget, local mirror and scope
+# M3.5: GitHub budget and scope
 
-Status: plan, nothing built. Comes after M3 (quests list and detail) and before the roadmap goes into issues and before
-M4.
+Status: decided, in progress (phases A and B). Comes after M3 (quests list and detail). It runs in parallel with M3.6
+(first run and words, in `PLAN_EXPERIENCE.md`) and finishes before M4. Names for the themed concepts are in
+`GLOSSARY.md`; Go packages keep plain names.
 
-Two problems, one cause: Dungeon Master is about to treat GitHub as its database, and GitHub is a rate-limited service
-shared with every other tool on the same token (the `gh` CLI, scripts, agents).
+Two problems, one cause: Dungeon Master reads GitHub as its database, and GitHub is a rate-limited service shared with
+every other tool on the same token (the `gh` CLI, scripts, agents).
 
-1. **We must never get a user locked out.** A bulk run of `gh issue create` on 50+ issues locked the owner out of `gh`
-   for roughly 30 minutes. That is GitHub's *secondary* rate limit. Anyone who maps a whole backlog through this app, or
-   through an agent running a loop, can hit it.
-2. **We must not drown the user in issues.** A repository with 300 open issues, of which 12 are the roadmap, must open
-   to those 12, not to 300.
+1. **We must never get a user locked out.** A bulk run of `gh issue create` over 50+ issues locked the owner out of
+   `gh` for roughly 30 minutes. That is GitHub's *secondary* rate limit.
+2. **We must not drown the user in issues.** A repository with 300 open issues, of which 12 are the work being driven
+   here, must open to those 12.
 
-## 1. Facts (GitHub docs, checked 2026-10-08)
+## Decisions
 
-Sources: [REST rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), [GraphQL rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api), [REST best practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api).
+| #   | Decision                                                                                                                       |
+|-----|--------------------------------------------------------------------------------------------------------------------------------|
+| 1   | Storage, when a local copy is needed: **SQLite**, pure Go (`modernc.org/sqlite`, no cgo), in the config directory.            |
+| 2   | Scope marker is a **label named `tracked`** (neutral, configurable), not a Projects board. Kinds (`roadmap`, `bug`) stay ordinary labels. |
+| 3   | Pacing defaults: **3 s** between writes (plus jitter), **15 per rolling minute**, **150 per rolling hour**, keep **20%** of the hourly read budget for interactive use. About a quarter of GitHub's limits. |
+| 4   | Agent guard: **both** a rule in the agent's instructions and a `gh` shim for sessions the app starts.                          |
+| 5   | Order: see "Phases". Changed after a review (below); **the part after phase B is awaiting confirmation**.                     |
+| 6   | Token: `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`, as now. A fine-grained token limited to issues is documented as the safer option. **No GitHub Apps** for now (kept in `PLAN_V2.md`). |
+| 7   | Issue reads and writes use **GraphQL**; **REST only for the free change probe**.                                              |
 
-| Limit                        | Value                                                                                                                                                                                                                                   |
-|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Primary, REST                | 5,000 requests per hour per user token                                                                                                                                                                                                  |
-| Primary, GraphQL             | 5,000 points per hour per user; a query costs `ceil(connection requests / 100)`, minimum 1                                                                                                                                              |
-| Secondary: concurrency       | no more than 100 concurrent requests (REST + GraphQL together)                                                                                                                                                                          |
-| Secondary: points per minute | 900 per REST endpoint, 2,000 for GraphQL. GET/query = 1 point, POST/PATCH/PUT/DELETE or a mutation = 5                                                                                                                                  |
-| Secondary: CPU               | 90 s per 60 s real time (60 s for GraphQL)                                                                                                                                                                                              |
-| Secondary: content creation  | about **80 per minute and 500 per hour** (creating issues, comments, ...). Some endpoints lower. Web UI actions count too                                                                                                               |
-| Undisclosed                  | "too many compute-heavy requests" is limited with no published number; limits can change without notice                                                                                                                                 |
-| Pacing advice                | **make requests serially, not concurrently; wait at least 1 s between mutating requests**                                                                                                                                               |
-| On a limit                   | `retry-after` header: wait that long. `x-ratelimit-remaining: 0`: wait until `x-ratelimit-reset`. Otherwise wait at least 1 minute, then back off exponentially. Retrying while limited "may result in the banning of your integration" |
-| Conditional requests         | an ETag request answered `304` does not count against the primary limit (REST only; GraphQL has no ETags)                                                                                                                               |
-| Webhooks                     | recommended over polling; not available to a local app                                                                                                                                                                                  |
+### Review of the first order, and what changed
 
-## 2. Can we see our usage? Partly.
+The first version built five phases (budget, scope, SQLite copy, paced write queue, `gh` shim) before M4. A review of
+that plan made these points, which are right:
 
-| What                                                                 | Visible?                        | How                                                                                                                                                                |
-|----------------------------------------------------------------------|---------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Primary budget (REST `core` and `graphql` are separate buckets)      | **Yes, free and authoritative** | `x-ratelimit-limit / remaining / used / reset / resource` headers on *every* response; `GET /rate_limit`; the GraphQL field `rateLimit { cost remaining resetAt }` |
-| Usage by other tools on the same token                               | **Yes**, same counters          | the headers show what is left for the whole account, so `gh` and scripts are already included                                                                      |
-| Secondary limits (points/min, content creation per minute/hour, CPU) | **No counters are exposed**     | we must track our own writes, and react to `403/429` with `retry-after`                                                                                            |
+- It is a lot of infrastructure before the core loop (pick a quest, start an agent) works.
+- Bulk writes from the app are a v2 idea; `PLAN.md` says write-back is small and opt-in. The app makes **no** writes
+  today, so a write queue has nothing to queue yet.
+- The one real defect is M3's label filter running after a 300-issue cut. That is phase B and is small.
 
-Verified against the owner's account: `GET /rate_limit` returned identical numbers on two consecutive calls (it is
-free); a GraphQL response carried `X-Ratelimit-Limit: 5000`, `Remaining`, `Reset`, `Resource: graphql`, and
-`rateLimit { cost: 1 }`.
+Where the review is incomplete, and why the guard stays early: the lockout came from **agents running `gh`**, and an
+agent can do that in a session right now. A governor inside the app cannot stop `gh` run by an agent; only the
+Gatekeeper (shim) can. It is also small and does not need SQLite. The SQLite copy and the write queue are the parts that
+can wait.
 
-So: **read the primary budget from the response headers of every request (no extra calls, no own counting), and keep our
-own persisted counters only for what GitHub does not show: our writes per rolling minute and hour.** The self-limit must
-be far below GitHub's, because other tools share the budget and the content-creation numbers are approximate.
+So the order is **A, B, E** (with the instruction rule), then M3.6 and M4. **C (Chronicle) and D (Caravan) are
+deferred** until a feature needs them (offline use, a large roadmap import). For the first roadmap import an idempotent
+import command through the Quartermaster is enough; it needs no durable queue.
 
-## 2b. What the `gh` CLI actually uses (measured)
+## 1. Facts (GitHub docs, checked 2026-10-08, and measured on the owner's account)
 
-Traced with `GH_DEBUG=api` against the owner's repository on 2026-10-08.
+Sources: [REST rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api),
+[GraphQL rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api),
+[REST best practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api).
 
-| Command                      | Requests it makes                                                                                                                                 | API                             |
-|------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------|
-| `gh issue list`              | 1 query (`IssueList`)                                                                                                                             | GraphQL                         |
-| `gh issue view`              | `IssueByNumber` (+ a second query for details)                                                                                                    | GraphQL                         |
-| `gh issue create`            | `IssueRepositoryInfo` query, then the `IssueCreate` mutation; each `--label`, `--assignee`, `--milestone` or `--project` adds more lookup queries | GraphQL                         |
-| `gh issue edit --add-label`  | `IssueByNumber`, `RepositoryLabelList`, then the `LabelAdd` mutation (3 requests)                                                                 | GraphQL                         |
-| `gh issue comment` / `close` | `IssueByNumber` query, then the mutation (2 requests)                                                                                             | GraphQL                         |
-| `gh api repos/...`           | 1 request                                                                                                                                         | REST (a separate `core` budget) |
+| Limit                            | Value                                                                                          |
+|----------------------------------|------------------------------------------------------------------------------------------------|
+| Primary, REST (`core`) / GraphQL | 5,000 per hour each, **separate buckets**. A GraphQL query costs `ceil(connection requests / 100)`, minimum 1 |
+| Secondary: concurrency           | no more than 100 concurrent requests                                                           |
+| Secondary: points per minute     | 900 per REST endpoint, 2,000 for GraphQL. Query = 1 point; mutation / POST / PATCH / PUT / DELETE = 5 |
+| Secondary: content creation      | about **80 per minute and 500 per hour** (issues, comments, ...), the same on REST and GraphQL |
+| Pacing advice                    | **serial requests; at least 1 s between mutating requests**                                    |
+| On a limit                       | `retry-after`: wait that long. `x-ratelimit-remaining: 0`: wait until `x-ratelimit-reset`. Otherwise at least 1 minute, then exponential backoff. Retrying while limited can get an integration banned |
+| Conditional requests             | `304` does not count against the primary limit (REST). Measured: `core used` did not move      |
+| Change latency                   | measured: after a comment on an in-scope issue, the conditional probe flipped from 304 to 200 within about 10 s (`Cache-Control: max-age=60`) |
 
-So `gh issue ...` is **GraphQL, not REST**, and counts against the **GraphQL** budget (5,000 points per hour, 2,000
-points per minute secondary, mutations 5 points, plus the content-creation caps). It does no pacing and no lookup
-caching: a loop creating 50 issues with labels and assignees sends roughly 150 to 200 requests, 50 of them
-content-creating mutations, in whatever time the loop takes, and each created issue also notifies people. That is the
-shape of what locked the account.
+**What `gh` uses** (traced with `GH_DEBUG=api`): every `gh issue` command is GraphQL (`POST /graphql`), not REST, and
+multiplies requests with lookups. `create` is an info query plus the `createIssue` mutation (more lookups per `--label`
+or `--assignee`); `edit --add-label` is 3 requests; `comment` and `close` are 2. Only `gh api repos/...` is REST. It
+paces nothing and caches nothing, so a loop of 50 issues sends 150 to 200 requests, 50 of them content-creating, as fast
+as it runs. GraphQL has every mutation we need (`createIssue`, `updateIssue`, `closeIssue`, `reopenIssue`, `addComment`,
+`createLabel`, `addLabelsToLabelable`, `addSubIssue`, `addBlockedBy`, `removeBlockedBy`).
 
-GraphQL has every mutation we need: `createIssue`, `updateIssue`, `closeIssue`, `reopenIssue`, `addComment`,
-`createLabel`, `addLabelsToLabelable`, `addSubIssue`, `addBlockedBy`, `removeBlockedBy` (confirmed by introspection).
-**Dungeon Master will use GraphQL for everything**, so reads and writes share one budget and one accounting model with
-`gh issue`, and the lookups (repository id, label ids, user ids) are cached in the mirror so a create costs **one**
-request instead of two to four.
+**Visibility.** The primary budget is visible and free: `x-ratelimit-*` headers on every response (they include what
+`gh` and other tools used on the same token), `GET /rate_limit`, and the GraphQL `rateLimit` field. The **secondary
+limits are not exposed**, so we count our own writes and react to `retry-after`.
 
-## 3. Design
+## 2. Quartermaster: one gatekeeper in front of all GitHub traffic (phase A)
 
-### 3.1 One governor in front of every GitHub request
+An `http.RoundTripper` that every GitHub request of the app goes through, so no caller can bypass it.
 
-All GitHub traffic (reads, mutations, the outbox worker) goes through one component. Nothing else may talk to GitHub.
+- **Serial**: one request in flight.
+- **Rations**: records `limit / remaining / reset / resource` from every response. Floors by request class: background
+  reads stop below 20% remaining, interactive reads below 5%, writes below 10%.
+- **Write pacing** (self-imposed): at least 3 s apart (plus 0 to 1 s jitter), at most 15 per rolling minute and 150 per
+  rolling hour. Every mutation counts as content-generating. Counters persist, so a restart cannot reset them.
+- **Camp (circuit breaker)**: on `403/429` with `retry-after`, `x-ratelimit-remaining: 0`, or a secondary-limit message,
+  stop **all** requests, wait `max(retry-after, reset, 60 s)`, double on repeats (cap 1 h), persist across restarts, tell
+  the user. No retry storm.
+- **Visibility**: `GET /api/github` returns the rations, the camp and the writes in the last minute and hour, for a
+  small chip in the quest panel.
+- State (camp, write timestamps) lives in a small private JSON file now; it moves into SQLite if and when phase C
+  happens.
 
-- **Serial by default**: one request in flight. No concurrency, as the docs advise.
-- **Budget awareness**: after every response, record `remaining/limit/reset/resource`. Reads are refused (served from
-  the mirror instead) below a floor (default: keep 20% of the hourly budget; hard stop at 500 remaining). Writes need a
-  higher floor.
-- **Write pacing, self-imposed**, defaults deliberately about a quarter of GitHub's limits:
-    - at least **3 s** between mutations, with jitter (docs: 1 s minimum);
-    - at most **15 mutations per rolling minute** and **150 per rolling hour** (GitHub: ~80 and ~500). Counters
-      persisted so a restart cannot reset them.
-    - all mutations counted as content-generating, to be safe.
-- **Circuit breaker**: on `403/429` with `retry-after`, `x-ratelimit-remaining: 0`, or a "secondary rate limit" message:
-  stop every write immediately, pause for `max(retry-after, 60 s)`, double on repeats (cap 1 h), persist the pause
-  across restarts, and tell the user. Reads continue from the mirror.
-- **Never retry blindly** on a limit signal; no retry storm. Transient 5xx and network errors back off separately.
-- **Visibility**: expose `Status{remaining, limit, resetsAt, pausedUntil, pendingWrites, lastSync}` to the UI.
+## 3. Scope (phase B)
 
-### 3.2 Local mirror (SQLite) and incremental sync
-
-GitHub stays the source of truth. The mirror is a cache plus the outbox, never edited directly.
-
-**Storage decision: SQLite, pure Go (`modernc.org/sqlite`, no cgo), in the config directory, 0600.** Reasons:
-
-- the outbox needs a durable queue with atomic state changes and crash recovery;
-- the quest list is relational (parent, blockers, labels, filters, counts);
-- incremental sync is upserts by issue number;
-- it keeps the release plan intact (the portable binary stays cgo-free); cost is a few MB of binary.
-  JSON files would be fine for a read-only cache but turn into hand-rolled transactions the moment a write queue exists.
-  Schema versioned with `PRAGMA user_version`.
-
-Tables (sketch): `repos`, `issues` (number, node id, title, state, labels, assignees, parent, milestone, updated_at,
-fetched_at, in_scope), `edges` (blocked-by), `comments` (lazy), `outbox`, `limiter` (counters, pause).
-
-**Sync, cheapest first:**
-
-- **Steady state**: GraphQL `issues(filterBy: {since: <last sync>})` ordered by `UPDATED_AT`. One request returns only
-  what changed, cost 1. Poll about every 60 s while a window is looking at the campaign, every few minutes otherwise,
-  never when no client has asked recently. That is roughly 60 points per hour (about 1% of the budget) per active
-  campaign.
-- **Reconcile**: a lightweight full pass (numbers and `updatedAt` only, 100 per page, a few points) on first connect,
-  when the scope changes, on demand, and when the last full pass is over 24 h old. This catches deletions, transfers and
-  anything `since` cannot see.
-- **Details and comments**: fetched when an issue is opened, cached, invalidated when the issue's `updatedAt` moves.
-- **Offline / limited**: the app keeps working from the mirror and says how old it is.
-
-**Divergence between our copy and GitHub:** reads are never in conflict (GitHub wins on every sync). Writes carry the
-`updatedAt` they were based on; if the issue changed on GitHub since, the operation stops in a `conflict` state for the
-user to decide. Creates cannot conflict.
-
-### 3.3 Outbox and paced worker for writes
-
-For bulk work (importing a roadmap, an agent splitting a task into 30 issues):
-
-- the user (or a skill) produces a **plan**: a list of operations (create issue, edit, comment, close, add sub-issue,
-  add blocked-by, create label), referring to not-yet-created issues by local ids that resolve to numbers once created;
-- the UI shows the plan with an **estimate** ("52 issues + 71 links, about 11 minutes"), then runs it with **pause,
-  resume and cancel**;
-- one worker drains it through the governor, strictly serial, with the pacing above;
-- every operation has a durable state (`pending`, `running`, `done`, `failed`, `conflict`), so a crash or restart
-  resumes where it stopped;
-- **no duplicates after an uncertain failure** (timeout, 5xx after the request left): before retrying a create, list
-  recently created issues by the user and match title and body hash, instead of marking issues with hidden text;
-- dry-run first: nothing is sent until the user confirms.
-
-### 3.4 Agents can still bypass the governor
-
-Skills such as `to-tickets` and `wayfinder` tell an agent to publish many issues with `gh`. Those calls share the token
-but not our pacing. Options, from least to most protective:
-
-1. A rule in the injected preamble: create issues one at a time, wait between them. Cheap, not enforceable.
-2. **A `gh` shim on the `PATH` of sessions we start**: it forwards to the real `gh`, but mutating commands
-   (`issue create`, `issue edit`, `api -X POST/PATCH/...`) wait on the same persisted pacing and honour the pause.
-   Agents then cannot flood GitHub by accident, from any skill. Reads pass straight through.
-3. Both.
-
-Recommendation: do 1 now and 2 as the last phase of M3.5, after the governor exists, since the shim is just another
-client of it.
-
-## 4. Scope: what appears in the panel
-
-### The defect to fix first
-
-M3 fetches up to 300 open issues (the most recently updated) and applies the campaign's label filter **afterwards, in
-the browser-side service**. In a large repository the roadmap issues that fall outside those 300 never show up. **The
-filter must be part of the GitHub query** (and of the mirror's `in_scope` column), not applied to a truncated list.
+### The defect fixed first
+M3 fetches the 300 most recently updated open issues and applies the campaign's label filter afterwards. In a large
+repository, tracked issues outside those 300 never appear. **Scope becomes part of the GitHub query.**
 
 ### Model
+Per campaign, stored locally:
 
-Each campaign has a **scope**, stored locally (never in the repository):
+| Mode                 | Meaning                                                       | Query                                         |
+|----------------------|---------------------------------------------------------------|-----------------------------------------------|
+| `labels` (default `tracked`) | issues carrying any of the chosen labels               | `issues(labels: [...])`, one query per label, merged (GitHub ANDs a list) |
+| `assigned`           | open issues assigned to the token's user                      | `filterBy: {assignee}`                        |
+| `all`                | everything, paged and capped, with the cap shown              | paged                                         |
 
-| Scope          | Meaning                                                      | Query                   |
-|----------------|--------------------------------------------------------------|-------------------------|
-| Labels         | issues with any of these labels (default `roadmap`)          | `issues(labels: [...])` |
-| Assigned to me | open issues assigned to the token's user                     | `filterBy: {assignee}`  |
-| Milestone      | one milestone                                                | `filterBy: {milestone}` |
-| Under an issue | the sub-issue tree of a chosen epic                          | sub-issues              |
-| Project board  | items of a GitHub Project (needs the `project` scope, later) | `projectV2.items`       |
-| Everything     | all issues                                                   | paged, on demand        |
+Kind is separate: the panel shows **type chips** (`roadmap`, `bug`, ...) built from the labels of the in-scope issues.
+A bug found mid-roadmap is still `tracked`.
 
-### First connection (the "300 issues" case)
+### First connection
+A campaign with no scope yet shows one question, with counts that cost a few points: "312 open issues. Show: tracked
+(0) · assigned to me (3) · pick labels (list with counts) · everything (312)". If the marker label has items it is
+preselected. The header always reads **`tracked · 14 of 312 open`**, with one click to widen to everything.
 
-Never open to nothing and never to everything. On first connection to a repository the panel asks one question, with
-counts that cost a few points in total:
+### Creating issues
+Issues the app creates later get the marker label automatically (created once, with confirmation, if missing). Adopting
+an old issue means adding the label, in GitHub or from the panel. Several repos in one workspace later is a set of
+repos sharing the marker.
 
-> This repository has 312 open issues. Show:
-> - issues labeled **roadmap** (14)  ← preselected when such a label exists
-> - issues assigned to me (3)
-> - pick a label (list with counts)
-> - everything (312)
+## 4. Gatekeeper: agents cannot bypass the Quartermaster (phase E)
 
-If no label looks like a roadmap, preselect "assigned to me" when it has items, otherwise ask without a default. The
-choice is stored per campaign.
+Skills such as `to-tickets` and `wayfinder` tell an agent to publish many issues with `gh`. That bypasses the app but
+shares the token, and it is possible today.
 
-The panel header always shows the scope and the total: **`roadmap · 14 of 312 open`** with one click to widen to "All"
-(paged, filter text sent to GitHub rather than loading everything) and back.
+- **Rule** in the instructions of every hero session (cheap, not enforceable): create issues one at a time; never loop
+  `gh issue create`; a delayed command is intentional.
+- **`gh` shim** first on the `PATH` of sessions the app starts. Read-only commands pass straight through. Commands that
+  create or change things first ask the app for a **slot** (same pacing, same camp), then run the real `gh`.
+  **Fail-open**: an unrecognised command, or an unreachable app, never blocks work. A per-session token limits what the
+  shim may call.
 
-### The pattern for creating issues
+## 5. Deferred: Chronicle (phase C) and Caravan (phase D)
 
-Issues created by Dungeon Master (through the outbox) carry the scope label automatically, creating the label once if it
-is missing (one mutation, with the user's confirmation). Skills that label their own issues (for example `wayfinder:*`)
-are covered by letting a scope list several labels. The label name is neutral (`roadmap`), because the theme must not
-leak into GitHub.
+Kept here so the design is not lost; built only when a feature needs them.
 
-## 5. Phases
+**Chronicle**, a SQLite copy of the tracked issues (tables for repos, issues, labels, edges, comments, sync state).
+Sync per repo: a free conditional `GET /repos/{o}/{r}/issues?labels=tracked&sort=updated&per_page=1` with the last ETag
+(304 means nothing changed), then a GraphQL query for issues updated since a cursor when it did change, plus a cheap
+reconcile pass (numbers and `updatedAt`) on first connect, scope change and about daily. Triggers: an interval (60 s
+when looked at, 5 min idle), window focus, a finished session, starting a hero on a quest, the refresh button. Needed
+for offline use or many campaigns; today the in-memory cache costs about 60 points per hour per active campaign.
 
-| Phase              | Contents                                                                                                                                                             | Why this order                                                 |
-|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|
-| **A. Governor**    | single request path, header-based budget tracking, floors, serial execution, `retry-after` handling, circuit breaker, UI chip (remaining, reset time, paused banner) | protects every other phase and the owner's account immediately |
-| **B. Scope**       | server-side filtering, counts, first-connection picker, "All" toggle, header total; fix the 300-issue truncation                                                     | fixes a real defect, and the roadmap needs it                  |
-| **C. Mirror**      | SQLite, schema and migrations, incremental sync, reconcile, stale/offline behaviour, sync age in the UI                                                              | makes polling nearly free and survives limits                  |
-| **D. Outbox**      | operations, plan preview with estimate, paced worker, pause/resume/cancel, crash recovery, duplicate protection                                                      | the bulk-write path; the roadmap import is its first real user |
-| **E. Agent guard** | `gh` shim for sessions (decision below)                                                                                                                              | closes the bypass                                              |
-
-Roadmap issues go in **after D**, created through the outbox, so the first real use of the app on itself is also the
-first test of the safe bulk path.
+**Caravan**, a durable queue of paced writes for bulk work: a plan of operations (create, edit, comment, close, link)
+with local refs, previewed with an estimate and run with pause, resume and cancel; one worker through the Quartermaster;
+durable states so a crash resumes; a duplicate guard after uncertain failures; cached ids so a create is one request.
+Needed when the app itself creates issues in bulk.
 
 ## 6. Tests
 
-- A **fake GitHub** that simulates: primary headers counting down, `403` with `retry-after`, the secondary-limit
-  message, content-creation caps per minute and hour, `304` on conditional requests, slow and failing responses.
-- A **fake clock**, so an hour of simulated traffic runs in milliseconds.
-- Property test: for any queue of writes, the governor never exceeds its own caps in any rolling minute or hour, and
-  always stops on a limit signal.
-- Crash tests: kill the worker between "request sent" and "result stored"; on restart there are no duplicates and no
-  lost operations.
-- Sync tests: a deleted or transferred issue disappears after a reconcile; a changed one updates; an unchanged poll
-  costs one point.
-- Scope tests: a roadmap issue in a repository with more than 300 newer issues is still found.
-- Browser test: the first-connection picker, the "All" toggle, the paused banner, plan preview and progress.
-- `make test-linux` covers SQLite on Linux.
+- A **fake GitHub** that simulates primary headers counting down, `403` with `retry-after`, the secondary-limit
+  message, content-creation caps, `304`, and slow and failing responses; a **fake clock**.
+- Property test: for any stream of writes the Quartermaster never exceeds its caps in any rolling minute or hour, never
+  has two requests in flight, and always stops on a limit signal.
+- Scope tests: a tracked issue in a repository with more than 300 newer issues is still found; the picker counts.
+- Shim tests: command classification, pass-through of exit code, output and stdin, fail-open.
+- Browser tests: the first-connection picker, the scope header, the camp banner and rations chip.
+- `make test-linux` for everything that touches processes.
 
-## 7. Decisions needed
+## 7. Phases and status
 
-1. **SQLite** for mirror and outbox (recommended), or JSON files and no outbox for now?
-2. **Scope default**: the first-connection picker with a `roadmap` label as the suggested pattern (recommended), or a
-   different default label or mechanism? Projects v2 stays a later option.
-3. **Pacing defaults**: 3 s between writes, 15 per minute, 150 per hour, keep 20% of the hourly read budget. Too slow,
-   too fast?
-4. **Agent guard**: preamble rule now and the `gh` shim in phase E (recommended), or the rule only?
-5. **Order**: A, B, C, D, E as above, or move B (scope) first because it fixes a defect?
+| Phase             | Contents                                                                              | Status      |
+|-------------------|---------------------------------------------------------------------------------------|-------------|
+| A. Quartermaster  | RoundTripper, rations from headers, floors, serial, write pacing, camp, persistence, `/api/github`, UI chip | in progress |
+| B. Scope          | server-side scope, counts, first-connection picker, scope header, type chips, 300-cut fix | planned     |
+| E. Gatekeeper     | instruction rule, then the `gh` shim with a per-session token                          | planned, **confirm** |
+| C. Chronicle      | SQLite copy and sync                                                                  | deferred    |
+| D. Caravan        | paced bulk writes                                                                     | deferred    |
+
+The first roadmap import goes through the Quartermaster (an idempotent import command), after phase B.

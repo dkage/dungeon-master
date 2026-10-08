@@ -1,5 +1,7 @@
 # Glossary
 
+This file is the development reference (plain meaning, code name). The in-app source of truth is planned as `web/src/lib/words.ts` with the `Term` popovers (M3.6, `PLAN_EXPERIENCE.md`); when it exists this table is generated from or checked against it, and the terms below (Quartermaster, Rations, Camp, Chronicle, Caravan, Gatekeeper) are added there.
+
 The themed words are for the user interface. Each one always shows its plain meaning where it appears, and Go identifiers use plain names. Nothing themed is ever written to GitHub or to a repository.
 
 | Word | Plain meaning | Where the user sees it | Code name |
