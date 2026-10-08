@@ -3,7 +3,7 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: build run web vet test check clean
+.PHONY: build run web vet test test-web test-e2e check clean
 
 ## build: build the dungeon binary into bin/
 build: web
@@ -13,19 +13,27 @@ build: web
 run: build
 	./bin/dungeon serve
 
-## web: stage the frontend into web/dist (placeholder until the Svelte app lands)
+## web: build the frontend into web/dist (embedded by the Go build)
 web:
-	mkdir -p web/dist
-	cp web/placeholder/index.html web/dist/index.html
+	cd web && npm ci && npm run build
+	touch web/dist/.gitkeep
 
 vet:
 	go vet ./...
 
 test:
-	go test ./...
+	go test -race ./...
+
+## test-web: frontend type check and unit/component tests
+test-web:
+	cd web && { [ -d node_modules ] || npm ci; } && npm run check && npm test
+
+## test-e2e: browser tests against the real binary (run `npx playwright install chromium` once)
+test-e2e: build
+	cd web && npm run test:e2e
 
 ## check: what CI runs
-check: vet test
+check: vet test test-web
 
 clean:
 	rm -rf bin build
