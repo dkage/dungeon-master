@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"dungeon/internal/campaign"
-	"dungeon/internal/history"
-	"dungeon/internal/launcher"
-	"dungeon/internal/party"
-	"dungeon/internal/session"
+	"github.com/dkage/dungeon-master/internal/campaign"
+	"github.com/dkage/dungeon-master/internal/history"
+	"github.com/dkage/dungeon-master/internal/launcher"
+	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/session"
 )
 
 const (
@@ -49,7 +49,7 @@ type sessionJSON struct {
 	Created  time.Time `json:"created"`
 	Exited   bool      `json:"exited"`
 	ExitCode int       `json:"exitCode"`
-	// Lost is a session that was running when Dungeon last stopped; its
+	// Lost is a session that was running when Dungeon Master last stopped; its
 	// terminal is gone and only the record remains.
 	Lost bool `json:"lost,omitempty"`
 }

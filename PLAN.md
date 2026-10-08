@@ -1,4 +1,4 @@
-# Dungeon — plan
+# Dungeon Master — plan
 
 A desktop cockpit for a human "Dungeon Master" who runs a party of CLI coding agents (Claude in v1; Codex and agy later) against **GitHub issues**. One button = one agent CLI launched in a PTY with its model, flags and context already set.
 

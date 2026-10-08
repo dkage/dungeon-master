@@ -27,7 +27,7 @@
         </div>
       {/each}
       {#if store.active?.lost}
-        <p class="empty">This expedition was running when Dungeon last stopped, so its terminal is gone. Close it to dismiss.</p>
+        <p class="empty">This expedition was running when Dungeon Master last stopped, so its terminal is gone. Close it to dismiss.</p>
       {:else if !store.active}
         <p class="empty">
           {store.campaign ? 'Pick a hero above to start an expedition.' : 'Add a campaign on the left to begin.'}

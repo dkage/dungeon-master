@@ -1,4 +1,4 @@
-// Command dungeon serves the Dungeon cockpit on localhost.
+// Command dungeon serves the Dungeon Master cockpit on localhost.
 package main
 
 import (
@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"dungeon/internal/server"
+	"github.com/dkage/dungeon-master/internal/server"
 )
 
 // Stamped at build time with -ldflags -X.

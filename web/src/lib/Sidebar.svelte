@@ -18,7 +18,7 @@
   }
 
   function status(s: SessionInfo): { label: string; kind: string } {
-    if (s.lost) return { label: 'lost (Dungeon restarted)', kind: 'lost' }
+    if (s.lost) return { label: 'lost (app restarted)', kind: 'lost' }
     if (!s.exited) return { label: 'running', kind: 'running' }
     return s.exitCode === 0
       ? { label: 'exited', kind: 'done' }

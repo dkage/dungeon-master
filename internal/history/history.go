@@ -1,6 +1,6 @@
 // Package history remembers sessions across restarts. Pseudo-terminals do not
 // survive a restart, so what is kept is a record: which hero ran where, when,
-// and how it ended. Records of sessions that were still running when Dungeon
+// and how it ended. Records of sessions that were still running when Dungeon Master
 // stopped come back marked as lost.
 package history
 
@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"dungeon/internal/fsutil"
+	"github.com/dkage/dungeon-master/internal/fsutil"
 )
 
 // MaxRecords bounds the file. When exceeded, the oldest finished records go.
@@ -29,7 +29,7 @@ type Record struct {
 	Created  time.Time  `json:"created"`
 	Ended    *time.Time `json:"ended,omitempty"`
 	ExitCode int        `json:"exitCode"`
-	// Lost marks a session that was still running when Dungeon stopped.
+	// Lost marks a session that was still running when Dungeon Master stopped.
 	Lost bool `json:"lost,omitempty"`
 }
 

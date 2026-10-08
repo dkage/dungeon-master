@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Git answers the two questions Dungeon asks of a repository. It exists so
+// Git answers the two questions Dungeon Master asks of a repository. It exists so
 // tests can fake it; ExecGit is the real implementation.
 type Git interface {
 	// Toplevel returns the root of the repository containing dir.

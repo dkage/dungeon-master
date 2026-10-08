@@ -1,4 +1,4 @@
-// Typed client for the Dungeon server. Every write sends application/json,
+// Typed client for the Dungeon Master server. Every write sends application/json,
 // which the server's guard requires.
 
 export interface Hero {
@@ -27,7 +27,7 @@ export interface SessionInfo {
   created: string
   exited: boolean
   exitCode: number
-  /** Was running when Dungeon last stopped; only the record remains. */
+  /** Was running when Dungeon Master last stopped; only the record remains. */
   lost?: boolean
 }
 

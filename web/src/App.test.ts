@@ -154,7 +154,7 @@ describe('App', () => {
     render(App)
     expect(await screen.findByText(/terminal is gone/)).toBeInTheDocument()
     expect(screen.queryByTestId('term-stub')).not.toBeInTheDocument()
-    expect(screen.getByText('lost (Dungeon restarted)')).toBeInTheDocument()
+    expect(screen.getByText('lost (app restarted)')).toBeInTheDocument()
     await fireEvent.click(screen.getByRole('button', { name: 'Close Opus' }))
     await waitFor(() => expect(screen.queryByText(/terminal is gone/)).not.toBeInTheDocument())
     expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/sessions/old')).toBe(true)

@@ -16,11 +16,11 @@ import (
 
 	"github.com/coder/websocket"
 
-	"dungeon/internal/campaign"
-	"dungeon/internal/history"
-	"dungeon/internal/party"
-	"dungeon/internal/session"
-	"dungeon/internal/testutil"
+	"github.com/dkage/dungeon-master/internal/campaign"
+	"github.com/dkage/dungeon-master/internal/history"
+	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/session"
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
 // env is a real server on a loopback port, wired to the fake claude.

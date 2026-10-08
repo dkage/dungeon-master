@@ -1,4 +1,4 @@
-# Dungeon
+# Dungeon Master
 
 A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents against GitHub issues. One button starts an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native webview shell.
 
@@ -16,7 +16,7 @@ Status: M0, M1 (heroes and terminal) and M2 (campaigns and the left panel) done;
 
 ## Vocabulary (UI only)
 
-Campaign = registered working directory (issues come from the git root's remote). Quest = GitHub issue. Hero = a registered Claude configuration. Spell = skill. Expedition = live session. Briefing = generated context file. Dungeon = the room graph of quests. Keep these terms out of GitHub-facing text and out of Go identifiers where a neutral name is clearer.
+Campaign = registered working directory (issues come from the git root's remote). Quest = GitHub issue. Hero = a registered Claude configuration. Spell = skill. Expedition = live session. Briefing = generated context file. Dungeon Master = the room graph of quests. Keep these terms out of GitHub-facing text and out of Go identifiers where a neutral name is clearer.
 
 ## Layout
 
@@ -57,7 +57,7 @@ make test-e2e  # browser tests against bin/dungeon (needs `npx playwright instal
 - **Test everything, at two levels.** Every change ships with unit tests (pure logic, parsing, validation) and feature tests that drive the real behaviour end to end: HTTP + websocket against `httptest`, a real PTY running a stub program, the frontend through its public UI. No feature is done without both. Security-relevant behaviour (guard, path confinement, argv building, env scrubbing) always has tests, including the hostile cases.
 - Tests live beside the code (`*_test.go`); shared fixtures and a fake `claude` stub go in `internal/testutil`. Never call the real `claude`, `gh` or the network in automated tests; real-CLI checks are manual probes in the gitignored `_probe/`.
 - Never build a command line through a shell; exec argv directly.
-- Module path is `dungeon` for now; it changes to the GitHub path when the remote exists.
+- Module path is `github.com/dkage/dungeon-master`. The product name "Dungeon Master" is provisional: it appears in prose and UI text only, while the binary, config directory and `DUNGEON_HOME` keep the short `dungeon` name so a later rename stays cheap.
 - Default branch is `master`.
 
 ## Git commits
@@ -67,7 +67,7 @@ Conventional Commits. The first commit is the model:
 ```
 docs: add initial project plans
 
-Dungeon is a desktop cockpit for launching CLI coding agents against
+Dungeon Master is a desktop cockpit for launching CLI coding agents against
 GitHub issues. Nothing is implemented yet; this commit records the
 design so the work can start from a shared reference.
 

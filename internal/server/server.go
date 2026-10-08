@@ -1,4 +1,4 @@
-// Package server is the local HTTP surface of Dungeon. It binds to loopback
+// Package server is the local HTTP surface of Dungeon Master. It binds to loopback
 // only and treats every request as untrusted until it passes the guard.
 package server
 
@@ -15,10 +15,10 @@ import (
 	"os"
 	"time"
 
-	"dungeon/internal/campaign"
-	"dungeon/internal/history"
-	"dungeon/internal/party"
-	"dungeon/internal/session"
+	"github.com/dkage/dungeon-master/internal/campaign"
+	"github.com/dkage/dungeon-master/internal/history"
+	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/session"
 )
 
 // Config is everything New needs.
@@ -162,9 +162,9 @@ func (s *Server) static() http.Handler {
 
 const fallbackPage = `<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dungeon</title>
+<title>Dungeon Master</title>
 <body style="font:16px/1.5 system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 16px">
-<h1>Dungeon</h1><p>The server is running, but the frontend is not built. Run <code>make web</code> and restart.</p>`
+<h1>Dungeon Master</h1><p>The server is running, but the frontend is not built. Run <code>make web</code> and restart.</p>`
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

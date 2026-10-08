@@ -1,12 +1,12 @@
 # Release plan
 
-How Dungeon is versioned, built, packaged, verified and distributed. Everything release-related lives in this directory; the only exceptions are files GitHub forces elsewhere (`.github/workflows/`) and thin `Makefile` entry points that delegate here.
+How Dungeon Master is versioned, built, packaged, verified and distributed. Everything release-related lives in this directory; the only exceptions are files GitHub forces elsewhere (`.github/workflows/`) and thin `Makefile` entry points that delegate here.
 
 Status: planned, nothing implemented. Aligns with milestone M8 in `../PLAN.md`, but the first pieces land much earlier (see §10).
 
 ## 1. Goals
 
-1. Anyone can download one file for their OS and run Dungeon.
+1. Anyone can download one file for their OS and run Dungeon Master.
 2. A release is reproducible from a tag, by CI, with no manual steps on a laptop.
 3. A broken release step is found by a dry run, not by the real tag.
 4. Trust is added in order of payoff: integrity first, then signing, then convenience.
@@ -19,7 +19,7 @@ Non-goals for now: `go install` (the embedded frontend makes it unusable), auto-
 |---|---|---|---|---|
 | Portable binary (`dungeon serve`, browser mode), darwin/linux/windows × amd64/arm64, tar.gz/zip | GoReleaser, one Linux job | ubuntu | no | R0 |
 | `checksums.txt` | GoReleaser | ubuntu | no | R0 |
-| macOS app: `Dungeon.app` in a `.dmg` (arm64) + `.sha256` | script in `release/macos/` | macos arm64 runner | yes | R1 |
+| macOS app: `Dungeon Master.app` in a `.dmg` (arm64) + `.sha256` | script in `release/macos/` | macos arm64 runner | yes | R1 |
 | Linux AppImage (amd64, arm64) | script in `release/linux/` | ubuntu + ubuntu-arm | yes | R2 |
 | `.deb` / `.rpm` | nfpm | ubuntu | yes (shell) | later |
 | Windows shell (WebView2) | script in `release/windows/` | windows | yes | later |
@@ -105,7 +105,7 @@ release/
   .release-please-manifest.json  current released version (present, owned by release-please)
   goreleaser.yaml        portable binaries, archives, checksums, (cask); no changelog, no publish
   macos/
-    build-app.sh         shell binary → Dungeon.app (icon, Info.plist, signing)
+    build-app.sh         shell binary → Dungeon Master.app (icon, Info.plist, signing)
     Info.plist.tmpl
     make-dmg.sh          app + /Applications link + README → .dmg + .sha256
     dmg-README.txt       first-launch (Gatekeeper) instructions
@@ -130,7 +130,7 @@ The root `Makefile` keeps only entry points (`make snapshot`, `make dmg`, `make 
 
 Build steps (script, on a macOS arm64 runner):
 1. Build the shell: `CGO_ENABLED=1 go build -tags webview -trimpath -ldflags "..."`.
-2. Assemble `Dungeon.app/Contents/{MacOS,Resources,Info.plist}`; the binary is `MacOS/dungeon`.
+2. Assemble `Dungeon Master.app/Contents/{MacOS,Resources,Info.plist}`; the binary is `MacOS/dungeon`.
 3. Icon: render the source PNG to the required sizes with `sips`, bundle with `iconutil -c icns`.
 4. `Info.plist`: bundle id, display name, short version (strip pre-release suffix) and full version, minimum macOS read from the binary (`otool -l` → `minos`), `NSHighResolutionCapable`, category.
 5. Sign (see ladder below) and `codesign --verify --strict`.

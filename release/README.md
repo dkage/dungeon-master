@@ -1,6 +1,6 @@
 # release/
 
-Everything about shipping Dungeon: plan, build scripts, packaging assets and release checks. Planned and mostly not built yet.
+Everything about shipping Dungeon Master: plan, build scripts, packaging assets and release checks. Planned and mostly not built yet.
 
 ## Index
 

@@ -8,7 +8,7 @@ import (
 
 // WriteFileAtomic writes data to path through a temporary file and a rename,
 // so a crash never leaves a half-written file. The directory is created with
-// 0700 and the file with 0600: Dungeon's state is private to the user.
+// 0700 and the file with 0600: Dungeon Master's state is private to the user.
 func WriteFileAtomic(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {

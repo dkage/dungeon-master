@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"dungeon/internal/party"
+	"github.com/dkage/dungeon-master/internal/party"
 )
 
 // Opts are the per-launch inputs that are not part of a hero.

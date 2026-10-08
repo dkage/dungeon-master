@@ -1,4 +1,4 @@
-module dungeon
+module github.com/dkage/dungeon-master
 
 go 1.26
 

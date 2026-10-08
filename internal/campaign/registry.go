@@ -19,7 +19,7 @@ import (
 	"time"
 	"unicode"
 
-	"dungeon/internal/fsutil"
+	"github.com/dkage/dungeon-master/internal/fsutil"
 )
 
 var (

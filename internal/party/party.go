@@ -62,7 +62,7 @@ func Defaults() Party {
 	}
 }
 
-// ConfigDir returns the directory holding Dungeon's local config. The
+// ConfigDir returns the directory holding Dungeon Master's local config. The
 // DUNGEON_HOME environment variable overrides it.
 func ConfigDir() (string, error) {
 	if d := os.Getenv("DUNGEON_HOME"); d != "" {

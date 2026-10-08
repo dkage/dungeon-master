@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"dungeon/internal/party"
+	"github.com/dkage/dungeon-master/internal/party"
 )
 
 func TestCommandOrder(t *testing.T) {

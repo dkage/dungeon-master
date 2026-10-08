@@ -20,7 +20,7 @@ func (s *Server) handleTerm(w http.ResponseWriter, r *http.Request) {
 	sess, ok := s.cfg.Sessions.Get(id)
 	if !ok {
 		if rec, known := s.cfg.History.Get(id); known && rec.Lost {
-			httpErr(w, http.StatusGone, "this session ended when Dungeon was last stopped")
+			httpErr(w, http.StatusGone, "this session ended when Dungeon Master was last stopped")
 			return
 		}
 		httpErr(w, http.StatusNotFound, "no such session")

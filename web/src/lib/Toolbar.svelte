@@ -43,7 +43,7 @@
 {/if}
 {#if store.defaultHeroes}
   <p class="notice">
-    Using the built-in heroes. Create <code>party.toml</code> in the Dungeon config directory to define your own.
+    Using the built-in heroes. Create <code>party.toml</code> in the Dungeon Master config directory to define your own.
   </p>
 {/if}
 {#if store.error}

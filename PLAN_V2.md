@@ -1,4 +1,4 @@
-# Dungeon — plan v2 (parking lot)
+# Dungeon Master — plan v2 (parking lot)
 
 Brainstorm only. Nothing here is in v1 (see `PLAN.md`: Claude only, GitHub issues read-mostly, one expedition per working tree). Add ideas freely; promote to a real plan when v1 is stable.
 

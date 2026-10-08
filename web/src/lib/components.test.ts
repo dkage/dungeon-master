@@ -105,7 +105,7 @@ describe('Sidebar', () => {
     expect(within(list).getByText('running')).toBeInTheDocument()
     expect(within(list).getByText('exited with code 2')).toBeInTheDocument()
     expect(within(list).getByText('exited')).toBeInTheDocument()
-    expect(within(list).getByText('lost (Dungeon restarted)')).toBeInTheDocument()
+    expect(within(list).getByText('lost (app restarted)')).toBeInTheDocument()
     expect(within(list).getByRole('button', { name: /^T-a/ })).toHaveAttribute('aria-current', 'true')
     expect(within(screen.getByRole('list', { name: 'Expeditions in Camp c2' })).getAllByRole('listitem')).toHaveLength(1)
 

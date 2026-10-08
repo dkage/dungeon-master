@@ -5,12 +5,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"dungeon/internal/campaign"
-	"dungeon/internal/history"
-	"dungeon/internal/launcher"
-	"dungeon/internal/party"
-	"dungeon/internal/server"
-	"dungeon/web"
+	"github.com/dkage/dungeon-master/internal/campaign"
+	"github.com/dkage/dungeon-master/internal/history"
+	"github.com/dkage/dungeon-master/internal/launcher"
+	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/server"
+	"github.com/dkage/dungeon-master/web"
 )
 
 // buildConfig assembles the server configuration from the user's local

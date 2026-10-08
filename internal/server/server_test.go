@@ -131,7 +131,7 @@ func TestWritesRequireJSON(t *testing.T) {
 
 func TestFallbackPageAndHeaders(t *testing.T) {
 	rec := do(t, "GET", "/", nil)
-	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Dungeon") {
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "Dungeon Master") {
 		t.Fatalf("got %d %q", rec.Code, rec.Body)
 	}
 	if rec.Header().Get("Content-Security-Policy") == "" || rec.Header().Get("X-Content-Type-Options") != "nosniff" {

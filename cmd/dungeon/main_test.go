@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"dungeon/internal/campaign"
-	"dungeon/internal/testutil"
+	"github.com/dkage/dungeon-master/internal/campaign"
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
 func TestRunCommands(t *testing.T) {
