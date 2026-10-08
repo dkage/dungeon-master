@@ -7,8 +7,8 @@ Status: phases A, B and E done; C and D deferred. Comes after M3 (quests list an
 Two problems, one cause: Dungeon Master reads GitHub as its database, and GitHub is a rate-limited service shared with
 every other tool on the same token (the `gh` CLI, scripts, agents).
 
-1. **We must never get a user locked out.** A bulk run of `gh issue create` over 50+ issues locked the owner out of
-   `gh` for roughly 30 minutes. That is GitHub's *secondary* rate limit.
+1. **We must never get a user locked out.** A bulk run of `gh issue create` over 50+ issues locked the owner out of `gh`
+   for roughly 30 minutes. That is GitHub's *secondary* rate limit.
 2. **We must not drown the user in issues.** A repository with 300 open issues, of which 12 are the work being driven
    here, must open to those 12.
 
@@ -45,9 +45,8 @@ import command through the Quartermaster is enough; it needs no durable queue.
 
 ## 1. Facts (GitHub docs, checked 2026-10-08, and measured on the owner's account)
 
-Sources: [REST rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api),
-[GraphQL rate and node
-limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api),
+Sources: [REST rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api), [GraphQL
+rate and node limits](https://docs.github.com/en/graphql/overview/rate-limits-and-node-limits-for-the-graphql-api),
 [REST best practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api).
 
 | Limit                            | Value                                                                                                                                                                                                  |
@@ -81,8 +80,7 @@ An `http.RoundTripper` that every GitHub request of the app goes through, so no 
   reads stop below 20% remaining, interactive reads below 5%, writes below 10%.
 - **Camp (circuit breaker)**: on `403/429` with `retry-after`, `x-ratelimit-remaining: 0`, or a secondary-limit message,
   stop **all** requests, wait `max(retry-after, reset, 60 s)`, double on repeats (cap 1 h), persist across restarts,
-  tell
-  the user. No retry storm.
+  tell the user. No retry storm.
 - **Visibility**: `GET /api/github` returns the rations and the camp, for a small chip in the quest panel.
 - **Reads only for now.** The app makes no writes today, so the write pacing described in decision 3 is built with the
   Gatekeeper (phase E), the only thing that writes. The Quartermaster keeps a `Reserve` hook for that.
@@ -105,23 +103,22 @@ Per campaign, stored locally:
 | `assigned`                   | open issues assigned to the token's user         | `filterBy: {assignee}`                                                    |
 | `all`                        | everything, paged and capped, with the cap shown | paged                                                                     |
 
-Kind is separate: the panel shows **type chips** (`roadmap`, `bug`, ...) built from the labels of the in-scope issues.
-A bug found mid-roadmap is still `tracked`.
+Kind is separate: the panel shows **type chips** (`roadmap`, `bug`, ...) built from the labels of the in-scope issues. A
+bug found mid-roadmap is still `tracked`.
 
 ### First connection
 
-A campaign with no scope yet shows one question, with counts that cost a few points: "312 open issues. Show: tracked
-(0) · assigned to me (3) · pick labels (list with counts) · everything (312)". If the marker label has items it is
+A campaign with no scope yet shows one question, with counts that cost a few points: "312 open issues. Show: tracked (0)
+· assigned to me (3) · pick labels (list with counts) · everything (312)". If the marker label has items it is
 preselected and listed first; when it has none it moves to the bottom as an opt-in, and the picker leads with assigned
-to
-me and the repository's existing labels. The app never writes the label itself. The header always reads
+to me and the repository's existing labels. The app never writes the label itself. The header always reads
 **`tracked · 14 of 312 open`**, with one click to widen to everything.
 
 ### Creating issues
 
 Issues the app creates later get the marker label automatically (created once, with confirmation, if missing). Adopting
-an old issue means adding the label, in GitHub or from the panel. Several repos in one workspace later is a set of
-repos sharing the marker.
+an old issue means adding the label, in GitHub or from the panel. Several repos in one workspace later is a set of repos
+sharing the marker.
 
 ## 4. Gatekeeper: agents cannot bypass the Quartermaster (phase E)
 
@@ -136,8 +133,8 @@ shares the token, and it is possible today.
 - **Transport**: the shim talks to the app over a **Unix domain socket** in a private per-user directory (0700, socket
   0600, refused when owned by someone else or reached through a symlink), not over the web port. The browser-facing
   guard has no gate-token path at all, and the socket refuses any request with an `Origin` header. A per-session token
-  (revoked when the session ends) says which session is asking. Works on macOS, Linux and Windows 10 1803 or later
-  (no file modes on Windows; the directory sits under the user's own temp directory).
+  (revoked when the session ends) says which session is asking. Works on macOS, Linux and Windows 10 1803 or later (no
+  file modes on Windows; the directory sits under the user's own temp directory).
 - **What it cannot stop**: a command that calls `gh` by absolute path, `gh api` or another client (`curl`), and an agent
   that edits its own `PATH`. It is a guard against accidents (a loop), not a sandbox. Starter heroes must not skip
   permissions, and a fine-grained token limited to issues is the recommended token. Sessions inherit `GH_TOKEN` and
@@ -150,9 +147,9 @@ shares the token, and it is possible today.
 
 Kept here so the design is not lost; built only when a feature needs them.
 
-**Chronicle**, a SQLite copy of the tracked issues (tables for repos, issues, labels, edges, comments, sync state).
-Sync per repo: a free conditional `GET /repos/{o}/{r}/issues?labels=tracked&sort=updated&per_page=1` with the last ETag
-(304 means nothing changed), then a GraphQL query for issues updated since a cursor when it did change, plus a cheap
+**Chronicle**, a SQLite copy of the tracked issues (tables for repos, issues, labels, edges, comments, sync state). Sync
+per repo: a free conditional `GET /repos/{o}/{r}/issues?labels=tracked&sort=updated&per_page=1` with the last ETag (304
+means nothing changed), then a GraphQL query for issues updated since a cursor when it did change, plus a cheap
 reconcile pass (numbers and `updatedAt`) on first connect, scope change and about daily. Triggers: an interval (60 s
 when looked at, 5 min idle), window focus, a finished session, starting a hero on a quest, the refresh button. Needed
 for offline use or many campaigns; today the in-memory cache costs about 60 points per hour per active campaign.
@@ -164,8 +161,8 @@ Needed when the app itself creates issues in bulk.
 
 ## 6. Tests
 
-- A **fake GitHub** that simulates primary headers counting down, `403` with `retry-after`, the secondary-limit
-  message, content-creation caps, `304`, and slow and failing responses; a **fake clock**.
+- A **fake GitHub** that simulates primary headers counting down, `403` with `retry-after`, the secondary-limit message,
+  content-creation caps, `304`, and slow and failing responses; a **fake clock**.
 - Property test: for any stream of writes the Quartermaster never exceeds its caps in any rolling minute or hour, never
   has two requests in flight, and always stops on a limit signal.
 - Scope tests: a tracked issue in a repository with more than 300 newer issues is still found; the picker counts.

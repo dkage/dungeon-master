@@ -28,8 +28,7 @@ identifiers use plain names. Nothing themed is ever written to GitHub or to a re
 | **Scope**         | which of a repository's issues the panel shows                                                                   | scope header and first-connection picker        | `scope`                |
 
 **Internal words.** Quartermaster, Rations, Camp, Chronicle, Scout, Caravan and Gatekeeper are names for developers:
-they
-appear in code, logs and these docs, never in the main interface. What the user sees is the plain sentence in the
+they appear in code, logs and these docs, never in the main interface. What the user sees is the plain sentence in the
 "Where the user sees it" column. Every notice that stops or slows something follows one pattern: what happened, until
 when, and what the user sees meanwhile. Sample (demo) campaigns never show GitHub notices at all.
 
