@@ -1,0 +1,82 @@
+# Dungeon
+
+A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents against GitHub issues. One button starts an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native webview shell.
+
+Status: M0 (skeleton) in progress. Plans: `PLAN.md` (v1), `PLAN_SKILLS.md` (skills), `PLAN_V2.md` (parking lot, not in v1). Read the relevant plan before building a milestone.
+
+## Scope and principles
+
+- **v1 is Claude Code only.** Keep one `Launcher` seam; do not build an adapter registry, typed-prompt fallback or per-agent detection until the later multi-agent plan.
+- **Invisible to the team.** All config is local (user state dir). No committed config files and no `.dungeon/` folder in user repos. The RPG theme exists only in the app UI; anything written to git or GitHub uses neutral wording. GitHub write-back is opt-in, off by default.
+- **Execution config stays local.** Heroes (model, flags, env, binary path) live in the user's `party.toml`, never in anything a repo can supply.
+- **Localhost is an attack surface.** Loopback bind only, per-launch token, strict Host/Origin checks, JSON-only writes. Treat any weakening of `internal/server/guard.go` as a release blocker. Issue text is untrusted input to agents.
+- **Own as little as possible for skills.** Use Matt Pocock's skills (MIT) as a pinned external source; fork only on a real gap, keeping his notice and credits.
+- **Independent design.** Write from the behaviour in the plans; do not copy code, prose or assets from other projects. `private/` is gitignored local notes: never commit it, never quote from it in tracked files.
+
+## Vocabulary (UI only)
+
+Campaign = registered working directory (issues come from the git root's remote). Quest = GitHub issue. Hero = a registered Claude configuration. Spell = skill. Expedition = live session. Briefing = generated context file. Dungeon = the room graph of quests. Keep these terms out of GitHub-facing text and out of Go identifiers where a neutral name is clearer.
+
+## Layout
+
+```
+cmd/dungeon/        CLI entry (serve, version)
+internal/server/    HTTP, guard (token, Host, Origin, content-type), static assets
+web/                embedded frontend (web/dist is generated, only .gitkeep is tracked)
+web/placeholder/    stand-in page until the Svelte app lands
+.github/workflows/  CI
+```
+
+Planned packages (see `PLAN.md` §4): `party`, `adapter`/`launcher`, `pty`, `session`, `github`, `quests`, `spells`, `briefing`, `config`.
+
+## Commands
+
+```
+make check    # go vet + go test (what CI runs)
+make build    # stage web, build bin/dungeon (CGO_ENABLED=0)
+make run      # build and serve on 127.0.0.1:7878
+make web      # stage the frontend into web/dist
+```
+
+`go build` and `go test` must work on a fresh clone with no frontend toolchain (the server falls back to a built-in page). The future native webview shell needs cgo and is built separately, never by the portable build.
+
+## Conventions
+
+- Go 1.26, stdlib first. Dependencies must be permissive-licensed and justified. Run `gofmt`; keep `go vet ./...` clean.
+- Tests live beside the code. Security-relevant behaviour (guard, path confinement, argv building) must have tests.
+- Never build a command line through a shell; exec argv directly.
+- Module path is `dungeon` for now; it changes to the GitHub path when the remote exists.
+- Default branch is `master`.
+
+## Git commits
+
+Conventional Commits. The first commit is the model:
+
+```
+docs: add initial project plans
+
+Dungeon is a desktop cockpit for launching CLI coding agents against
+GitHub issues. Nothing is implemented yet; this commit records the
+design so the work can start from a shared reference.
+
+- PLAN.md: v1 scope (Claude Code only), architecture, ...
+- PLAN_SKILLS.md: how skills map to quests and launch buttons.
+```
+
+- Subject: `type: imperative lowercase summary`, no trailing period, about 50 characters (72 hard limit). Optional scope: `feat(server): ...`.
+- Types: `feat`, `fix`, `docs`, `chore` (scaffolding, deps), `build` (packaging, Makefile, release), `ci`, `test`, `refactor`, `perf`.
+- Blank line, then a body wrapped at 72 columns. Say what the change is and why; the diff already says how. Use `- file/area: note` bullets for multi-part commits.
+- Breaking changes: `!` after the type and a `BREAKING CHANGE:` footer.
+- One logical change per commit. Commit only when asked.
+- **No attribution of any kind**: no `Co-Authored-By`, no `Claude-Session:` trailer, no "Generated with" line, in commits or PR bodies.
+- Do not amend or rewrite commits that have been pushed.
+
+## Milestones
+
+M0 skeleton, M1 heroes and terminal, M2 campaigns, M3 GitHub quests, M4 briefing and launch from a quest, M5 spells, M6 dungeon map, M7 hooks status and notifications, M8 packaging and release. Details in `PLAN.md` §11 and `PLAN_SKILLS.md` §7.
+
+## Open verifications (do early)
+
+- Does `claude "/skill args"` run a user-invoked skill in the interactive TUI? (M1)
+- Flags for hook settings injection and `--add-dir`. (M1/M7)
+- GitHub sub-issue, dependency and assignee API calls on the user's repos. (M3)
