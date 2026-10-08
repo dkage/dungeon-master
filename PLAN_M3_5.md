@@ -1,6 +1,6 @@
 # M3.5: GitHub budget and scope
 
-Status: decided, in progress (phases A and B). Comes after M3 (quests list and detail). It runs in parallel with M3.6
+Status: phases A, B and E done; C and D deferred. Comes after M3 (quests list and detail). It runs in parallel with M3.6
 (first run and words, in `PLAN_EXPERIENCE.md`) and finishes before M4. Names for the themed concepts are in
 `GLOSSARY.md`; Go packages keep plain names.
 
@@ -112,7 +112,10 @@ A bug found mid-roadmap is still `tracked`.
 
 A campaign with no scope yet shows one question, with counts that cost a few points: "312 open issues. Show: tracked
 (0) · assigned to me (3) · pick labels (list with counts) · everything (312)". If the marker label has items it is
-preselected. The header always reads **`tracked · 14 of 312 open`**, with one click to widen to everything.
+preselected and listed first; when it has none it moves to the bottom as an opt-in, and the picker leads with assigned
+to
+me and the repository's existing labels. The app never writes the label itself. The header always reads
+**`tracked · 14 of 312 open`**, with one click to widen to everything.
 
 ### Creating issues
 
@@ -129,8 +132,16 @@ shares the token, and it is possible today.
   `gh issue create`; a delayed command is intentional.
 - **`gh` shim** first on the `PATH` of sessions the app starts. Read-only commands pass straight through. Commands that
   create or change things first ask the app for a **slot** (same pacing, same camp), then run the real `gh`.
-  **Fail-open**: an unrecognised command, or an unreachable app, never blocks work. A per-session token limits what the
-  shim may call.
+  **Fail-open**: an unrecognised command, or an unreachable app, never blocks work.
+- **Transport**: the shim talks to the app over a **Unix domain socket** in a private per-user directory (0700, socket
+  0600, refused when owned by someone else or reached through a symlink), not over the web port. The browser-facing
+  guard has no gate-token path at all, and the socket refuses any request with an `Origin` header. A per-session token
+  (revoked when the session ends) says which session is asking. Works on macOS, Linux and Windows 10 1803 or later
+  (no file modes on Windows; the directory sits under the user's own temp directory).
+- **What it cannot stop**: a command that calls `gh` by absolute path, `gh api` or another client (`curl`), and an agent
+  that edits its own `PATH`. It is a guard against accidents (a loop), not a sandbox. Starter heroes must not skip
+  permissions, and a fine-grained token limited to issues is the recommended token. Sessions inherit `GH_TOKEN` and
+  `GITHUB_TOKEN` from the environment the app started in, as they do for any shell; the app does not add or remove it.
 - **Write pacing lives here** (decision 3): at least 3 s between writes (plus 0 to 1 s jitter), at most 15 per rolling
   minute and 150 per rolling hour, every write counted as content-creating, counters persisted so a restart cannot reset
   them, and a write is refused while the Quartermaster is in camp.

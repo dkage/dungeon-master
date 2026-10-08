@@ -5,9 +5,8 @@ an agent CLI in a PTY with its model, flags and context already set. Go server w
 webview shell.
 
 Status: M0-M3 done. M3.5 (GitHub budget, scope and the `gh` shim, `PLAN_M3_5.md`) is done except the deferred SQLite
-copy
-and write queue (phases C and D). M3.6 (first run and words, `PLAN_EXPERIENCE.md`) is in parallel; M4 (start a hero from
-a quest) is next. Themed words: `GLOSSARY.md`.
+copy and write queue (phases C and D). M3.6 (first run and words, `PLAN_EXPERIENCE.md`) is in parallel; M4 (start a hero
+from a quest) is next. Themed words: `GLOSSARY.md`.
 
 ## Scope and principles
 
@@ -148,8 +147,17 @@ M0 skeleton, M1 heroes and terminal, M2 campaigns, M3 GitHub quests, M4 briefing
 dungeon map, M7 hooks status and notifications, M8 packaging and release. Details in `PLAN.md` §11 and `PLAN_SKILLS.md`
 §7.
 
-## Open verifications (do early)
+## Verifications
 
-- Does `claude "/skill args"` run a user-invoked skill in the interactive TUI? (M1)
-- Flags for hook settings injection and `--add-dir`. (M1/M7)
-- GitHub sub-issue, dependency and assignee API calls on the user's repos. (M3)
+Done:
+
+- A user-invoked skill runs from a positional prompt (`claude "/skill args"`) in the interactive TUI. (M1)
+- `--add-dir` and `--append-system-prompt` work as launch flags; the Gatekeeper rule uses the latter. (M1, M3.5)
+- GitHub sub-issues, blocked-by edges, assignees and linked PRs come from one GraphQL query on the user's repos. (M3)
+
+Still open:
+
+- Hook settings injection (`--settings`) for session state. (M7)
+- Camp and secondary-limit refusal against the real GitHub; only the fake has exercised it. (M3.5)
+- Windows: the `gh` shim needs a copy or a `.cmd` instead of a symlink, and the Gatekeeper socket and PTY need a run on
+  a real Windows machine. (release)

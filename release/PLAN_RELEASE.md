@@ -178,6 +178,10 @@ with `lipo`; decide later.
 - **AppImage** (bundles WebKitGTK): build on the oldest reasonable Ubuntu LTS runner for glibc compatibility; arm64 on
   an arm runner. Smoke on a bare container with no WebKit installed.
 - **deb/rpm** via nfpm depend on the distro's WebKitGTK; smoke on Ubuntu LTS and Fedora containers.
+- **Windows minimum: Windows 10 1803.** Unix domain sockets (the Gatekeeper) and ConPTY (terminals) both arrive in that
+  version; every feature must work there, so each milestone that touches processes, sockets or paths adds a Windows
+  check. Open items: the `gh` shim as a copy of the binary or a `.cmd` (symlinks need Developer Mode), the socket
+  directory under the user's temp directory, and no file modes.
 - **Windows:** ship the portable binary first. A ConPTY round-trip smoke test runs on `windows-latest` from the start,
   because PTY behaviour differs most there. The WebView2 shell comes later.
 

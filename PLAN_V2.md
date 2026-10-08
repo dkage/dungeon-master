@@ -33,6 +33,9 @@ working tree). Add ideas freely; promote to a real plan when v1 is stable.
   for teams or very large organizations. The Quartermaster treats the token as an input, so this is another way to
   supply one.
 
+- Local pins as a scope mode: the user marks issues as "mine to drive" inside the app, stored locally, so a campaign can
+  be scoped without writing a label to a repository the user does not own or must not touch. No footprint on GitHub; the
+  cost is that the choice is not shared and not visible in GitHub's own filters.
 - Projects v2 status columns as dungeon floors.
 - Webhook-free live updates via `gh api` polling tuning, or optional relay.
 - Auto-comment of expedition summaries (currently user-confirmed only).

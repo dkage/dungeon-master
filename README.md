@@ -33,6 +33,35 @@ Heroes come from `party.toml` in the config directory; without one, built-in Opu
 `make check` runs the Go and frontend tests; `make test-e2e` runs the browser tests (once:
 `cd web && npx playwright install chromium`).
 
+## Supported platforms
+
+Dungeon Master is released for macOS, Linux and Windows, and every feature must work on all three (a requirement for
+each milestone, not a later port).
+
+| Platform | Minimum                        |
+|----------|--------------------------------|
+| macOS    | current and previous release   |
+| Linux    | glibc or musl                  |
+| Windows  | Windows 10 version 1803 (2018) |
+
+Windows 10 1803 is the first version with Unix domain sockets and ConPTY, which the Gatekeeper and the terminals need.
+Builds are for x86-64 and ARM; Linux is also tested in CI and with `make test-linux`.
+
+Where the systems differ, the code takes the plain route on each: the Gatekeeper talks to the shim over a Unix domain
+socket in a private per-user directory (file modes on macOS and Linux, the user's own temporary directory on Windows),
+and the `gh` shim is a symlink on macOS and Linux and will be a copy of the program on Windows (symlinks need extra
+rights there; not done yet). See
+[release/](release/README.md) for how each platform is built and tested.
+
+## GitHub safety
+
+Agents started here get a `gh` that paces its writes (about one every 3 s, at most 15 a minute and 150 an hour) and
+stops while GitHub has asked for a pause, so a loop cannot get you locked out. It guards the common path only: it
+cannot stop a command that calls `gh` by absolute path, another client such as `curl`, or `gh api`. For stronger
+protection, give agents a [fine-grained token](https://github.com/settings/personal-access-tokens) limited to issues,
+and start heroes without `--dangerously-skip-permissions`. Sessions inherit `GH_TOKEN` from the environment the app
+started in; the Gatekeeper rule and its limits are described in [PLAN_M3_5.md](PLAN_M3_5.md).
+
 ## Acknowledgements
 
 - Dungeon Master is inspired by [chartr](https://github.com/rengwu/chartr) by John Goh, an agent multiplexer with a map
