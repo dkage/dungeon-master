@@ -123,6 +123,10 @@ design so the work can start from a shared reference.
   `- file/area: note` bullets for multi-part commits.
 - Breaking changes: `!` after the type and a `BREAKING CHANGE:` footer.
 - One logical change per commit. Commit only when asked.
+- **Several agent sessions share this working tree**, so other sessions' uncommitted work is usually present. Never
+  `git add -A`, `git add .` or `git commit -a`. Stage and commit only the paths you changed
+  (`git add <paths>` then `git commit <paths>`), run `git status --short` and `git diff --cached --stat` first, and
+  unstage anything that is not yours. If a file you need to commit also holds someone else's edits, stop and ask.
 - **No attribution of any kind**: no `Co-Authored-By`, no `Claude-Session:` trailer, no "Generated with" line, in
   commits or PR bodies.
 - Do not amend or rewrite commits that have been pushed.
