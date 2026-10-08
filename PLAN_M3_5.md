@@ -78,15 +78,13 @@ An `http.RoundTripper` that every GitHub request of the app goes through, so no 
 - **Serial**: one request in flight.
 - **Rations**: records `limit / remaining / reset / resource` from every response. Floors by request class: background
   reads stop below 20% remaining, interactive reads below 5%, writes below 10%.
-- **Write pacing** (self-imposed): at least 3 s apart (plus 0 to 1 s jitter), at most 15 per rolling minute and 150 per
-  rolling hour. Every mutation counts as content-generating. Counters persist, so a restart cannot reset them.
 - **Camp (circuit breaker)**: on `403/429` with `retry-after`, `x-ratelimit-remaining: 0`, or a secondary-limit message,
   stop **all** requests, wait `max(retry-after, reset, 60 s)`, double on repeats (cap 1 h), persist across restarts, tell
   the user. No retry storm.
-- **Visibility**: `GET /api/github` returns the rations, the camp and the writes in the last minute and hour, for a
-  small chip in the quest panel.
-- State (camp, write timestamps) lives in a small private JSON file now; it moves into SQLite if and when phase C
-  happens.
+- **Visibility**: `GET /api/github` returns the rations and the camp, for a small chip in the quest panel.
+- **Reads only for now.** The app makes no writes today, so the write pacing described in decision 3 is built with the
+  Gatekeeper (phase E), the only thing that writes. The Quartermaster keeps a `Reserve` hook for that.
+- State (the camp) lives in a small private JSON file; it moves into SQLite if and when phase C happens.
 
 ## 3. Scope (phase B)
 
@@ -127,6 +125,9 @@ shares the token, and it is possible today.
   create or change things first ask the app for a **slot** (same pacing, same camp), then run the real `gh`.
   **Fail-open**: an unrecognised command, or an unreachable app, never blocks work. A per-session token limits what the
   shim may call.
+- **Write pacing lives here** (decision 3): at least 3 s between writes (plus 0 to 1 s jitter), at most 15 per rolling
+  minute and 150 per rolling hour, every write counted as content-creating, counters persisted so a restart cannot reset
+  them, and a write is refused while the Quartermaster is in camp.
 
 ## 5. Deferred: Chronicle (phase C) and Caravan (phase D)
 
@@ -159,9 +160,9 @@ Needed when the app itself creates issues in bulk.
 
 | Phase             | Contents                                                                              | Status      |
 |-------------------|---------------------------------------------------------------------------------------|-------------|
-| A. Quartermaster  | RoundTripper, rations from headers, floors, serial, write pacing, camp, persistence, `/api/github`, UI chip | in progress |
+| A. Quartermaster  | RoundTripper, rations from headers, floors, serial, camp, persistence, `/api/github`, UI chip (reads only) | in progress |
 | B. Scope          | server-side scope, counts, first-connection picker, scope header, type chips, 300-cut fix | planned     |
-| E. Gatekeeper     | instruction rule, then the `gh` shim with a per-session token                          | planned, **confirm** |
+| E. Gatekeeper     | instruction rule, `gh` shim with a per-session token, and the write pacing         | planned, **confirm** |
 | C. Chronicle      | SQLite copy and sync                                                                  | deferred    |
 | D. Caravan        | paced bulk writes                                                                     | deferred    |
 
