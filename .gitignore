@@ -25,3 +25,6 @@ web/dist/*
 
 # Private development notes (never committed)
 /private/
+
+# Local throwaway experiments
+/_probe/
