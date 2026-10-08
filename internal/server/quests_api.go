@@ -1,0 +1,77 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"strconv"
+
+	"github.com/dkage/dungeon-master/internal/quests"
+)
+
+func (s *Server) handleQuests(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.cfg.Campaigns.Get(r.PathValue("id"))
+	if !ok {
+		httpErr(w, http.StatusNotFound, "no such campaign")
+		return
+	}
+	res, err := s.cfg.Quests.List(r.Context(), c, r.URL.Query().Get("refresh") == "1")
+	if err != nil {
+		questsErr(w, err, c.Repo)
+		return
+	}
+	if res.Quests == nil {
+		res.Quests = []quests.Quest{}
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (s *Server) handleQuest(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.cfg.Campaigns.Get(r.PathValue("id"))
+	if !ok {
+		httpErr(w, http.StatusNotFound, "no such campaign")
+		return
+	}
+	n, err := strconv.Atoi(r.PathValue("number"))
+	if err != nil || n <= 0 {
+		httpErr(w, http.StatusBadRequest, "quest number must be a positive integer")
+		return
+	}
+	d, err := s.cfg.Quests.Detail(r.Context(), c, n)
+	if err != nil {
+		if errors.Is(err, quests.ErrNotFound) {
+			httpErrCode(w, http.StatusNotFound, "not_found", "That issue was not found.")
+			return
+		}
+		questsErr(w, err, c.Repo)
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// questsErr turns a source failure into a status, a code the UI can act on
+// and a message that says what to do next. Raw upstream details never reach
+// the browser beyond what the sources chose to put in their error text.
+func questsErr(w http.ResponseWriter, err error, repo string) {
+	var rl *quests.RateLimitError
+	switch {
+	case errors.Is(err, quests.ErrNoRepo):
+		httpErrCode(w, http.StatusConflict, "no_repo",
+			"This campaign has no GitHub repository. Give the project a remote named origin that points at github.com, or load the demo quests.")
+	case errors.Is(err, quests.ErrNoToken):
+		httpErrCode(w, http.StatusServiceUnavailable, "no_token",
+			"No GitHub credentials found. Run `gh auth login` (or set GH_TOKEN), then refresh.")
+	case errors.Is(err, quests.ErrUnauthorized):
+		httpErrCode(w, http.StatusBadGateway, "github_unauthorized",
+			"GitHub rejected the credentials. Run `gh auth login` again, or check GH_TOKEN.")
+	case errors.As(err, &rl):
+		httpErrCode(w, http.StatusTooManyRequests, "rate_limited", rl.Error()+". Try again later.")
+	case errors.Is(err, quests.ErrNotFound):
+		httpErrCode(w, http.StatusNotFound, "repo_not_found",
+			"GitHub could not find "+repo+", or the credentials cannot see it.")
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+		httpErrCode(w, http.StatusGatewayTimeout, "timeout", "GitHub took too long to answer.")
+	default:
+		httpErrCode(w, http.StatusBadGateway, "upstream", err.Error())
+	}
+}

@@ -28,6 +28,8 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/campaigns", s.handleCampaignAdd)
 	mux.HandleFunc("PATCH /api/campaigns/{id}", s.handleCampaignUpdate)
 	mux.HandleFunc("DELETE /api/campaigns/{id}", s.handleCampaignRemove)
+	mux.HandleFunc("GET /api/campaigns/{id}/quests", s.handleQuests)
+	mux.HandleFunc("GET /api/campaigns/{id}/quests/{number}", s.handleQuest)
 
 	mux.HandleFunc("POST /api/sessions", s.handleCreate)
 	mux.HandleFunc("DELETE /api/sessions/{id}", s.handleDelete)
@@ -132,12 +134,13 @@ func (s *Server) handleCampaignUpdate(w http.ResponseWriter, r *http.Request) {
 		Name   *string   `json:"name"`
 		Remote *string   `json:"remote"`
 		Labels *[]string `json:"labels"`
+		Demo   *bool     `json:"demo"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
 	c, err := s.cfg.Campaigns.Update(r.Context(), r.PathValue("id"), campaign.Patch{
-		Name: req.Name, Remote: req.Remote, Labels: req.Labels,
+		Name: req.Name, Remote: req.Remote, Labels: req.Labels, Demo: req.Demo,
 	})
 	if err != nil {
 		campaignErr(w, err)
@@ -323,4 +326,9 @@ func checkDir(dir string) error {
 
 func httpErr(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// httpErrCode adds a machine-readable code the frontend can act on.
+func httpErrCode(w http.ResponseWriter, status int, code, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg, "code": code})
 }

@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dkage/dungeon-master/internal/party"
 )
@@ -139,5 +140,21 @@ func TestResolveFallsBackToLoginShellPath(t *testing.T) {
 	if _, err := resolve(ctx, "claude", "/nonexistent", "/nonexistent/shell"); err == nil ||
 		!strings.Contains(err.Error(), "not found") {
 		t.Fatalf("broken shell: %v", err)
+	}
+}
+
+func TestLoginShellWithStrayChildrenDoesNotHang(t *testing.T) {
+	shell := filepath.Join(t.TempDir(), "slowshell")
+	if err := os.WriteFile(shell, []byte("#!/bin/sh\nsleep 30 &\nsleep 30\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	if _, err := loginPath(ctx, shell); err == nil {
+		t.Fatal("expected an error")
+	}
+	if time.Since(start) > 8*time.Second {
+		t.Fatalf("hung for %v", time.Since(start))
 	}
 }

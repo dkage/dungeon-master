@@ -144,7 +144,10 @@ func checkExecutable(p string) (string, error) {
 func loginPath(ctx context.Context, shell string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, shell, "-ilc", `printf '%s' "$PATH"`).Output()
+	cmd := exec.CommandContext(ctx, shell, "-ilc", `printf '%s' "$PATH"`)
+	// An rc file may leave background children holding the pipe open.
+	cmd.WaitDelay = time.Second
+	out, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}

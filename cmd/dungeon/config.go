@@ -9,9 +9,15 @@ import (
 	"github.com/dkage/dungeon-master/internal/history"
 	"github.com/dkage/dungeon-master/internal/launcher"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/quests"
+	"github.com/dkage/dungeon-master/internal/quests/demo"
+	"github.com/dkage/dungeon-master/internal/quests/github"
 	"github.com/dkage/dungeon-master/internal/server"
 	"github.com/dkage/dungeon-master/web"
 )
+
+// githubEndpoint is GitHub's GraphQL URL; tests point it at a local server.
+var githubEndpoint = github.DefaultEndpoint
 
 // buildConfig assembles the server configuration from the user's local
 // state: the party file, the claude binary and the shell. A missing claude is
@@ -33,6 +39,14 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 	if err != nil {
 		return server.Config{}, err
 	}
+	// The GitHub CLI is optional: without it, quests need GH_TOKEN or
+	// GITHUB_TOKEN. Resolved through the login shell like claude, since a
+	// GUI launch lacks the user's PATH.
+	ghPath, _ := launcher.Resolve(ctx, "gh")
+	qsvc := quests.NewService(quests.ServiceOptions{
+		GitHub: github.New(github.Options{Endpoint: githubEndpoint, Token: github.EnvOrGH(ghPath)}),
+		Demo:   demo.New(),
+	})
 	cfg := server.Config{
 		Addr:    addr,
 		Token:   token,
@@ -43,6 +57,7 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 
 		Campaigns: campaigns,
 		History:   hist,
+		Quests:    qsvc,
 	}
 	if path, err := launcher.Resolve(ctx, p.Claude); err != nil {
 		cfg.ClaudeErr = err.Error()

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseGitHubRemote(t *testing.T) {
@@ -346,5 +347,51 @@ func TestRealGitMonorepoSubfolderAndRewrites(t *testing.T) {
 	u, err := r.Update(ctx, c.ID, Patch{Remote: &missing})
 	if err != nil || u.GitRoot != root || u.Repo != "" {
 		t.Fatalf("missing remote: %+v %v", u, err)
+	}
+}
+
+func TestDemoFlagPersistsAndUpdates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.json")
+	r := newReg(t, path, &fakeGit{})
+	c, _ := r.Add(context.Background(), Input{Dir: t.TempDir()})
+	if c.Demo {
+		t.Fatal("campaigns start with real quests")
+	}
+	on := true
+	u, err := r.Update(context.Background(), c.ID, Patch{Demo: &on})
+	if err != nil || !u.Demo {
+		t.Fatalf("%+v %v", u, err)
+	}
+	if got, _ := newReg(t, path, &fakeGit{}).Get(c.ID); !got.Demo {
+		t.Fatal("demo flag not persisted")
+	}
+	// Other updates leave it alone; it can be switched back off.
+	name := "x"
+	if u, _ := r.Update(context.Background(), c.ID, Patch{Name: &name}); !u.Demo {
+		t.Fatal("unrelated update cleared the demo flag")
+	}
+	off := false
+	if u, _ := r.Update(context.Background(), c.ID, Patch{Demo: &off}); u.Demo {
+		t.Fatal("demo flag not cleared")
+	}
+}
+
+func TestExecGitDoesNotHangOnStrayChildren(t *testing.T) {
+	// A "git" that leaves a background process holding stdout open must not
+	// make us wait for that process after the timeout kills git.
+	dir := t.TempDir()
+	script := "#!/bin/sh\nsleep 30 &\nsleep 30\n"
+	if err := os.WriteFile(filepath.Join(dir, "git"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	if _, err := (ExecGit{}).Toplevel(ctx, t.TempDir()); err == nil {
+		t.Fatal("expected an error")
+	}
+	if time.Since(start) > 8*time.Second {
+		t.Fatalf("hung for %v", time.Since(start))
 	}
 }

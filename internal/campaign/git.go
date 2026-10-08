@@ -31,6 +31,7 @@ func (ExecGit) run(ctx context.Context, dir string, args ...string) (string, err
 	full := append([]string{"-C", dir, "-c", "core.fsmonitor=false"}, args...)
 	cmd := exec.CommandContext(ctx, "git", full...)
 	cmd.Env = append(cmd.Environ(), "GIT_TERMINAL_PROMPT=0", "LC_ALL=C")
+	cmd.WaitDelay = time.Second // do not hang on pipes held by stray children after a timeout
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err

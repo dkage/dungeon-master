@@ -30,7 +30,11 @@ func EnvOrGH(ghPath string) TokenFunc {
 		}
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
-		out, err := exec.CommandContext(ctx, ghPath, "auth", "token").Output()
+		cmd := exec.CommandContext(ctx, ghPath, "auth", "token")
+		// After a timeout kills gh, do not wait on pipes that a stray
+		// grandchild process may still hold open.
+		cmd.WaitDelay = time.Second
+		out, err := cmd.Output()
 		if err != nil {
 			return "", quests.ErrNoToken
 		}

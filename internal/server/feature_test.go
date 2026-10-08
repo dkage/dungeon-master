@@ -19,6 +19,8 @@ import (
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/history"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/quests"
+	"github.com/dkage/dungeon-master/internal/quests/demo"
 	"github.com/dkage/dungeon-master/internal/session"
 	"github.com/dkage/dungeon-master/internal/testutil"
 )
@@ -32,6 +34,7 @@ type env struct {
 	campaign string // that campaign's id
 	token    string
 	cfg      Config
+	gh       *fakeQuests // the GitHub source behind the quest service
 }
 
 func startServer(t *testing.T, mutate func(*Config)) *env {
@@ -55,6 +58,13 @@ func startServer(t *testing.T, mutate func(*Config)) *env {
 		},
 	}
 	cfg.Sessions = session.NewManager()
+	// Campaigns resolve to github.com/acme/widgets unless the directory is
+	// named "plain", so tests need no real repository.
+	cfg.Campaigns, _ = campaign.Open(context.Background(), "", fakeGit{})
+	gh := &fakeQuests{}
+	cfg.Quests = quests.NewService(quests.ServiceOptions{
+		GitHub: gh, Demo: demo.New(), TTL: time.Nanosecond, MinRefresh: time.Nanosecond,
+	})
 	if mutate != nil {
 		mutate(&cfg)
 	}
@@ -74,7 +84,7 @@ func startServer(t *testing.T, mutate func(*Config)) *env {
 		cfg.Sessions.Shutdown()
 		srv.Close()
 	})
-	return &env{t: t, base: srv.URL, host: ln.Addr().String(), dir: dir, campaign: camp.ID, token: testToken, cfg: cfg}
+	return &env{t: t, base: srv.URL, host: ln.Addr().String(), dir: dir, campaign: camp.ID, token: testToken, cfg: cfg, gh: gh}
 }
 
 func (e *env) req(method, path string, body any, mutate func(*http.Request)) (*http.Response, []byte) {

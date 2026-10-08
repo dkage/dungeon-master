@@ -41,6 +41,8 @@ type Campaign struct {
 	Dir    string   `json:"dir"`
 	Remote string   `json:"remote"`
 	Labels []string `json:"labels"`
+	// Demo shows built-in sample quests instead of GitHub issues.
+	Demo bool `json:"demo"`
 	// Derived from git on registration and update; empty when the directory
 	// is not in a repository or the remote is not on github.com.
 	GitRoot string `json:"gitRoot,omitempty"`
@@ -60,6 +62,7 @@ type Patch struct {
 	Name   *string
 	Remote *string
 	Labels *[]string
+	Demo   *bool
 }
 
 type record struct {
@@ -68,6 +71,7 @@ type record struct {
 	Dir    string    `json:"dir"`
 	Remote string    `json:"remote"`
 	Labels []string  `json:"labels"`
+	Demo   bool      `json:"demo,omitempty"`
 	Added  time.Time `json:"added"`
 }
 
@@ -184,7 +188,7 @@ func (r *Registry) Add(ctx context.Context, in Input) (Campaign, error) {
 	return r.view(rec), nil
 }
 
-// Update changes name, remote or labels, re-reading git when the remote
+// Update changes name, remote, labels or the demo flag, re-reading git when the remote
 // changes.
 func (r *Registry) Update(ctx context.Context, id string, p Patch) (Campaign, error) {
 	r.mu.Lock()
@@ -224,6 +228,9 @@ func (r *Registry) Update(ctx context.Context, id string, p Patch) (Campaign, er
 			return Campaign{}, err
 		}
 		rec.Labels = ls
+	}
+	if p.Demo != nil {
+		rec.Demo = *p.Demo
 	}
 	d := r.resolve(ctx, rec)
 
@@ -270,7 +277,7 @@ func (r *Registry) view(rec record) Campaign {
 		labels = []string{}
 	}
 	return Campaign{
-		ID: rec.ID, Name: rec.Name, Dir: rec.Dir, Remote: rec.Remote, Labels: labels,
+		ID: rec.ID, Name: rec.Name, Dir: rec.Dir, Remote: rec.Remote, Labels: labels, Demo: rec.Demo,
 		GitRoot: d.gitRoot, Repo: d.repo,
 	}
 }

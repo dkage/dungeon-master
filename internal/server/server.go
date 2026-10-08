@@ -18,6 +18,8 @@ import (
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/history"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/quests"
+	"github.com/dkage/dungeon-master/internal/quests/demo"
 	"github.com/dkage/dungeon-master/internal/session"
 )
 
@@ -50,6 +52,8 @@ type Config struct {
 	Campaigns *campaign.Registry
 	// History records sessions across restarts. In-memory when nil.
 	History *history.Store
+	// Quests supplies issues. When nil, only the demo quests are available.
+	Quests *quests.Service
 }
 
 // Server wires the handler, the guard and the listener together.
@@ -97,6 +101,9 @@ func withDefaults(cfg Config) Config {
 	}
 	if cfg.History == nil {
 		cfg.History, _ = history.Open("") // in-memory: cannot fail
+	}
+	if cfg.Quests == nil {
+		cfg.Quests = quests.NewService(quests.ServiceOptions{GitHub: noGitHub{}, Demo: demo.New()})
 	}
 	return cfg
 }
@@ -178,4 +185,15 @@ func isLoopbackHost(h string) bool {
 	}
 	ip := net.ParseIP(h)
 	return ip != nil && ip.IsLoopback()
+}
+
+// noGitHub is the GitHub source of a server started without one.
+type noGitHub struct{}
+
+func (noGitHub) List(context.Context, quests.Repo) ([]quests.Quest, error) {
+	return nil, quests.ErrNoToken
+}
+
+func (noGitHub) Get(context.Context, quests.Repo, int) (quests.Detail, error) {
+	return quests.Detail{}, quests.ErrNoToken
 }
