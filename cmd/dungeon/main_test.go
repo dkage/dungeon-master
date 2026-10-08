@@ -162,9 +162,7 @@ func TestBuildConfigQuestsUseTheGitHubCLIToken(t *testing.T) {
 		w.Write(recorded)
 	}))
 	defer srv.Close()
-	old := githubEndpoint
-	githubEndpoint = srv.URL
-	defer func() { githubEndpoint = old }()
+	t.Setenv("DUNGEON_GITHUB_ENDPOINT", srv.URL)
 
 	t.Setenv("DUNGEON_HOME", t.TempDir())
 	t.Setenv("GH_TOKEN", "")
@@ -205,5 +203,33 @@ func TestBuildConfigQuestsUseTheGitHubCLIToken(t *testing.T) {
 	}
 	if res.Source != "github" || len(res.Quests) != 5 {
 		t.Fatalf("result: %+v", res)
+	}
+}
+
+func TestGitHubEndpointOverrideIsLoopbackOnly(t *testing.T) {
+	t.Setenv("DUNGEON_GITHUB_ENDPOINT", "")
+	if got, err := githubEndpoint(); err != nil || got != "https://api.github.com/graphql" {
+		t.Fatalf("default: %q %v", got, err)
+	}
+	for _, ok := range []string{"http://127.0.0.1:9", "http://localhost:8080/graphql", "https://127.0.0.1/x", "http://[::1]:3000"} {
+		t.Setenv("DUNGEON_GITHUB_ENDPOINT", ok)
+		if got, err := githubEndpoint(); err != nil || got != ok {
+			t.Errorf("%s: %q %v", ok, got, err)
+		}
+	}
+	for _, bad := range []string{
+		"https://evil.test/graphql", "http://10.0.0.5:80", "http://127.0.0.1.evil.test/", "http://localhost.evil.test",
+		"ftp://127.0.0.1", "not a url", "//127.0.0.1", "file:///etc/passwd", "http://0.0.0.0:80",
+	} {
+		t.Setenv("DUNGEON_GITHUB_ENDPOINT", bad)
+		if got, err := githubEndpoint(); err == nil {
+			t.Errorf("%q accepted as %q", bad, got)
+		}
+	}
+	// An unusable override stops startup instead of silently using GitHub.
+	t.Setenv("DUNGEON_HOME", t.TempDir())
+	t.Setenv("DUNGEON_GITHUB_ENDPOINT", "https://evil.test/graphql")
+	if _, err := buildConfig(context.Background(), "127.0.0.1:0", "tok"); err == nil {
+		t.Fatal("buildConfig accepted a remote endpoint")
 	}
 }

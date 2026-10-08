@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -16,8 +19,24 @@ import (
 	"github.com/dkage/dungeon-master/web"
 )
 
-// githubEndpoint is GitHub's GraphQL URL; tests point it at a local server.
-var githubEndpoint = github.DefaultEndpoint
+// githubEndpoint returns GitHub's GraphQL URL. DUNGEON_GITHUB_ENDPOINT can
+// replace it, for tests that run against a local fake, but only with a
+// loopback URL: the token travels in these requests, so an environment
+// variable must never be able to point them at another host.
+func githubEndpoint() (string, error) {
+	v := os.Getenv("DUNGEON_GITHUB_ENDPOINT")
+	if v == "" {
+		return github.DefaultEndpoint, nil
+	}
+	u, err := url.Parse(v)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return "", fmt.Errorf("DUNGEON_GITHUB_ENDPOINT: %q is not an http(s) URL", v)
+	}
+	if h := u.Hostname(); h != "localhost" && !net.ParseIP(h).IsLoopback() {
+		return "", fmt.Errorf("DUNGEON_GITHUB_ENDPOINT: %q is not a loopback URL", v)
+	}
+	return v, nil
+}
 
 // buildConfig assembles the server configuration from the user's local
 // state: the party file, the claude binary and the shell. A missing claude is
@@ -43,8 +62,12 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 	// GITHUB_TOKEN. Resolved through the login shell like claude, since a
 	// GUI launch lacks the user's PATH.
 	ghPath, _ := launcher.Resolve(ctx, "gh")
+	endpoint, err := githubEndpoint()
+	if err != nil {
+		return server.Config{}, err
+	}
 	qsvc := quests.NewService(quests.ServiceOptions{
-		GitHub: github.New(github.Options{Endpoint: githubEndpoint, Token: github.EnvOrGH(ghPath)}),
+		GitHub: github.New(github.Options{Endpoint: endpoint, Token: github.EnvOrGH(ghPath)}),
 		Demo:   demo.New(),
 	})
 	cfg := server.Config{
