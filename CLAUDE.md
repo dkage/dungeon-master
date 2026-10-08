@@ -2,12 +2,13 @@
 
 A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents against GitHub issues. One button starts an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native webview shell.
 
-Status: M0 done; M1 (heroes and terminal) done; M2 (campaigns) in progress. Plans: `PLAN.md` (v1), `PLAN_SKILLS.md` (skills), `release/PLAN_RELEASE.md` (releases), `PLAN_V2.md` (parking lot, not in v1). Read the relevant plan before building a milestone.
+Status: M0, M1 (heroes and terminal) and M2 (campaigns and the left panel) done; M3 (GitHub quests) is next. Plans: `PLAN.md` (v1), `PLAN_SKILLS.md` (skills), `release/PLAN_RELEASE.md` (releases), `PLAN_V2.md` (parking lot, not in v1). Read the relevant plan before building a milestone.
 
 ## Scope and principles
 
 - **v1 is Claude Code only.** Keep one `Launcher` seam; do not build an adapter registry, typed-prompt fallback or per-agent detection until the later multi-agent plan.
 - **Invisible to the team.** All config is local (user state dir). No committed config files and no `.dungeon/` folder in user repos. The RPG theme exists only in the app UI; anything written to git or GitHub uses neutral wording. GitHub write-back is opt-in, off by default.
+- **State files** (`campaigns.json`, `sessions.json`, `party.toml`) live in the user config dir (`DUNGEON_HOME` overrides it), written atomically with 0600/0700 permissions. Derived data (git root, owner/repo) is recomputed on load, never persisted.
 - **Execution config stays local.** Heroes (model, flags, env, binary path) live in the user's `party.toml`, never in anything a repo can supply.
 - **Localhost is an attack surface.** Loopback bind only, per-launch token, strict Host/Origin checks, JSON-only writes. Treat any weakening of `internal/server/guard.go` as a release blocker. Issue text is untrusted input to agents.
 - **Own as little as possible for skills.** Use Matt Pocock's skills (MIT) as a pinned external source; fork only on a real gap, keeping his notice and credits.
@@ -24,6 +25,9 @@ cmd/dungeon/        CLI entry (serve, version)
 internal/server/    HTTP, guard (token, Host, Origin, content-type), static assets
 internal/session/   PTY sessions (scrollback, subscribers, process-group kill)
 internal/party/     party.toml loading and validation
+internal/campaign/  registry of working directories; git root and owner/repo resolution
+internal/history/   session records that survive restarts
+internal/fsutil/    atomic private file writes
 internal/launcher/  claude argv, env scrubbing, binary lookup
 internal/testutil/  shared fixtures (fake claude)
 web/                Svelte 5 + Vite + TypeScript frontend, embedded via go:embed
