@@ -4,12 +4,15 @@ import { fileURLToPath } from 'node:url'
 import { expect, test, type Page } from '@playwright/test'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const { url, workdir, subdir } = JSON.parse(readFileSync(join(here, '.url.json'), 'utf8')) as {
+const { url, workdir, subdir, plaindir } = JSON.parse(readFileSync(join(here, '.url.json'), 'utf8')) as {
   url: string
   workdir: string
   subdir: string
+  plaindir: string
 }
 
+// The close button of an expedition (not the quest drawer's).
+const closeSession = /^Close (?!quests)/
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Campaigns' })
 const hero = (page: Page, name: string) => page.getByRole('button', { name, exact: true })
 const screenText = (page: Page) => page.locator('.pane:not([hidden]) .xterm-rows')
@@ -33,7 +36,7 @@ async function open(page: Page) {
   }
   await nav(page).getByRole('button', { name: /^demo/ }).click()
   await expect(hero(page, 'Opus')).toBeEnabled()
-  const close = page.getByRole('button', { name: /^Close / })
+  const close = page.getByRole('button', { name: closeSession })
   while ((await close.count()) > 0) {
     const before = await close.count()
     await close.first().click()
@@ -66,7 +69,7 @@ test('a monorepo subfolder runs agents in the subfolder but uses the repository 
   await expect(screenText(page)).toContainText('apps/api') // cwd is the subfolder
 
   // Clean up so later tests start from one campaign.
-  await page.getByRole('button', { name: /^Close / }).click()
+  await page.getByRole('button', { name: closeSession }).click()
   await page.getByRole('button', { name: 'Remove campaign api' }).click()
   await page.getByRole('button', { name: 'Remove?' }).click()
   await expect(nav(page).getByRole('button', { name: /^api/ })).toHaveCount(0)
@@ -135,7 +138,7 @@ test('a campaign with a running expedition cannot be removed', async ({ page }) 
   await expect(nav(page).getByRole('button', { name: /^busy/ })).toBeVisible()
 
   // Close the expedition, then removal succeeds.
-  await page.getByRole('button', { name: /^Close / }).click()
+  await page.getByRole('button', { name: closeSession }).click()
   await page.getByRole('button', { name: 'Remove campaign busy' }).click()
   await page.getByRole('button', { name: 'Remove?' }).click()
   await expect(nav(page).getByRole('button', { name: /^busy/ })).toHaveCount(0)
@@ -145,7 +148,7 @@ test('closing an expedition ends it on the server', async ({ page }) => {
   await open(page)
   await hero(page, 'Shell').click()
   await expect(expeditions(page).getByRole('listitem')).toHaveCount(1)
-  await page.getByRole('button', { name: /^Close / }).click()
+  await page.getByRole('button', { name: closeSession }).click()
   await expect(page.getByRole('list', { name: /^Expeditions in/ })).toHaveCount(0)
   await page.reload()
   await expect(hero(page, 'Opus')).toBeEnabled()
@@ -202,4 +205,137 @@ test('the terminal renders with its own font, colours and selection (CSP must al
   expect(await sel.evaluate((e) => getComputedStyle(e).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)')
 
   expect(violations).toEqual([])
+})
+
+// --- quests ---
+
+const questPanel = (page: Page) => page.getByRole('complementary', { name: 'Quests' })
+
+test("the quest panel lists the repository's issues with their states and relationships", async ({ page }) => {
+  await open(page)
+  const panel = questPanel(page)
+  await expect(panel.getByText('acme/demo')).toBeVisible()
+  await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).toBeVisible()
+  await expect(panel.getByRole('button', { name: /#5 \[demo\] Bug/ })).toContainText('@dkage') // assigned
+  await expect(panel.getByRole('button', { name: /#3 \[demo\] Render rooms/ })).toContainText('blocked by #2') // locked
+  await expect(panel.getByTitle('Sub-issues done')).toHaveText('0/2')
+  await expect(panel.getByLabel('Quest counts')).toContainText('1 locked')
+  await expect(panel.getByLabel('Quest counts')).toContainText('1 in progress')
+
+  // The two sub-issues are nested under the epic.
+  const rows = await panel.getByRole('listitem').evaluateAll((els) =>
+    els.map((e) => [e.textContent?.match(/#(\d+)/)?.[1] ?? '', getComputedStyle(e).paddingLeft]),
+  )
+  const pad = Object.fromEntries(rows)
+  expect(pad['1']).toBe('0px')
+  expect(pad['2']).toBe('16px')
+  expect(pad['3']).toBe('16px')
+})
+
+test('the quest filter narrows the list', async ({ page }) => {
+  await open(page)
+  const panel = questPanel(page)
+  await panel.getByLabel('Filter quests').fill('renderer')
+  await expect(panel.getByRole('listitem')).toHaveCount(1)
+  await expect(panel.getByRole('button', { name: /which renderer/ })).toBeVisible()
+  await panel.getByLabel('Filter quests').fill('#5')
+  await expect(panel.getByRole('listitem')).toHaveCount(1)
+  await panel.getByLabel('Filter quests').fill('nothing matches this')
+  await expect(panel.getByText('No quests match.')).toBeVisible()
+})
+
+test('opening a quest shows its markdown, relations and comments; an unknown issue fails gracefully', async ({ page }) => {
+  await open(page)
+  const panel = questPanel(page)
+  await panel.getByRole('button', { name: /#3 \[demo\] Render rooms/ }).click()
+  await expect(panel.getByRole('heading', { name: /#3 \[demo\] Render rooms on the map/ })).toBeVisible()
+  await expect(panel.getByText('opened by @dkage')).toBeVisible()
+  await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).toBeVisible() // parent
+  await expect(panel.getByRole('button', { name: /#2 \[demo\] Sketch/ })).toBeVisible() // blocker
+  await expect(panel.getByLabel('Description')).toContainText('See also the epic')
+  await expect(panel.getByLabel('Comments')).toContainText('Needs the layout sketch first')
+  await expect(panel.getByLabel('Comments').locator('strong').last()).toHaveText('layout sketch') // markdown rendered
+
+  // The fake GitHub only knows #3 in detail, so following the blocker shows the error state.
+  await panel.getByRole('button', { name: /#2 \[demo\] Sketch/ }).click()
+  await expect(panel.getByRole('alert')).toContainText('That issue was not found.')
+  await panel.getByRole('button', { name: /← Quests/ }).click()
+  await expect(panel.getByLabel('Filter quests')).toBeVisible()
+})
+
+test('a hostile issue cannot run script or load anything (sanitiser and CSP together)', async ({ page }) => {
+  const violations: string[] = []
+  page.on('console', (m) => {
+    if (/content security policy/i.test(m.text())) violations.push(m.text())
+  })
+  await open(page)
+  const panel = questPanel(page)
+  await panel.getByRole('button', { name: /#9 Hostile body/ }).click()
+  await expect(panel.getByRole('heading', { name: /#9 Hostile body/ })).toBeVisible()
+  await expect(panel.getByLabel('Description')).toContainText('still bold')
+  await expect(panel.getByLabel('Comments')).toBeVisible()
+
+  // Nothing dangerous reached the DOM…
+  const dangerous = await panel.locator('script, img, svg, iframe, [onerror], [onload]').count()
+  expect(dangerous).toBe(0)
+  const hrefs = await panel.getByLabel('Description').locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href') ?? ''))
+  for (const h of hrefs) expect(h).not.toMatch(/^javascript:/i)
+  // …nothing ran…
+  expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined()
+  // …and the browser reported no policy violation either.
+  expect(violations).toEqual([])
+})
+
+test('refreshing reloads the quests', async ({ page }) => {
+  await open(page)
+  const panel = questPanel(page)
+  await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).toBeVisible()
+  const requested = page.waitForRequest((r) => r.url().endsWith('/quests?refresh=1'))
+  await panel.getByRole('button', { name: 'Refresh quests' }).click()
+  await requested
+  await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).toBeVisible()
+})
+
+test('a campaign without a GitHub repository offers demo quests, and can go back', async ({ page }) => {
+  await open(page)
+  await addCampaign(page, plaindir, 'plain')
+  const panel = questPanel(page)
+  await expect(panel.getByRole('alert')).toContainText('no GitHub repository')
+  await expect(panel.getByRole('button', { name: /Epic/ })).toHaveCount(0) // not the other campaign's issues
+
+  await panel.getByRole('button', { name: 'Load demo quests' }).click()
+  await expect(panel.getByText('demo data')).toBeVisible()
+  await expect(panel.getByRole('button', { name: /Build the signup form/ })).toBeVisible()
+  await expect(panel.getByRole('button', { name: /Suspend a user/ })).toContainText('blocked by #12')
+
+  // Demo detail, with its relations, and no GitHub link for sample data.
+  await panel.getByRole('button', { name: /Build the signup form/ }).click()
+  await expect(panel.getByRole('heading', { name: /#3 Build the signup form/ })).toBeVisible()
+  await expect(panel.getByRole('button', { name: /#2 Design the welcome screen/ })).toBeVisible()
+  await expect(panel.getByRole('link', { name: 'Open on GitHub' })).toHaveCount(0)
+  await panel.getByRole('button', { name: /← Quests/ }).click()
+
+  await panel.getByRole('button', { name: 'Use real issues' }).click()
+  await expect(panel.getByRole('alert')).toContainText('no GitHub repository')
+
+  // Switching back to the other campaign shows its own issues again.
+  await nav(page).getByRole('button', { name: /^demo/ }).click()
+  await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).toBeVisible()
+
+  // Clean up.
+  await nav(page).getByRole('button', { name: /^plain/ }).click()
+  await page.getByRole('button', { name: 'Remove campaign plain' }).click()
+  await page.getByRole('button', { name: 'Remove?' }).click()
+  await expect(nav(page).getByRole('button', { name: /^plain/ })).toHaveCount(0)
+})
+
+test('on a narrow window the quest panel is a drawer opened from the toolbar', async ({ page }) => {
+  await page.setViewportSize({ width: 1000, height: 800 })
+  await open(page)
+  const panel = questPanel(page)
+  await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).not.toBeInViewport()
+  await page.getByRole('button', { name: 'Quests', exact: true }).click()
+  await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).toBeInViewport()
+  await panel.getByRole('button', { name: 'Close quests' }).click()
+  await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).not.toBeInViewport()
 })
