@@ -44,7 +44,8 @@ make web      # stage the frontend into web/dist
 ## Conventions
 
 - Go 1.26, stdlib first. Dependencies must be permissive-licensed and justified. Run `gofmt`; keep `go vet ./...` clean.
-- Tests live beside the code. Security-relevant behaviour (guard, path confinement, argv building) must have tests.
+- **Test everything, at two levels.** Every change ships with unit tests (pure logic, parsing, validation) and feature tests that drive the real behaviour end to end: HTTP + websocket against `httptest`, a real PTY running a stub program, the frontend through its public UI. No feature is done without both. Security-relevant behaviour (guard, path confinement, argv building, env scrubbing) always has tests, including the hostile cases.
+- Tests live beside the code (`*_test.go`); shared fixtures and a fake `claude` stub go in `internal/testutil`. Never call the real `claude`, `gh` or the network in automated tests; real-CLI checks are manual probes in the gitignored `_probe/`.
 - Never build a command line through a shell; exec argv directly.
 - Module path is `dungeon` for now; it changes to the GitHub path when the remote exists.
 - Default branch is `master`.
