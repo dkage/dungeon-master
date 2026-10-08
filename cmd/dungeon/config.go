@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dkage/dungeon-master/internal/campaign"
+	"github.com/dkage/dungeon-master/internal/gatekeeper"
 	"github.com/dkage/dungeon-master/internal/history"
 	"github.com/dkage/dungeon-master/internal/launcher"
 	"github.com/dkage/dungeon-master/internal/party"
@@ -41,6 +42,32 @@ func githubEndpoint() (string, error) {
 	return v, nil
 }
 
+// realGH finds the real gh and, when there is one, puts the Gatekeeper's shim
+// in front of it for the sessions the app starts. A candidate that resolves to
+// this very program is skipped: started from one of its own sessions, the app
+// finds its shim first on the PATH and must not mistake it for gh.
+func realGH(ctx context.Context, dir string) (string, *server.Gatekeeper) {
+	exe, err := os.Executable()
+	if err != nil {
+		path, _ := launcher.Resolve(ctx, "gh")
+		return path, nil
+	}
+	self, _ := filepath.EvalSymlinks(exe)
+	real, err := launcher.ResolveExcept(ctx, "gh", func(p string) bool {
+		r, _ := filepath.EvalSymlinks(p)
+		return r != "" && r == self
+	})
+	if err != nil {
+		return "", nil // no gh, so nothing for agents to flood
+	}
+	bin, err := gatekeeper.Install(filepath.Join(dir, "gatekeeper"), exe)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "warning: gh writes in sessions will not be paced:", err)
+		return real, nil
+	}
+	return real, &server.Gatekeeper{BinDir: bin, RealGH: real}
+}
+
 // buildConfig assembles the server configuration from the user's local
 // state: the party file, the claude binary and the shell. A missing claude is
 // not fatal, because the app still starts and explains the problem in its UI.
@@ -64,7 +91,7 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 	// The GitHub CLI is optional: without it, quests need GH_TOKEN or
 	// GITHUB_TOKEN. Resolved through the login shell like claude, since a
 	// GUI launch lacks the user's PATH.
-	ghPath, _ := launcher.Resolve(ctx, "gh")
+	ghPath, gate := realGH(ctx, dir)
 	endpoint, err := githubEndpoint()
 	if err != nil {
 		return server.Config{}, err
@@ -101,6 +128,7 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 		Quests:    qsvc,
 
 		Quartermaster: qm,
+		Gatekeeper:    gate,
 	}
 	if path, err := launcher.Resolve(ctx, p.Claude); err != nil {
 		cfg.ClaudeErr = err.Error()

@@ -93,30 +93,30 @@ func TestResolve(t *testing.T) {
 	want := writeExe(t, bin, "claude")
 
 	// Explicit path.
-	if got, err := resolve(ctx, want, "", ""); err != nil || got != want {
+	if got, err := resolve(ctx, want, "", "", nil); err != nil || got != want {
 		t.Fatalf("explicit: %q %v", got, err)
 	}
 	// Explicit path that is not executable.
 	plain := filepath.Join(t.TempDir(), "claude")
 	_ = os.WriteFile(plain, []byte("x"), 0o644)
-	if _, err := resolve(ctx, plain, "", ""); err == nil {
+	if _, err := resolve(ctx, plain, "", "", nil); err == nil {
 		t.Fatal("non-executable accepted")
 	}
 	// A directory named like the binary.
 	d := t.TempDir()
 	_ = os.Mkdir(filepath.Join(d, "claude"), 0o755)
-	if _, err := resolve(ctx, "claude", d, ""); err == nil {
+	if _, err := resolve(ctx, "claude", d, "", nil); err == nil {
 		t.Fatal("directory accepted")
 	}
 	// PATH lookup.
-	if got, err := resolve(ctx, "claude", "/nonexistent:"+bin, ""); err != nil || got != want {
+	if got, err := resolve(ctx, "claude", "/nonexistent:"+bin, "", nil); err != nil || got != want {
 		t.Fatalf("PATH: %q %v", got, err)
 	}
 	// Not found anywhere.
-	if _, err := resolve(ctx, "claude", "/nonexistent", ""); err == nil {
+	if _, err := resolve(ctx, "claude", "/nonexistent", "", nil); err == nil {
 		t.Fatal("found a binary that does not exist")
 	}
-	if _, err := resolve(ctx, "", "", ""); err == nil {
+	if _, err := resolve(ctx, "", "", "", nil); err == nil {
 		t.Fatal("empty name accepted")
 	}
 }
@@ -132,12 +132,12 @@ func TestResolveFallsBackToLoginShellPath(t *testing.T) {
 	if err := os.WriteFile(shell, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	got, err := resolve(ctx, "claude", "/nonexistent", shell)
+	got, err := resolve(ctx, "claude", "/nonexistent", shell, nil)
 	if err != nil || got != want {
 		t.Fatalf("login PATH fallback: %q %v", got, err)
 	}
 	// A broken shell must not turn into a crash, just "not found".
-	if _, err := resolve(ctx, "claude", "/nonexistent", "/nonexistent/shell"); err == nil ||
+	if _, err := resolve(ctx, "claude", "/nonexistent", "/nonexistent/shell", nil); err == nil ||
 		!strings.Contains(err.Error(), "not found") {
 		t.Fatalf("broken shell: %v", err)
 	}
@@ -156,5 +156,37 @@ func TestLoginShellWithStrayChildrenDoesNotHang(t *testing.T) {
 	}
 	if time.Since(start) > 8*time.Second {
 		t.Fatalf("hung for %v", time.Since(start))
+	}
+}
+
+func TestResolveExceptSkipsRejectedCandidates(t *testing.T) {
+	ctx := context.Background()
+	shim, real := t.TempDir(), t.TempDir()
+	writeExe(t, shim, "gh")
+	wantReal := writeExe(t, real, "gh")
+	path := shim + string(os.PathListSeparator) + real
+
+	// Without a filter the first gh on PATH wins, which here is the shim.
+	if got, err := resolve(ctx, "gh", path, "", nil); err != nil || filepath.Dir(got) != shim {
+		t.Fatalf("%q %v", got, err)
+	}
+	// Rejecting the shim finds the real one behind it.
+	reject := func(p string) bool { return filepath.Dir(p) == shim }
+	if got, err := resolve(ctx, "gh", path, "", reject); err != nil || got != wantReal {
+		t.Fatalf("%q %v", got, err)
+	}
+	// Rejecting everything is "not found", not a crash.
+	if _, err := resolve(ctx, "gh", path, "", func(string) bool { return true }); err == nil {
+		t.Fatal("found something although everything was rejected")
+	}
+}
+
+func TestResolveExceptUsesTheEnvironmentPath(t *testing.T) {
+	bin := t.TempDir()
+	want := writeExe(t, bin, "ghx")
+	t.Setenv("PATH", bin)
+	t.Setenv("SHELL", "")
+	if got, err := ResolveExcept(context.Background(), "ghx", nil); err != nil || got != want {
+		t.Fatalf("%q %v", got, err)
 	}
 }

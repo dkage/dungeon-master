@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -334,5 +335,100 @@ func TestQuartermasterIsWiredAndItsPauseSurvivesARestart(t *testing.T) {
 	}
 	if _, err := cfg2.Quests.List(ctx, camp, true); !errors.As(err, &rl) || !rl.Paused || hits.Load() != before {
 		t.Fatalf("restart bypassed the pause: %v", err)
+	}
+}
+
+func fakeGHScript(t *testing.T, exit int) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "gh")
+	script := "#!/bin/sh\nexit " + strconv.Itoa(exit) + "\n"
+	if err := os.WriteFile(p, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestTheProgramIsTheShimOnlyWhenStartedAsGh(t *testing.T) {
+	for _, name := range []string{"dungeon", "/usr/bin/dungeon", "ghost", "/x/gh-extension", ""} {
+		if _, ok := maybeShim([]string{name, "issue", "create"}); ok {
+			t.Errorf("%q must not be the shim", name)
+		}
+	}
+	if _, ok := maybeShim(nil); ok {
+		t.Error("no argv")
+	}
+	// As gh it runs the real gh and passes its exit code on (read: no app needed).
+	t.Setenv("DUNGEON_REAL_GH", fakeGHScript(t, 7))
+	t.Setenv("DUNGEON_GATE_URL", "")
+	t.Setenv("DUNGEON_GATE_TOKEN", "")
+	code, ok := maybeShim([]string{"/some/where/gh", "issue", "list"})
+	if !ok || code != 7 {
+		t.Fatalf("handled=%v code=%d", ok, code)
+	}
+	// A write with no app to ask runs unpaced (fail-open) and also passes the code on.
+	code, ok = maybeShim([]string{"gh", "issue", "create", "--title", "x"})
+	if !ok || code != 7 {
+		t.Fatalf("fail-open write: handled=%v code=%d", ok, code)
+	}
+}
+
+func TestStartupPutsTheShimInFrontOfTheRealGh(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("DUNGEON_HOME", home)
+	real := fakeGHScript(t, 0)
+	t.Setenv("PATH", filepath.Dir(real))
+	t.Setenv("SHELL", "")
+	cfg, err := buildConfig(context.Background(), "127.0.0.1:0", "tok")
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := cfg.Gatekeeper
+	if g == nil || g.RealGH != real {
+		t.Fatalf("gatekeeper: %+v (want real gh %s)", g, real)
+	}
+	exe, _ := os.Executable()
+	if target, err := os.Readlink(filepath.Join(g.BinDir, "gh")); err != nil || target != exe {
+		t.Fatalf("shim link: %q %v", target, err)
+	}
+	if !strings.HasPrefix(g.BinDir, home) {
+		t.Fatalf("the shim must live in the config directory, not %q", g.BinDir)
+	}
+}
+
+func TestStartedFromInsideASessionTheAppDoesNotTakeItsOwnShimForGh(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("DUNGEON_HOME", home)
+	real := fakeGHScript(t, 0)
+	// A session's PATH: the shim (a link to this very program) comes first.
+	shimDir := t.TempDir()
+	exe, _ := os.Executable()
+	if err := os.Symlink(exe, filepath.Join(shimDir, "gh")); err != nil {
+		t.Skip("symlinks unavailable")
+	}
+	t.Setenv("PATH", shimDir+string(os.PathListSeparator)+filepath.Dir(real))
+	t.Setenv("SHELL", "")
+	cfg, err := buildConfig(context.Background(), "127.0.0.1:0", "tok")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Gatekeeper == nil || cfg.Gatekeeper.RealGH != real {
+		t.Fatalf("the real gh is %+v, want %q (the shim must be skipped, or every command would loop)", cfg.Gatekeeper, real)
+	}
+}
+
+func TestWithoutGhThereIsNothingToGuard(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("DUNGEON_HOME", home)
+	t.Setenv("PATH", "/nonexistent")
+	t.Setenv("SHELL", "")
+	cfg, err := buildConfig(context.Background(), "127.0.0.1:0", "tok")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Gatekeeper != nil {
+		t.Fatalf("%+v", cfg.Gatekeeper)
+	}
+	if _, err := os.Stat(filepath.Join(home, "gatekeeper")); err == nil {
+		t.Fatal("a shim directory was created although there is no gh")
 	}
 }

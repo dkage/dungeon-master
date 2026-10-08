@@ -4,9 +4,10 @@ A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents ag
 an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native
 webview shell.
 
-Status: M0-M3 done. M3.5 (GitHub budget and scope, `PLAN_M3_5.md`): phases A and B done, the Gatekeeper (phase E) is
-next, in parallel with M3.6 (first run and
-words, `PLAN_EXPERIENCE.md`); then M4. Themed words: `GLOSSARY.md`.
+Status: M0-M3 done. M3.5 (GitHub budget, scope and the `gh` shim, `PLAN_M3_5.md`) is done except the deferred SQLite
+copy
+and write queue (phases C and D). M3.6 (first run and words, `PLAN_EXPERIENCE.md`) is in parallel; M4 (start a hero from
+a quest) is next. Themed words: `GLOSSARY.md`.
 
 ## Scope and principles
 
@@ -23,6 +24,12 @@ words, `PLAN_EXPERIENCE.md`); then M4. Themed words: `GLOSSARY.md`.
 - **GitHub credentials** come from `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`; they are used for GitHub requests only
   and never stored, logged, put in an error or sent to the browser. `DUNGEON_GITHUB_ENDPOINT` (tests only) accepts
   loopback URLs and nothing else.
+- **Never get a user locked out of GitHub.** All of the app's GitHub requests go through the Quartermaster's transport
+  (serial, budget read from headers, camp on a limit). Agents run `gh` themselves, so every session the app starts has a
+  shim named `gh` first on its PATH (a link to this binary, `internal/gatekeeper`): reads pass straight through, writes
+  (`gh issue create`, `gh api -X POST`, GraphQL mutations, ...) wait for a paced slot (3 s apart, 15 a minute, 150 an
+  hour) and are refused while GitHub has asked us to slow down. It fails open: an unreachable app or an unrecognised
+  command never blocks work. Never loop `gh issue create`; one write at a time.
 - **Scope is part of the GitHub query**, never a filter applied to a truncated list. A campaign has no scope until the
   user chooses one (the first-connection question); `tracked` is the neutral marker label the picker suggests.
 - **Issue text is untrusted.** Markdown is cut to a bare-tag allowlist, then sanitised; never pass anything but
@@ -42,8 +49,8 @@ words, `PLAN_EXPERIENCE.md`); then M4. Themed words: `GLOSSARY.md`.
 
 Campaign = registered working directory (issues come from the git root's remote). Quest = GitHub issue. Hero = a
 registered Claude configuration. Spell = skill. Expedition = live session. Briefing = generated context file. Dungeon
-Master = the room graph of quests. Keep these terms out of GitHub-facing text and out of Go identifiers where a neutral
-name is clearer.
+(the map) = the room graph of quests. Keep these terms out of GitHub-facing text and out of Go identifiers where a
+neutral name is clearer.
 
 ## Layout
 
@@ -56,6 +63,7 @@ internal/campaign/  registry of working directories; git root and owner/repo res
 internal/history/   session records that survive restarts
 internal/fsutil/    atomic private file writes
 internal/quartermaster/ gatekeeper for ALL GitHub requests (an http.RoundTripper): serial, reads the budget from headers, pauses ("camp") when GitHub says slow down. New GitHub code must use its transport
+internal/gatekeeper/ the gh shim for agent sessions: classifies gh commands, asks the app for write slots, passes everything else through
 internal/quests/    quest model, derived state, cached service; github/ (GraphQL client, token from env or `gh`) and demo/ (sample data) are its sources
 internal/launcher/  claude argv, env scrubbing, binary lookup
 internal/testutil/  shared fixtures (fake claude)

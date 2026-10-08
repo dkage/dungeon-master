@@ -4,11 +4,12 @@ import { fileURLToPath } from 'node:url'
 import { expect, test, type Page } from '@playwright/test'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const { url, workdir, subdir, plaindir } = JSON.parse(readFileSync(join(here, '.url.json'), 'utf8')) as {
+const { url, workdir, subdir, plaindir, ghLog } = JSON.parse(readFileSync(join(here, '.url.json'), 'utf8')) as {
   url: string
   workdir: string
   subdir: string
   plaindir: string
+  ghLog: string
 }
 
 // The close button of an expedition (not the quest drawer's).
@@ -476,4 +477,45 @@ test('a list that was cut says so and points to narrowing the scope', async ({ p
   await page.getByRole('button', { name: 'Remove campaign huge' }).click()
   await page.getByRole('button', { name: 'Remove?' }).click()
   await expect(nav(page).getByRole('button', { name: /^huge/ })).toHaveCount(0)
+})
+
+// --- Gatekeeper ---
+
+test('gh in a session is the shim: reads pass at once, writes are paced', async ({ page }) => {
+  test.setTimeout(60_000)
+  await open(page)
+  await hero(page, 'Shell').click()
+  const term = screenText(page)
+  await page.locator('.pane:not([hidden]) .xterm').click()
+
+  // The first gh on the session's PATH is the app's shim, in front of the real one.
+  await page.keyboard.type('type -p gh')
+  await page.keyboard.press('Enter')
+  await expect(term).toContainText('/gatekeeper/bin/gh')
+
+  // A read goes straight through to the real gh.
+  await page.keyboard.type('gh issue list --limit 3')
+  await page.keyboard.press('Enter')
+  await expect(term).toContainText('fake-gh-ran: issue list --limit 3')
+
+  // Three writes in a tight loop, as an agent might send them.
+  await page.keyboard.type('for n in a b c; do gh issue create --title $n; done; echo LOOP-DONE-$((40 + 2))')
+  await page.keyboard.press('Enter')
+  await expect(term).toContainText('LOOP-DONE-42', { timeout: 40_000 }) // only the output has 42, not the typed command
+  await expect(term).toContainText('fake-gh-ran: issue create --title c')
+
+  const calls = readFileSync(ghLog, 'utf8').trim().split('\n').map((l) => {
+    const [sec, ...rest] = l.split(' ')
+    return { at: Number(sec), cmd: rest.join(' ') }
+  })
+  const creates = calls.filter((c) => c.cmd.startsWith('issue create'))
+  expect(creates.map((c) => c.cmd)).toEqual(['issue create --title a', 'issue create --title b', 'issue create --title c'])
+  // At least 3 s between writes (plus jitter): two gaps are at least 6 s, allowing a second of clock rounding.
+  expect(creates[2].at - creates[0].at).toBeGreaterThanOrEqual(5)
+  // The shell was told why it waited.
+  await expect(term).toContainText('waited')
+  await expect(term).toContainText('GitHub write slot')
+  // The app counted them.
+  const status = await page.evaluate(async () => (await fetch('/api/github', { credentials: 'same-origin' })).json())
+  expect(status.writes.lastMinute).toBeGreaterThanOrEqual(3)
 })

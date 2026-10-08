@@ -19,6 +19,7 @@ import (
 
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/fsutil"
+	"github.com/dkage/dungeon-master/internal/gatekeeper"
 	"github.com/dkage/dungeon-master/internal/history"
 	"github.com/dkage/dungeon-master/internal/party"
 	"github.com/dkage/dungeon-master/internal/quartermaster"
@@ -58,9 +59,25 @@ type Config struct {
 	History *history.Store
 	// Quests supplies issues. When nil, only the demo quests are available.
 	Quests *quests.Service
-	// Quartermaster is the gatekeeper for GitHub traffic; only its status is
-	// served here. May be nil.
+	// Quartermaster is the gatekeeper for GitHub traffic; its status is
+	// served here and it paces the writes of sessions' gh commands. May be nil.
 	Quartermaster *quartermaster.Quartermaster
+	// Gatekeeper puts the gh shim in front of the sessions it starts. Nil
+	// means sessions run with the plain gh.
+	Gatekeeper *Gatekeeper
+}
+
+// Gatekeeper configures the gh shim for sessions.
+type Gatekeeper struct {
+	// BinDir holds the shim, and goes first on every session's PATH.
+	BinDir string
+	// RealGH is the gh the shim runs.
+	RealGH string
+	// URL is where sessions reach this server; derived from the listener when
+	// empty.
+	URL string
+	// Tokens are the per-session credentials; created when nil.
+	Tokens *gatekeeper.Tokens
 }
 
 // Server wires the handler, the guard and the listener together.
@@ -69,6 +86,7 @@ type Server struct {
 	http *http.Server
 	ln   net.Listener
 	g    *guard
+	url  string // where this server can be reached, set once it listens
 }
 
 // TokenFile is where the access token is kept inside the config directory.
@@ -149,6 +167,11 @@ func withDefaults(cfg Config) Config {
 	if cfg.History == nil {
 		cfg.History, _ = history.Open("") // in-memory: cannot fail
 	}
+	if cfg.Gatekeeper != nil && cfg.Gatekeeper.Tokens == nil {
+		g := *cfg.Gatekeeper
+		g.Tokens = gatekeeper.NewTokens()
+		cfg.Gatekeeper = &g
+	}
 	if cfg.Quests == nil {
 		cfg.Quests = quests.NewService(quests.ServiceOptions{GitHub: noGitHub{}, Demo: demo.New()})
 	}
@@ -163,7 +186,9 @@ func (s *Server) Listen() (net.Listener, error) {
 		return nil, err
 	}
 	s.ln = ln
+	s.url = "http://" + ln.Addr().String()
 	s.g = newGuard(ln.Addr().(*net.TCPAddr).Port, s.cfg.Token)
+	s.g.gateOK = s.gateTokenOK
 	s.http = &http.Server{
 		Handler:           s.handler(),
 		ReadHeaderTimeout: 10 * time.Second,
@@ -183,7 +208,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 // Handler returns the guarded handler for a listener bound on the given
 // port. It exists so tests can drive the server without a real socket.
 func Handler(cfg Config, port int) http.Handler {
-	s := &Server{cfg: withDefaults(cfg), g: newGuard(port, cfg.Token)}
+	s := &Server{cfg: withDefaults(cfg), g: newGuard(port, cfg.Token), url: fmt.Sprintf("http://127.0.0.1:%d", port)}
+	s.g.gateOK = s.gateTokenOK
 	return s.handler()
 }
 

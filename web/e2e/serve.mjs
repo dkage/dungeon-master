@@ -17,6 +17,9 @@ const workdir = join(root, 'work')
 const fakeBin = join(root, 'bin')
 for (const d of [home, workdir, fakeBin]) mkdirSync(d)
 copyFileSync(join(here, 'fake-claude.sh'), join(fakeBin, 'claude'))
+// A fake gh: records when it ran and with what, so the tests can see the pacing.
+const ghLog = join(root, 'gh-calls.log')
+writeFileSync(join(fakeBin, 'gh'), `#!/bin/sh\necho "$(date +%s) $*" >> ${ghLog}\necho "fake-gh-ran: $*"\n`, { mode: 0o755 })
 
 // The workdir is a real repository with a GitHub remote, and apps/api is a
 // monorepo subfolder, so the tests can check how campaigns resolve them.
@@ -129,7 +132,7 @@ child.stdout.on('data', (d) => {
   buf += d
   const m = buf.match(/http:\/\/127\.0\.0\.1:\d+\/\?token=[0-9a-f]+/)
   if (m) {
-    writeFileSync(join(here, '.url.json'), JSON.stringify({ url: m[0], workdir, subdir, plaindir }))
+    writeFileSync(join(here, '.url.json'), JSON.stringify({ url: m[0], workdir, subdir, plaindir, ghLog }))
     buf = ''
   }
   process.stdout.write(d)

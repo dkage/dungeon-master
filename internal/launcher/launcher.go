@@ -93,22 +93,29 @@ func ShellEnviron(base []string) []string {
 // would have, because a GUI app launched from Finder lacks the user's shell
 // PATH (nvm, Homebrew and asdf installs would otherwise be invisible).
 func Resolve(ctx context.Context, name string) (string, error) {
-	return resolve(ctx, name, os.Getenv("PATH"), os.Getenv("SHELL"))
+	return resolve(ctx, name, os.Getenv("PATH"), os.Getenv("SHELL"), nil)
 }
 
-func resolve(ctx context.Context, name, pathEnv, shell string) (string, error) {
+// ResolveExcept is Resolve, skipping any candidate for which reject returns
+// true. The app uses it to find the real gh when its own shim may already be
+// first on the PATH (the app was started from one of its own sessions).
+func ResolveExcept(ctx context.Context, name string, reject func(path string) bool) (string, error) {
+	return resolve(ctx, name, os.Getenv("PATH"), os.Getenv("SHELL"), reject)
+}
+
+func resolve(ctx context.Context, name, pathEnv, shell string, reject func(string) bool) (string, error) {
 	if name == "" {
 		return "", errors.New("launcher: empty binary name")
 	}
 	if strings.ContainsRune(name, filepath.Separator) {
 		return checkExecutable(name)
 	}
-	if p, ok := lookIn(name, pathEnv); ok {
+	if p, ok := lookIn(name, pathEnv, reject); ok {
 		return p, nil
 	}
 	if shell != "" {
 		if lp, err := loginPath(ctx, shell); err == nil {
-			if p, ok := lookIn(name, lp); ok {
+			if p, ok := lookIn(name, lp, reject); ok {
 				return p, nil
 			}
 		}
@@ -116,12 +123,15 @@ func resolve(ctx context.Context, name, pathEnv, shell string) (string, error) {
 	return "", fmt.Errorf("launcher: %q not found on PATH or in the login shell PATH", name)
 }
 
-func lookIn(name, pathList string) (string, bool) {
+func lookIn(name, pathList string, reject func(string) bool) (string, bool) {
 	for _, dir := range filepath.SplitList(pathList) {
 		if dir == "" {
 			continue
 		}
 		if p, err := checkExecutable(filepath.Join(dir, name)); err == nil {
+			if reject != nil && reject(p) {
+				continue
+			}
 			return p, true
 		}
 	}

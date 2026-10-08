@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -241,27 +242,32 @@ func TestOldWritesAreForgottenAndStatusCountsTheWindows(t *testing.T) {
 func TestConcurrentWritersAreSpacedOut(t *testing.T) {
 	clk := &fakeClock{t: t0}
 	q := pacer(t, clk, nil)
-	var mu sync.Mutex
-	var times []time.Time
 	var wg sync.WaitGroup
+	var failures atomic.Int32
 	for i := 0; i < 12; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			if _, err := q.Reserve(context.Background()); err != nil {
 				t.Error(err)
-				return
+				failures.Add(1)
 			}
-			mu.Lock()
-			times = append(times, clk.Now())
-			mu.Unlock()
 		}()
 	}
 	wg.Wait()
-	if len(times) != 12 {
-		t.Fatalf("%d writes", len(times))
+	if failures.Load() != 0 {
+		return
 	}
-	checkPacing(t, times, 3*time.Second, 15, 150)
+	// The times the Quartermaster itself recorded are the truth. (Reading the
+	// shared fake clock in the goroutines would be wrong: another writer's sleep
+	// advances it before this one looks.)
+	q.mu.Lock()
+	at := append([]time.Time(nil), q.state.Writes...)
+	q.mu.Unlock()
+	if len(at) != 12 {
+		t.Fatalf("%d writes recorded for 12 writers", len(at))
+	}
+	checkPacing(t, at, 3*time.Second, 15, 150)
 }
 
 // checkPacing verifies the invariants over a list of write times.

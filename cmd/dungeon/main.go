@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dkage/dungeon-master/internal/gatekeeper"
 	"github.com/dkage/dungeon-master/internal/party"
 	"github.com/dkage/dungeon-master/internal/server"
 )
@@ -26,10 +27,25 @@ var (
 )
 
 func main() {
+	// Started under the name "gh" (through the link the app puts first on the
+	// PATH of its sessions), this program is the Gatekeeper's shim, not the app.
+	if code, ok := maybeShim(os.Args); ok {
+		os.Exit(code)
+	}
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "dungeon:", err)
 		os.Exit(1)
 	}
+}
+
+// maybeShim runs the gh shim when argv says the program was started as gh.
+func maybeShim(argv []string) (code int, ok bool) {
+	if len(argv) == 0 || !gatekeeper.IsShim(argv[0]) {
+		return 0, false
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return gatekeeper.Run(ctx, gatekeeper.ShimOptions{Args: argv[1:]}), true
 }
 
 func run(args []string) error {

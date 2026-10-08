@@ -10,8 +10,6 @@ import (
 
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/history"
-	"github.com/dkage/dungeon-master/internal/launcher"
-	"github.com/dkage/dungeon-master/internal/party"
 	"github.com/dkage/dungeon-master/internal/session"
 )
 
@@ -25,6 +23,8 @@ const (
 func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/state", s.handleState)
 	mux.HandleFunc("GET /api/github", s.handleGitHub)
+	mux.HandleFunc("POST /api/gatekeeper/slot", s.handleSlot)
+	mux.HandleFunc("POST /api/gatekeeper/report", s.handleReport)
 
 	mux.HandleFunc("POST /api/campaigns", s.handleCampaignAdd)
 	mux.HandleFunc("PATCH /api/campaigns/{id}", s.handleCampaignUpdate)
@@ -228,11 +228,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 			httpErr(w, http.StatusServiceUnavailable, "no shell configured")
 			return
 		}
-		spec = session.Spec{
-			Argv: []string{s.cfg.Shell},
-			Env:  launcher.ShellEnviron(s.cfg.BaseEnv()),
-			Meta: map[string]string{"kind": "shell", "title": "shell"},
-		}
+		spec = s.shellSpecWithGate()
 	case req.Hero != "" && !req.Shell:
 		h, ok := s.cfg.Party.Hero(req.Hero)
 		if !ok {
@@ -243,7 +239,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 			httpErr(w, http.StatusServiceUnavailable, "claude not found: "+s.cfg.ClaudeErr)
 			return
 		}
-		spec = heroSpec(s.cfg, h, req.Opener)
+		spec = s.heroSpecWithGate(h, req.Opener)
 	default:
 		httpErr(w, http.StatusBadRequest, "give either hero or shell")
 		return
@@ -268,6 +264,9 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		<-sess.Done()
 		_, code := sess.Exited()
 		_ = s.cfg.History.Finish(sess.ID, code)
+		if g := s.cfg.Gatekeeper; g != nil {
+			g.Tokens.Revoke(sess.ID) // a finished session's shim token stops working
+		}
 	}()
 
 	for _, v := range s.sessionViews() {
@@ -277,14 +276,6 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	httpErr(w, http.StatusInternalServerError, "session vanished")
-}
-
-func heroSpec(cfg Config, h party.Hero, opener string) session.Spec {
-	return session.Spec{
-		Argv: launcher.Command(cfg.Claude, h, launcher.Opts{Opener: opener}),
-		Env:  launcher.Environ(cfg.BaseEnv(), h),
-		Meta: map[string]string{"kind": "hero", "hero": h.ID, "title": h.Label},
-	}
 }
 
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {

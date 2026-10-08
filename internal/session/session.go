@@ -29,7 +29,10 @@ type Spec struct {
 	Argv []string
 	Dir  string
 	// Env is the full environment of the child.
-	Env        []string
+	Env []string
+	// EnvFor, when set, builds the environment once the session's id is
+	// known, so it can carry something specific to this session.
+	EnvFor     func(id string) []string
 	Cols, Rows int
 	// Meta is caller-owned labelling (hero, kind, ...), echoed back on the
 	// session. The package never interprets it.
@@ -261,6 +264,9 @@ func (m *Manager) Spawn(spec Spec) (*Session, error) {
 	id, err := m.newID()
 	if err != nil {
 		return nil, err
+	}
+	if spec.EnvFor != nil {
+		spec.Env = spec.EnvFor(id)
 	}
 	s, err := start(id, spec)
 	if err != nil {

@@ -18,6 +18,10 @@ for a in "$@"; do echo "arg=[$a]"; done
 echo "cwd=$(pwd)"
 echo "child-marker=${CLAUDE_CODE_CHILD_SESSION:-unset}"
 echo "hero-env=${HERO_VAR:-unset}"
+echo "path=$PATH"
+echo "gate-url=${DUNGEON_GATE_URL:-unset}"
+echo "gate-token=${DUNGEON_GATE_TOKEN:-unset}"
+echo "real-gh=${DUNGEON_REAL_GH:-unset}"
 while IFS= read -r line; do echo "echo:$line"; done
 `
 	p := filepath.Join(t.TempDir(), "claude")
