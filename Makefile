@@ -3,7 +3,7 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: build run web vet test test-web test-e2e check clean
+.PHONY: build run web vet test test-linux test-web test-e2e check clean
 
 ## build: build the dungeon binary into bin/
 build: web
@@ -23,6 +23,11 @@ vet:
 
 test:
 	go test -race ./...
+
+## test-linux: run the Go tests in a Linux container (PTY behaviour differs from macOS)
+test-linux:
+	docker run --rm -v "$(CURDIR)":/src -v dungeon-gocache:/root/.cache -v dungeon-gomod:/go/pkg/mod -w /src \
+		golang:1.26 go test -count=1 ./...
 
 ## test-web: frontend type check and unit/component tests
 test-web:

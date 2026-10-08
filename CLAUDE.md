@@ -46,6 +46,7 @@ make check     # go vet + go test -race + frontend type check and unit tests (wh
 make build     # build the frontend, then bin/dungeon (CGO_ENABLED=0)
 make run       # build and serve on 127.0.0.1:7878
 make web       # build the frontend into web/dist
+make test-linux # Go tests in a Linux container (needs Docker); PTY behaviour differs from macOS
 make test-e2e  # browser tests against bin/dungeon (needs `npx playwright install chromium` once)
 ```
 

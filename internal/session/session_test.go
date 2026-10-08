@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	pty "github.com/aymanbagabas/go-pty"
 )
 
 func TestRing(t *testing.T) {
@@ -146,5 +148,37 @@ func TestIDsAreUniqueAndRandom(t *testing.T) {
 	s, _ := m2.Spawn(Spec{Argv: []string{"sh", "-c", "sleep 1"}, Env: Environ()})
 	if seen[s.ID] {
 		t.Fatalf("id %q repeated across managers", s.ID)
+	}
+}
+
+func TestParentReleasesSlaveEnd(t *testing.T) {
+	m := NewManager()
+	defer m.Shutdown()
+	s, err := m.Spawn(Spec{Argv: []string{"sh", "-c", "sleep 1"}, Env: Environ()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	up, ok := s.p.(pty.UnixPty)
+	if !ok {
+		t.Skip("not a unix pty")
+	}
+	// If the parent kept its copy of the slave open, reading the master would
+	// not see end-of-file on Linux after the child exits.
+	if _, err := up.Slave().Stat(); err == nil {
+		t.Fatal("parent still holds the slave end open")
+	}
+}
+
+func TestSessionFinishesWhenProcessExits(t *testing.T) {
+	m := NewManager()
+	defer m.Shutdown()
+	s, err := m.Spawn(Spec{Argv: []string{"sh", "-c", "exit 0"}, Env: Environ()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-s.Done():
+	case <-time.After(5 * time.Second):
+		t.Fatal("session never finished after its process exited")
 	}
 }

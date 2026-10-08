@@ -81,6 +81,13 @@ func start(id string, spec Spec) (*Session, error) {
 		_ = p.Close()
 		return nil, fmt.Errorf("session: start %s: %w", spec.Argv[0], err)
 	}
+	// The child has its own copy of the slave end. Keeping ours open means
+	// that on Linux reading the master never reports end-of-file after the
+	// child exits, so the session would never finish. macOS reports it
+	// anyway, which is why this only shows up on Linux.
+	if up, ok := p.(pty.UnixPty); ok {
+		_ = up.Slave().Close()
+	}
 	s := &Session{
 		ID:      id,
 		Created: time.Now(),
