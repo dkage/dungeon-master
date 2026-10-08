@@ -1,0 +1,27 @@
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Go
+/bin/
+*.test
+*.out
+coverage.*
+
+# Build output (goreleaser, app bundles, dmg, appimage)
+/build/
+/dist/
+
+# Frontend
+web/node_modules/
+web/dist/*
+!web/dist/.gitkeep
+
+# Local state and secrets
+.env
+.env.*
+*.local
+
+# Private development notes (never committed)
+/private/
