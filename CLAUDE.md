@@ -4,7 +4,8 @@ A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents ag
 an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native
 webview shell.
 
-Status: M0-M3 done. M3.5 (GitHub budget and scope, `PLAN_M3_5.md`) is in progress, in parallel with M3.6 (first run and
+Status: M0-M3 done. M3.5 (GitHub budget and scope, `PLAN_M3_5.md`): phases A and B done, the Gatekeeper (phase E) is
+next, in parallel with M3.6 (first run and
 words, `PLAN_EXPERIENCE.md`); then M4. Themed words: `GLOSSARY.md`.
 
 ## Scope and principles
@@ -22,6 +23,8 @@ words, `PLAN_EXPERIENCE.md`); then M4. Themed words: `GLOSSARY.md`.
 - **GitHub credentials** come from `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`; they are used for GitHub requests only
   and never stored, logged, put in an error or sent to the browser. `DUNGEON_GITHUB_ENDPOINT` (tests only) accepts
   loopback URLs and nothing else.
+- **Scope is part of the GitHub query**, never a filter applied to a truncated list. A campaign has no scope until the
+  user chooses one (the first-connection question); `tracked` is the neutral marker label the picker suggests.
 - **Issue text is untrusted.** Markdown is cut to a bare-tag allowlist, then sanitised; never pass anything but
   `renderMarkdown` output to `{@html}`.
 - **Localhost is an attack surface.** Loopback bind only, an access token kept in the config dir (0600) so a signed-in

@@ -1,17 +1,33 @@
 <script lang="ts">
   import type { AppStore } from './store.svelte'
-  import { STATE_LABEL, counts, labelText, timeAgo, visibleRows } from './quests'
+  import { STATE_LABEL, counts, labelText, scopeText, timeAgo, typeChips, visibleRows } from './quests'
   import QuestDetail from './QuestDetail.svelte'
   import Rations from './Rations.svelte'
+  import ScopePicker from './ScopePicker.svelte'
 
   let { store }: { store: AppStore } = $props()
 
   let text = $state('')
   let hideCleared = $state(false)
+  let types = $state<string[]>([])
+
+  // A different campaign starts with a clean filter.
+  $effect(() => {
+    void store.campaignId
+    types = []
+    text = ''
+  })
 
   const result = $derived(store.quests)
-  const rows = $derived(result ? visibleRows(result.quests, { text, hideCleared }) : [])
+  const rows = $derived(result ? visibleRows(result.quests, { text, hideCleared, labels: types }) : [])
   const tally = $derived(result ? counts(result.quests) : null)
+  const chips = $derived(result ? typeChips(result.quests) : [])
+  const openShown = $derived(result ? result.quests.filter((q) => !q.closed).length : 0)
+  const asking = $derived(store.questsError?.code === 'scope_needed' || store.pickingScope)
+
+  function toggleType(name: string) {
+    types = types.includes(name) ? types.filter((t) => t !== name) : [...types, name]
+  }
   const demo = $derived(store.campaign?.demo === true)
 </script>
 
@@ -52,6 +68,18 @@
         GitHub asked this app to slow down, so requests are paused. {result ? 'Showing the last copy.' : ''}
       </p>
     {/if}
+    {#if result?.scope && !demo && !store.pickingScope}
+      <div class="scopeline">
+        <button type="button" class="scopechip" title="Change which issues are shown" onclick={() => (store.pickingScope = true)}>
+          {scopeText(result.scope)} · {openShown} of {result.totalOpen.toLocaleString()} open ▾
+        </button>
+      </div>
+    {/if}
+    {#if result?.truncated && !store.pickingScope}
+      <p class="banner warn" role="status">
+        Showing the newest {openShown} of {result.totalOpen.toLocaleString()} open issues. Narrow the scope to see the rest.
+      </p>
+    {/if}
     {#if demo}
       <p class="banner">
         Showing sample quests.
@@ -62,7 +90,9 @@
       <p class="banner warn" role="status">Showing older data. {result.warning}</p>
     {/if}
 
-    {#if store.questsError}
+    {#if asking}
+      <ScopePicker {store} />
+    {:else if store.questsError}
       {@const err = store.questsError}
       <div class="problem" role="alert">
         <p>{err.message}</p>
@@ -86,6 +116,21 @@
         <input type="search" placeholder="Filter by title, label or #number" aria-label="Filter quests" bind:value={text} />
         <label class="check"><input type="checkbox" bind:checked={hideCleared} /> Hide cleared</label>
       </div>
+      {#if chips.length > 1}
+        <div class="typechips" role="group" aria-label="Filter by label">
+          {#each chips as c (c.name)}
+            <button
+              type="button"
+              class="typechip"
+              aria-pressed={types.includes(c.name)}
+              style={`--chip:#${c.color ?? '999999'}`}
+              onclick={() => toggleType(c.name)}
+            >
+              {c.name} <span class="n">{c.count}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
       {#if tally}
         <p class="tally" aria-label="Quest counts">
           <span class="s open">{tally.open} open</span>

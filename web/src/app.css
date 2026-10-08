@@ -195,3 +195,23 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .rations { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; line-height: 18px; white-space: nowrap; }
 .rations.low { color: var(--warn); border-color: var(--warn); }
+
+/* --- scope --- */
+.scopeline { padding: 6px 12px 0; }
+.scopechip { background: none; border: 1px solid var(--line); border-radius: 10px; color: var(--text); padding: 1px 10px; font-size: 12px; line-height: 18px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scopechip:hover { border-color: var(--accent); }
+.typechips { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 12px 0; }
+.typechip { font-size: 11px; line-height: 18px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--chip, var(--line)); background: none; color: var(--text); }
+.typechip[aria-pressed='true'] { background: var(--chip); color: #fff; }
+.typechip .n { opacity: 0.7; }
+
+.scope-picker { padding: 12px; }
+.scope-picker fieldset { border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.scope-picker legend { font-weight: 600; margin-bottom: 8px; padding: 0; }
+.scope-picker .opt { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.scope-picker .optbody { display: flex; flex-direction: column; gap: 2px; }
+.scope-picker .help { color: var(--muted); font-size: 12px; }
+.scope-picker .count { color: var(--muted); }
+.scope-picker .labelpick { list-style: none; margin: 0 0 0 24px; padding: 0; max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.scope-picker .labelpick label { display: flex; align-items: center; gap: 6px; }
+.scope-picker .actions { margin-top: 14px; }

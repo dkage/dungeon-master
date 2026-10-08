@@ -35,21 +35,37 @@ git('remote', 'add', 'origin', 'git@github.com:acme/demo.git')
 const plaindir = join(root, 'plain')
 mkdirSync(plaindir)
 
+const fixtures = resolve(here, '../../internal/quests/github/testdata')
+
 // A fake GitHub. It serves responses recorded from the real API, requires the
 // token the server was given, and returns a hostile issue body for #9 so the
 // tests can prove the page neutralises it.
-const fixtures = resolve(here, '../../internal/quests/github/testdata')
-// The recorded list plus one hostile issue (#9), so the tests can open it from the list.
-const listJson = JSON.parse(readFileSync(join(fixtures, 'list.json'), 'utf8'))
-listJson.data.repository.issues.nodes.push({
+// Responses recorded from the real API (see internal/quests/github/testdata), plus
+// one hostile issue (#9) so the tests can open it from the list.
+const rec = (name) => JSON.parse(readFileSync(join(fixtures, name), 'utf8'))
+const hostileNode = {
   number: 9, title: 'Hostile body', state: 'OPEN', stateReason: null, url: 'https://github.com/acme/demo/issues/9',
   updatedAt: new Date().toISOString(), labels: { nodes: [] }, assignees: { nodes: [] }, milestone: null, parent: null,
   blockedBy: { nodes: [] }, subIssuesSummary: { total: 0, completed: 0 }, closedByPullRequestsReferences: { nodes: [] },
   comments: { totalCount: 1 },
-})
-const recordedList = JSON.stringify(listJson)
+}
+const withTotal = (page) => {
+  page.data.repository.total = { totalCount: 312 } // a busy repository: the panel says "N of 312 open"
+  return page
+}
+const listPages = {
+  all: withTotal(rec('list_all_open.json')),
+  labels: withTotal(rec('list_labels_open.json')),
+  assigned: withTotal(rec('list_assigned_open.json')),
+}
+listPages.all.data.repository.issues.nodes.push(hostileNode)
+const emptyPage = JSON.stringify(withTotal({ data: { repository: { issues: { pageInfo: { hasNextPage: false }, nodes: [] } } } }))
+const counts = rec('counts.json')
+counts.data.repository.total.totalCount = 312 // the same busy repository
+// A label whose pages never end, to see the "narrow the scope" notice.
+counts.data.repository.labels.nodes.push({ name: 'huge', color: '000000', issues: { totalCount: 900 } })
 const recordedDetail = readFileSync(join(fixtures, 'detail.json'), 'utf8')
-const emptyPage = JSON.stringify({ data: { repository: { issues: { pageInfo: { hasNextPage: false }, nodes: [] } } } })
+const viewer = readFileSync(join(fixtures, 'viewer.json'), 'utf8')
 const hostile = JSON.stringify({
   data: { repository: { issue: {
     number: 9, title: 'Hostile body', state: 'OPEN', url: 'https://github.com/acme/demo/issues/9',
@@ -75,11 +91,22 @@ const github = createServer((req, res) => {
       res.statusCode = 401
       return res.end('{}')
     }
-    const { variables = {} } = JSON.parse(body || '{}')
+    const { query = '', variables = {} } = JSON.parse(body || '{}')
+    if (query.includes('viewer{login}')) return res.end(viewer)
+    if (query.includes('assigned: issues')) return res.end(JSON.stringify(counts))
     if (variables.number !== undefined) {
       return res.end(variables.number === 3 ? recordedDetail : variables.number === 9 ? hostile : '{"data":{"repository":{"issue":null}}}')
     }
-    res.end(variables.states?.[0] === 'CLOSED' ? emptyPage : recordedList)
+    if (variables.states?.[0] === 'CLOSED') return res.end(emptyPage)
+    const kind = variables.labels ? 'labels' : variables.filter ? 'assigned' : 'all'
+    if (variables.labels?.includes('huge')) {
+      // Pages that never end: the client stops at its cap and says the list was cut.
+      const page = JSON.parse(JSON.stringify(withTotal({ data: { repository: { issues: { pageInfo: {}, nodes: [] } } } })))
+      page.data.repository.issues.nodes = variables.after ? [] : listPages.labels.data.repository.issues.nodes
+      page.data.repository.issues.pageInfo = { hasNextPage: true, endCursor: `p${(variables.after ?? 'p0').slice(1) * 1 + 1}` }
+      return res.end(JSON.stringify(page))
+    }
+    res.end(JSON.stringify(listPages[kind]))
   })
 })
 await new Promise((ok) => github.listen(0, '127.0.0.1', ok))

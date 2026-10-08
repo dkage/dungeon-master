@@ -20,11 +20,11 @@ const realQuests = [
 const demoQuests = [mkQuest(100, 'Sample quest one'), mkQuest(101, 'Sample quest two', { state: 'cleared', closed: true })]
 
 // A tiny in-memory server behind fetch, so the real api client and store run.
-function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: boolean; noRepo?: boolean } = {}) {
+function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: boolean; noRepo?: boolean; noScope?: boolean } = {}) {
   const calls: Call[] = []
   let next = 0
   const campaigns: Record<string, unknown>[] =
-    opts.campaigns === false ? [] : [{ id: 'c1', name: 'demo', dir: '/work/demo', remote: 'origin', labels: [], demo: false, ...(opts.noRepo ? {} : { repo: 'acme/demo' }) }]
+    opts.campaigns === false ? [] : [{ id: 'c1', name: 'demo', dir: '/work/demo', remote: 'origin', scope: opts.noScope ? null : { mode: 'labels', labels: ['tracked'] }, demo: false, ...(opts.noRepo ? {} : { repo: 'acme/demo' }) }]
   const sessions: Record<string, unknown>[] = opts.lost
     ? [{ id: 'old', kind: 'hero', title: 'Opus', campaign: 'c1', dir: '/work/demo', created: '', exited: true, exitCode: -1, lost: true }]
     : []
@@ -45,11 +45,28 @@ function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: b
         camp: { active: false },
       })
     }
+    const sm = path.match(/^\/api\/campaigns\/([^/]+)\/scope(\/options)?$/)
+    if (sm) {
+      const camp = campaigns.find((c) => c.id === sm[1]) as { scope?: unknown; repo?: string } | undefined
+      if (!camp) return json(404, { error: 'no such campaign' })
+      if (method === 'GET' && sm[2]) {
+        return json(200, {
+          openTotal: 312, assigned: 3, login: 'me',
+          labels: [{ name: 'tracked', open: 14 }, { name: 'bug', open: 40 }],
+        })
+      }
+      if (method === 'PUT') {
+        if (body.mode === 'bad') return json(400, { error: 'scope mode must be labels, assigned or all' })
+        camp.scope = { mode: body.mode, labels: body.labels ?? [] }
+        return json(200, camp)
+      }
+    }
     const qm = path.match(/^\/api\/campaigns\/([^/]+)\/quests(?:\/(\d+))?(\?[a-z0-9=&]+)?$/)
     if (method === 'GET' && qm) {
-      const camp = campaigns.find((c) => c.id === qm[1]) as { demo?: boolean; repo?: string } | undefined
+      const camp = campaigns.find((c) => c.id === qm[1]) as { demo?: boolean; repo?: string; scope?: unknown } | undefined
       if (!camp) return json(404, { error: 'no such campaign' })
       if (!camp.demo && !camp.repo) return json(409, { code: 'no_repo', error: 'This campaign has no GitHub repository.' })
+      if (!camp.demo && !camp.scope && !qm[2]) return json(409, { code: 'scope_needed', error: 'Choose which of this repository\'s issues to show.' })
       const pool = camp.demo ? demoQuests : realQuests
       if (qm[2]) {
         const q = pool.find((x) => String(x.number) === qm[2])
@@ -58,6 +75,7 @@ function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: b
       }
       return json(200, {
         source: camp.demo ? 'demo' : 'github', repo: camp.demo ? undefined : camp.repo,
+        scope: camp.demo ? undefined : camp.scope, totalOpen: pool.filter((x) => !x.closed).length + 100, truncated: false,
         quests: pool, fetchedAt: new Date().toISOString(), stale: false,
       })
     }
@@ -69,7 +87,7 @@ function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: b
     }
     if (method === 'POST' && path === '/api/campaigns') {
       if (body.dir === '/dup') return json(409, { error: 'that directory is already a campaign' })
-      const c = { id: `c${campaigns.length + 1}`, name: body.name ?? 'new', dir: body.dir, remote: 'origin', labels: [], demo: false }
+      const c = { id: `c${campaigns.length + 1}`, name: body.name ?? 'new', dir: body.dir, remote: 'origin', scope: null, demo: false }
       campaigns.push(c)
       return json(201, c)
     }
@@ -354,6 +372,38 @@ describe('App', () => {
       } finally {
         vi.useRealTimers()
       }
+    })
+  })
+
+  describe('first connection to a repository', () => {
+    it('asks which issues to show, then loads them and says what is shown', async () => {
+      const calls = fakeServer({ noScope: true })
+      render(App)
+      const panel = await screen.findByRole('complementary', { name: 'Quests' })
+      expect(await within(panel).findByText(/This repository has 312 open issues/)).toBeInTheDocument()
+      // Nothing was fetched before the user chose.
+      expect(within(panel).queryByText('Real first issue')).not.toBeInTheDocument()
+      expect(within(panel).queryByRole('alert')).not.toBeInTheDocument()
+      expect(calls.some((c) => c.path.endsWith('/scope/options'))).toBe(true)
+
+      await fireEvent.click(within(panel).getByRole('radio', { name: /Issues labeled tracked/ }))
+      await fireEvent.click(within(panel).getByRole('button', { name: 'Show these issues' }))
+      expect(await within(panel).findByText('Real first issue')).toBeInTheDocument()
+      expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ mode: 'labels', labels: ['tracked'] })
+      expect(within(panel).getByRole('button', { name: /tracked · 2 of 102 open/ })).toBeInTheDocument()
+    })
+
+    it('lets the user change the choice later', async () => {
+      const calls = fakeServer()
+      render(App)
+      const panel = await screen.findByRole('complementary', { name: 'Quests' })
+      await within(panel).findByText('Real first issue')
+      await fireEvent.click(within(panel).getByRole('button', { name: /tracked · / }))
+      expect(await within(panel).findByText('Show which issues?')).toBeInTheDocument()
+      await fireEvent.click(within(panel).getByRole('radio', { name: /Everything/ }))
+      await fireEvent.click(within(panel).getByRole('button', { name: 'Apply' }))
+      expect(await within(panel).findByRole('button', { name: /everything · / })).toBeInTheDocument()
+      expect(calls.filter((c) => c.method === 'PUT').map((c) => c.body)).toEqual([{ mode: 'all', labels: [] }])
     })
   })
 })

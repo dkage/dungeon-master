@@ -7,10 +7,11 @@ import type { Campaign, Quest, QuestDetail as QuestDetailT, QuestResult, Session
 import QuestsPanel from './QuestsPanel.svelte'
 import QuestDetail from './QuestDetail.svelte'
 import Rations from './Rations.svelte'
-import type { GithubStatus } from './api'
+import type { GithubStatus, ScopeOptions } from './api'
+import ScopePicker from './ScopePicker.svelte'
 
 const camp = (id: string, over: Partial<Campaign> = {}): Campaign => ({
-  id, name: `Camp ${id}`, dir: `/p/${id}`, remote: 'origin', labels: [], demo: false, repo: `acme/${id}`, ...over,
+  id, name: `Camp ${id}`, dir: `/p/${id}`, remote: 'origin', scope: { mode: 'labels', labels: ['tracked'] }, demo: false, repo: `acme/${id}`, ...over,
 })
 const sess = (id: string, campaign: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   id, kind: 'hero', title: `T-${id}`, campaign, dir: '/d', created: '', exited: false, exitCode: 0, ...over,
@@ -20,7 +21,7 @@ function store(setup: (s: AppStore) => void = () => {}) {
   const s = new AppStore({
     getState: vi.fn(), createSession: vi.fn(), deleteSession: vi.fn(),
     addCampaign: vi.fn(), updateCampaign: vi.fn(), removeCampaign: vi.fn(),
-    getQuests: vi.fn(), getQuest: vi.fn(), getGithub: vi.fn(),
+    getQuests: vi.fn(), getQuest: vi.fn(), getGithub: vi.fn(), setScope: vi.fn(), getScopeOptions: vi.fn(),
   })
   s.heroes = [{ id: 'opus', label: 'Opus' }, { id: 'sonnet', label: 'Sonnet' }]
   s.campaigns = [camp('c1'), camp('c2', { repo: undefined })]
@@ -173,7 +174,8 @@ const quest = (number: number, over: Partial<Quest> = {}): Quest => ({
 })
 
 const questResult = (quests: Quest[], over: Partial<QuestResult> = {}): QuestResult => ({
-  source: 'github', repo: 'acme/c1', quests, fetchedAt: new Date().toISOString(), stale: false, ...over,
+  source: 'github', repo: 'acme/c1', scope: { mode: 'labels', labels: ['tracked'] }, quests,
+  totalOpen: quests.filter((q) => !q.closed).length, truncated: false, fetchedAt: new Date().toISOString(), stale: false, ...over,
 })
 
 function questStore(result: QuestResult | null, setup: (s: AppStore) => void = () => {}) {
@@ -504,5 +506,212 @@ describe('QuestsPanel camp and budget', () => {
     render(QuestsPanel, { store: s })
     expect(screen.getByText(/Camp until/)).not.toHaveTextContent('Showing the last copy')
     expect(screen.getByRole('alert')).toHaveTextContent('not sending requests until 15:12')
+  })
+})
+
+describe('ScopePicker', () => {
+  const options = (over: Partial<ScopeOptions> = {}): ScopeOptions => ({
+    openTotal: 312, assigned: 3, login: 'me',
+    labels: [
+      { name: 'tracked', open: 14, color: '123456' },
+      { name: 'bug', open: 40, color: 'd73a4a' },
+      { name: 'wontfix', open: 0 },
+      { name: 'a', open: 1 }, { name: 'b', open: 1 }, { name: 'c', open: 1 }, { name: 'd', open: 1 },
+    ],
+    ...over,
+  })
+
+  function picker(opts: ScopeOptions | null, setup: (s: AppStore) => void = () => {}) {
+    const s = store((st) => {
+      st.campaigns[0].scope = null
+      st.scopeOptions = opts
+      setup(st)
+    })
+    vi.spyOn(s, 'loadScopeOptions').mockResolvedValue()
+    return s
+  }
+
+  it('asks the question with the numbers, preselecting the tracked label when it has issues', async () => {
+    const s = picker(options())
+    render(ScopePicker, { store: s })
+    expect(screen.getByText(/This repository has 312 open issues/)).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Issues labeled tracked \(14\)/ })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /Assigned to me \(@me\) \(3\)/ })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: /Everything \(312\)/ })).not.toBeChecked()
+    const chose = vi.spyOn(s, 'chooseScope').mockResolvedValue(true)
+    await fireEvent.click(screen.getByRole('button', { name: 'Show these issues' }))
+    expect(chose).toHaveBeenCalledWith({ mode: 'labels', labels: ['tracked'] })
+  })
+
+  it('preselects assigned-to-me when nothing is tracked yet, and explains how to start tracking', () => {
+    const o = options({ labels: [{ name: 'tracked', open: 0 }, { name: 'bug', open: 40 }] })
+    render(ScopePicker, { store: picker(o) })
+    expect(screen.getByRole('radio', { name: /Assigned to me/ })).toBeChecked()
+    expect(screen.getByText(/None yet. Add the label to an issue on GitHub/)).toBeInTheDocument()
+  })
+
+  it('preselects nothing, and cannot submit, when there is nothing to suggest', async () => {
+    const o = options({ assigned: 0, labels: [{ name: 'tracked', open: 0 }] })
+    render(ScopePicker, { store: picker(o) })
+    for (const r of screen.getAllByRole('radio')) expect(r).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Show these issues' })).toBeDisabled()
+    await fireEvent.click(screen.getByRole('radio', { name: /Everything/ }))
+    expect(screen.getByRole('button', { name: 'Show these issues' })).toBeEnabled()
+  })
+
+  it('submits each kind of choice', async () => {
+    const s = picker(options())
+    const chose = vi.spyOn(s, 'chooseScope').mockResolvedValue(true)
+    render(ScopePicker, { store: s })
+    const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Show these issues' }))
+    await fireEvent.click(screen.getByRole('radio', { name: /Assigned to me/ }))
+    await submit()
+    await fireEvent.click(screen.getByRole('radio', { name: /Everything/ }))
+    await submit()
+    expect(chose.mock.calls.map((c) => c[0])).toEqual([
+      { mode: 'assigned', labels: [] },
+      { mode: 'all', labels: [] },
+    ])
+  })
+
+  it('lets you pick up to five labels, listing only those with issues (and the marker)', async () => {
+    const s = picker(options())
+    const chose = vi.spyOn(s, 'chooseScope').mockResolvedValue(true)
+    render(ScopePicker, { store: s })
+    await fireEvent.click(screen.getByRole('radio', { name: /Pick labels/ }))
+    const list = screen.getByRole('list', { name: 'Labels' })
+    expect(within(list).queryByText('wontfix')).not.toBeInTheDocument() // nothing open: not offered
+    expect(screen.getByRole('button', { name: 'Show these issues' })).toBeDisabled() // none picked yet
+    const box = (name: string) => within(list).getByRole('checkbox', { name: new RegExp(`^${name} \\(`) })
+    for (const name of ['tracked', 'bug', 'a', 'b', 'c']) await fireEvent.click(box(name))
+    expect(box('d')).toBeDisabled() // the sixth is refused
+    await fireEvent.click(box('c')) // unpicking frees a slot
+    expect(box('d')).toBeEnabled()
+    await fireEvent.click(screen.getByRole('button', { name: 'Show these issues' }))
+    expect(chose).toHaveBeenCalledWith({ mode: 'labels', labels: ['tracked', 'bug', 'a', 'b'] })
+  })
+
+  it('when changing an existing choice it starts from that choice and can be cancelled', async () => {
+    const s = picker(options(), (st) => {
+      st.campaigns[0].scope = { mode: 'labels', labels: ['bug', 'a'] }
+      st.pickingScope = true
+    })
+    render(ScopePicker, { store: s })
+    expect(screen.getByText('Show which issues?')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Pick labels/ })).toBeChecked()
+    const list = screen.getByRole('list', { name: 'Labels' })
+    expect(within(list).getByRole('checkbox', { name: /^bug \(/ })).toBeChecked()
+    expect(within(list).getByRole('checkbox', { name: /^a \(/ })).toBeChecked()
+    expect(within(list).getByRole('checkbox', { name: /^tracked \(/ })).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled()
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(s.pickingScope).toBe(false)
+  })
+
+  it('starts from the current tracked-only and assigned choices too', () => {
+    const { unmount } = render(ScopePicker, { store: picker(options(), (st) => { st.campaigns[0].scope = { mode: 'labels', labels: ['Tracked'] } }) })
+    expect(screen.getByRole('radio', { name: /Issues labeled tracked/ })).toBeChecked()
+    unmount()
+    render(ScopePicker, { store: picker(options(), (st) => { st.campaigns[0].scope = { mode: 'assigned', labels: [] } }) })
+    expect(screen.getByRole('radio', { name: /Assigned to me/ })).toBeChecked()
+  })
+
+  it('shows progress and failures, and loads the numbers when opened', () => {
+    const s = picker(null, (st) => (st.scopeOptionsLoading = true))
+    const { unmount } = render(ScopePicker, { store: s })
+    expect(screen.getByRole('status')).toHaveTextContent('Counting issues…')
+    expect(s.loadScopeOptions).toHaveBeenCalled()
+    unmount()
+    const bad = picker(null, (st) => (st.scopeOptionsError = { code: 'no_token', message: 'No GitHub credentials found.' }))
+    render(ScopePicker, { store: bad })
+    expect(screen.getByRole('alert')).toHaveTextContent('No GitHub credentials found.')
+  })
+})
+
+describe('QuestsPanel scope', () => {
+  const issues = [
+    quest(1, { labels: [{ name: 'bug', color: 'd73a4a' }, { name: 'tracked' }] }),
+    quest(2, { labels: [{ name: 'tracked' }, { name: 'feature' }] }),
+    quest(3, { labels: [{ name: 'feature' }] }),
+    quest(4, { closed: true, state: 'cleared', labels: [{ name: 'bug' }] }),
+  ]
+
+  it('says which issues are shown, and how many of the repository\'s open issues that is', () => {
+    render(QuestsPanel, { store: questStore(questResult(issues, { totalOpen: 312 })) })
+    expect(screen.getByRole('button', { name: /tracked · 3 of 312 open/ })).toBeInTheDocument()
+  })
+
+  it('describes each kind of scope in words', () => {
+    const { unmount } = render(QuestsPanel, { store: questStore(questResult(issues, { totalOpen: 9, scope: { mode: 'assigned', labels: [] } })) })
+    expect(screen.getByRole('button', { name: /assigned to me · 3 of 9 open/ })).toBeInTheDocument()
+    unmount()
+    const r = render(QuestsPanel, { store: questStore(questResult(issues, { totalOpen: 3, scope: { mode: 'all', labels: [] } })) })
+    expect(screen.getByRole('button', { name: /everything · 3 of 3 open/ })).toBeInTheDocument()
+    r.unmount()
+    render(QuestsPanel, { store: questStore(questResult(issues, { totalOpen: 50, scope: { mode: 'labels', labels: ['a', 'b'] } })) })
+    expect(screen.getByRole('button', { name: /a \+ b · 3 of 50 open/ })).toBeInTheDocument()
+  })
+
+  it('opens the picker from the scope line', async () => {
+    const s = questStore(questResult(issues))
+    render(QuestsPanel, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: /tracked · 3 of/ }))
+    expect(s.pickingScope).toBe(true)
+  })
+
+  it('shows the picker instead of the list while it is open, or when the campaign has no scope', () => {
+    vi.spyOn(AppStore.prototype, 'loadScopeOptions').mockResolvedValue()
+    const counts = { openTotal: 312, assigned: 3, login: 'me', labels: [{ name: 'tracked', open: 14 }] }
+    const open = questStore(questResult(issues), (st) => { st.pickingScope = true; st.scopeOptions = counts })
+    const { unmount } = render(QuestsPanel, { store: open })
+    expect(screen.getByRole('group')).toBeInTheDocument() // the fieldset
+    expect(screen.queryByLabelText('Filter quests')).not.toBeInTheDocument()
+    unmount()
+    const first = questStore(null, (st) => {
+      st.scopeOptions = counts
+      st.questsError = { code: 'scope_needed', message: 'Choose which of this repository\'s issues to show.' }
+    })
+    render(QuestsPanel, { store: first })
+    expect(screen.getByRole('group')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument() // not shown as an error
+    vi.restoreAllMocks()
+  })
+
+  it('warns when the list was cut', () => {
+    render(QuestsPanel, { store: questStore(questResult(issues, { truncated: true, totalOpen: 912, scope: { mode: 'all', labels: [] } })) })
+    expect(screen.getByRole('status')).toHaveTextContent('Showing the newest 3 of 912 open issues. Narrow the scope')
+  })
+
+  it('does not warn when nothing was cut, and has no scope line for demo data', () => {
+    const { unmount } = render(QuestsPanel, { store: questStore(questResult(issues)) })
+    expect(screen.queryByText(/Showing the newest/)).not.toBeInTheDocument()
+    unmount()
+    render(QuestsPanel, {
+      store: questStore(questResult(issues, { source: 'demo', scope: undefined, repo: undefined }), (st) => (st.campaigns[0].demo = true)),
+    })
+    expect(screen.queryByRole('button', { name: /open ▾/ })).not.toBeInTheDocument()
+  })
+
+  it('offers the most common labels as filters and narrows the list', async () => {
+    render(QuestsPanel, { store: questStore(questResult(issues)) })
+    const group = screen.getByRole('group', { name: 'Filter by label' })
+    const names = within(group).getAllByRole('button').map((b) => b.textContent?.trim())
+    expect(names).toEqual(['bug 2', 'feature 2', 'tracked 2']) // by count, ties by name
+    await fireEvent.click(within(group).getByRole('button', { name: /^feature/ }))
+    expect(within(group).getByRole('button', { name: /^feature/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toHaveLength(2)
+    expect(screen.queryByText('Quest 1')).not.toBeInTheDocument()
+    // Two filters mean "either".
+    await fireEvent.click(within(group).getByRole('button', { name: /^bug/ }))
+    expect(screen.getAllByRole('listitem')).toHaveLength(4)
+    // Toggling again clears.
+    await fireEvent.click(within(group).getByRole('button', { name: /^feature/ }))
+    await fireEvent.click(within(group).getByRole('button', { name: /^bug/ }))
+    expect(screen.getAllByRole('listitem')).toHaveLength(4)
+  })
+
+  it('offers no label filters when there is nothing to choose between', () => {
+    render(QuestsPanel, { store: questStore(questResult([quest(1, { labels: [{ name: 'only' }] })])) })
+    expect(screen.queryByRole('group', { name: 'Filter by label' })).not.toBeInTheDocument()
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Quest } from './api'
-import { counts, labelText, matches, questRows, timeAgo, visibleRows } from './quests'
+import { counts, labelText, matches, questRows, scopeText, timeAgo, typeChips, visibleRows } from './quests'
 
 const q = (number: number, over: Partial<Quest> = {}): Quest => ({
   number, title: `Quest ${number}`, state: 'open', closed: false, url: '', labels: [], assignees: [],
@@ -83,5 +83,44 @@ describe('helpers', () => {
     expect(labelText('fbca04')).toBe('#1d1d1b')
     expect(labelText(undefined)).toBe('inherit')
     expect(labelText('nothex')).toBe('inherit')
+  })
+})
+
+describe('label filters and scope text', () => {
+  const withLabels = (n: number, ...names: string[]) => q(n, { labels: names.map((name) => ({ name })) })
+
+  it('filters by any of the chosen labels, case-insensitively', () => {
+    const list = [withLabels(1, 'Bug'), withLabels(2, 'feature'), withLabels(3), withLabels(4, 'bug', 'feature')]
+    const f = (labels: string[]) => visibleRows(list, { text: '', hideCleared: false, labels }).map((r) => r.quest.number)
+    expect(f([])).toEqual([1, 2, 3, 4])
+    expect(f(['bug'])).toEqual([1, 4])
+    expect(f(['BUG', 'feature'])).toEqual([1, 2, 4])
+    expect(f(['nope'])).toEqual([])
+    // Combines with the text filter and "hide cleared".
+    const list2 = [withLabels(1, 'bug'), { ...withLabels(2, 'bug'), closed: true }]
+    expect(visibleRows(list2, { text: '', hideCleared: true, labels: ['bug'] }).map((r) => r.quest.number)).toEqual([1])
+    expect(visibleRows(list, { text: '#4', hideCleared: false, labels: ['bug'] }).map((r) => r.quest.number)).toEqual([4])
+  })
+
+  it('lists the most common labels first, by name on ties, up to a limit', () => {
+    const list = [withLabels(1, 'b', 'a'), withLabels(2, 'b'), withLabels(3, 'c', 'A')]
+    expect(typeChips(list).map((c) => `${c.name}:${c.count}`)).toEqual(['a:2', 'b:2', 'c:1'])
+    const many = Array.from({ length: 12 }, (_, i) => withLabels(i + 1, `l${String(i).padStart(2, '0')}`))
+    expect(typeChips(many)).toHaveLength(8)
+    expect(typeChips(many, 3)).toHaveLength(3)
+    expect(typeChips([])).toEqual([])
+  })
+
+  it('keeps a label colour for chips', () => {
+    expect(typeChips([q(1, { labels: [{ name: 'bug', color: 'd73a4a' }] })])[0].color).toBe('d73a4a')
+  })
+
+  it('names a scope in words', () => {
+    expect(scopeText(null)).toBe('')
+    expect(scopeText(undefined)).toBe('')
+    expect(scopeText({ mode: 'assigned', labels: [] })).toBe('assigned to me')
+    expect(scopeText({ mode: 'all', labels: [] })).toBe('everything')
+    expect(scopeText({ mode: 'labels', labels: ['tracked'] })).toBe('tracked')
+    expect(scopeText({ mode: 'labels', labels: ['a', 'b'] })).toBe('a + b')
   })
 })

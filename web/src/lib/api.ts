@@ -6,12 +6,25 @@ export interface Hero {
   label: string
 }
 
+export interface Scope {
+  mode: 'labels' | 'assigned' | 'all'
+  labels: string[]
+}
+
+export interface ScopeOptions {
+  openTotal: number
+  assigned: number
+  login?: string
+  labels: { name: string; color?: string; open: number }[]
+}
+
 export interface Campaign {
   id: string
   name: string
   dir: string
   remote: string
-  labels: string[]
+  /** Which issues the quest panel shows; null until the user has chosen. */
+  scope: Scope | null
   /** Shows built-in sample quests instead of GitHub issues. */
   demo: boolean
   gitRoot?: string
@@ -46,7 +59,6 @@ export interface CampaignInput {
   dir: string
   name?: string
   remote?: string
-  labels?: string[]
 }
 
 export type CampaignPatch = Partial<Omit<CampaignInput, 'dir'>> & { demo?: boolean }
@@ -101,7 +113,13 @@ export interface Quest {
 export interface QuestResult {
   source: 'github' | 'demo'
   repo?: string
+  /** Which issues were asked for; absent for demo data. */
+  scope?: Scope
   quests: Quest[]
+  /** Open issues in the whole repository, whatever the scope. */
+  totalOpen: number
+  /** More issues matched than were fetched: narrow the scope. */
+  truncated: boolean
   fetchedAt: string
   /** A refresh failed, so older data is shown; `warning` says why. */
   stale: boolean
@@ -191,6 +209,10 @@ export const getQuests = (campaignId: string, refresh = false, background = fals
   const q = [refresh && 'refresh=1', background && 'background=1'].filter(Boolean).join('&')
   return call<QuestResult>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/quests${q ? `?${q}` : ''}`) as Promise<QuestResult>
 }
+export const setScope = (campaignId: string, scope: Scope) =>
+  call<Campaign>('PUT', `/api/campaigns/${encodeURIComponent(campaignId)}/scope`, scope) as Promise<Campaign>
+export const getScopeOptions = (campaignId: string) =>
+  call<ScopeOptions>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/scope/options`) as Promise<ScopeOptions>
 export const getGithub = () => call<GithubStatus>('GET', '/api/github') as Promise<GithubStatus>
 export const getQuest = (campaignId: string, number: number) =>
   call<QuestDetail>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}`) as Promise<QuestDetail>

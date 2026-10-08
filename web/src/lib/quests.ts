@@ -40,6 +40,8 @@ export function questRows(quests: Quest[]): Row[] {
 export interface Filter {
   text: string
   hideCleared: boolean
+  /** Show only quests carrying at least one of these labels (empty: all). */
+  labels?: string[]
 }
 
 export function matches(q: Quest, text: string): boolean {
@@ -59,7 +61,11 @@ export function matches(q: Quest, text: string): boolean {
  * with no search it is the nested forest.
  */
 export function visibleRows(quests: Quest[], f: Filter): Row[] {
-  const pool = f.hideCleared ? quests.filter((q) => !q.closed) : quests
+  let pool = f.hideCleared ? quests.filter((q) => !q.closed) : quests
+  if (f.labels && f.labels.length > 0) {
+    const want = new Set(f.labels.map((l) => l.toLowerCase()))
+    pool = pool.filter((q) => q.labels.some((l) => want.has(l.name.toLowerCase())))
+  }
   if (f.text.trim()) {
     return pool.filter((q) => matches(q, f.text)).map((quest) => ({ quest, depth: 0 }))
   }
@@ -99,4 +105,34 @@ export function labelText(hex: string | undefined): string {
   const n = parseInt(m[1], 16)
   const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255
   return lum > 0.6 ? '#1d1d1b' : '#ffffff'
+}
+
+export interface TypeChip {
+  name: string
+  color?: string
+  count: number
+}
+
+/** The labels worth offering as filters: the most common ones in the list. */
+export function typeChips(quests: Quest[], max = 8): TypeChip[] {
+  const by = new Map<string, TypeChip>()
+  for (const q of quests) {
+    for (const l of q.labels) {
+      const key = l.name.toLowerCase()
+      const c = by.get(key)
+      if (c) c.count++
+      else by.set(key, { name: l.name, color: l.color, count: 1 })
+    }
+  }
+  return [...by.values()]
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .slice(0, max)
+}
+
+/** "tracked", "assigned to me" or "everything": what the scope shows, in words. */
+export function scopeText(scope: { mode: string; labels: string[] } | null | undefined): string {
+  if (!scope) return ''
+  if (scope.mode === 'assigned') return 'assigned to me'
+  if (scope.mode === 'all') return 'everything'
+  return scope.labels.join(' + ')
 }

@@ -1,12 +1,13 @@
 import * as realApi from './api'
 import type {
-  AppState, Campaign, CampaignInput, CampaignPatch, GithubStatus, Hero, QuestDetail, QuestResult, SessionInfo,
+  AppState, Campaign, CampaignInput, CampaignPatch, GithubStatus, Hero, QuestDetail, QuestResult, Scope, ScopeOptions,
+  SessionInfo,
 } from './api'
 
 export type Client = Pick<
   typeof realApi,
   | 'getState' | 'createSession' | 'deleteSession' | 'addCampaign' | 'updateCampaign' | 'removeCampaign'
-  | 'getQuests' | 'getQuest' | 'getGithub'
+  | 'getQuests' | 'getQuest' | 'getGithub' | 'setScope' | 'getScopeOptions'
 >
 
 const CAMPAIGN_KEY = 'dungeon.campaign'
@@ -60,6 +61,12 @@ export class AppStore {
   detail = $state<QuestDetail | null>(null)
   detailError = $state<Failure | null>(null)
   detailLoading = $state(false)
+  /** What each scope choice would show, for the first-connection question. */
+  scopeOptions = $state<ScopeOptions | null>(null)
+  scopeOptionsError = $state<Failure | null>(null)
+  scopeOptionsLoading = $state(false)
+  /** The user opened the scope picker to change an existing choice. */
+  pickingScope = $state(false)
   /** The GitHub request budget and whether requests are paused. */
   github = $state<GithubStatus | null>(null)
   /** Whether the quest panel is open on narrow screens. */
@@ -128,6 +135,11 @@ export class AppStore {
   }
 
   private pickCampaign(id: string | null) {
+    if (id !== this.campaignId) {
+      this.pickingScope = false
+      this.scopeOptions = null
+      this.scopeOptionsError = null
+    }
     this.campaignId = id
     save(CAMPAIGN_KEY, id ?? '')
   }
@@ -174,6 +186,42 @@ export class AppStore {
     } finally {
       if (seq === this.questsSeq && !background) this.questsLoading = false
       if (seq === this.questsSeq) void this.loadGithub()
+    }
+  }
+
+  async loadScopeOptions() {
+    const id = this.campaignId
+    if (!id) return
+    this.scopeOptionsLoading = true
+    this.scopeOptionsError = null
+    try {
+      const o = await this.client.getScopeOptions(id)
+      if (id === this.campaignId) this.scopeOptions = o
+    } catch (e) {
+      if (id === this.campaignId) this.scopeOptionsError = this.noticeAuth(failure(e), e)
+    } finally {
+      if (id === this.campaignId) this.scopeOptionsLoading = false
+    }
+  }
+
+  /** Stores the chosen scope for the selected campaign and reloads its quests. */
+  async chooseScope(scope: Scope): Promise<boolean> {
+    const id = this.campaignId
+    if (!id) return false
+    try {
+      const c = await this.client.setScope(id, scope)
+      this.campaigns = this.campaigns.map((x) => (x.id === id ? c : x))
+      this.pickingScope = false
+      this.error = null
+      this.closeQuest()
+      this.quests = null
+      this.questsError = null
+      this.questsFor = null
+      await this.loadQuests()
+      return true
+    } catch (e) {
+      this.error = this.fail(e)
+      return false
     }
   }
 

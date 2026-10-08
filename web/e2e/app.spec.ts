@@ -13,6 +13,7 @@ const { url, workdir, subdir, plaindir } = JSON.parse(readFileSync(join(here, '.
 
 // The close button of an expedition (not the quest drawer's).
 const closeSession = /^Close (?!quests)/
+const questPanel = (page: Page) => page.getByRole('complementary', { name: 'Quests' })
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Campaigns' })
 const hero = (page: Page, name: string) => page.getByRole('button', { name, exact: true })
 const screenText = (page: Page) => page.locator('.pane:not([hidden]) .xterm-rows')
@@ -23,6 +24,21 @@ async function addCampaign(page: Page, dir: string, name: string) {
   await page.getByPlaceholder('/absolute/path/to/project').fill(dir)
   await page.getByPlaceholder(/defaults to the folder/).fill(name)
   await page.getByRole('button', { name: 'Add campaign' }).click()
+}
+
+// A campaign that has not chosen which issues to show is asked once. Most tests
+// are about something else, so they answer "everything"; the scope tests below
+// answer differently on purpose.
+async function chooseEverything(page: Page) {
+  const panel = questPanel(page)
+  const list = panel.getByLabel('Filter quests')
+  const question = panel.getByRole('radio', { name: /Everything/ })
+  await expect(list.or(question)).toBeVisible()
+  if (await question.isVisible()) {
+    await question.check()
+    await panel.getByRole('button', { name: 'Show these issues' }).click()
+    await expect(list).toBeVisible()
+  }
 }
 
 // Opens the app signed in, with the "demo" campaign registered and selected,
@@ -36,6 +52,7 @@ async function open(page: Page) {
   }
   await nav(page).getByRole('button', { name: /^demo/ }).click()
   await expect(hero(page, 'Opus')).toBeEnabled()
+  await chooseEverything(page)
   const close = page.getByRole('button', { name: closeSession })
   while ((await close.count()) > 0) {
     const before = await close.count()
@@ -223,8 +240,6 @@ test('the terminal renders with its own font, colours and selection (CSP must al
 
 // --- quests ---
 
-const questPanel = (page: Page) => page.getByRole('complementary', { name: 'Quests' })
-
 test("the quest panel lists the repository's issues with their states and relationships", async ({ page }) => {
   await open(page)
   const panel = questPanel(page)
@@ -375,4 +390,90 @@ test('the panel shows the GitHub budget the Quartermaster read from the response
   const status = await page.evaluate(async () => (await fetch('/api/github', { credentials: 'same-origin' })).json())
   expect(status.camp.active).toBe(false)
   expect(status.rations[0]).toMatchObject({ resource: 'graphql', limit: 5000, remaining: 4936 })
+})
+
+// --- scope ---
+
+test('a new campaign asks which issues to show, with real counts, and remembers the answer', async ({ page }) => {
+  await open(page)
+  await addCampaign(page, plaindir.replace(/plain$/, 'work/apps'), 'scoped')
+  const panel = questPanel(page)
+
+  // The question, with the numbers from the (recorded) repository.
+  await expect(panel.getByText('This repository has 312 open issues. Show:')).toBeVisible()
+  await expect(panel.getByRole('radio', { name: /Issues labeled tracked \(0\)/ })).not.toBeChecked()
+  await expect(panel.getByText('None yet. Add the label to an issue on GitHub')).toBeVisible()
+  await expect(panel.getByRole('radio', { name: /Assigned to me \(@dkage\) \(1\)/ })).toBeChecked() // the suggestion
+  await expect(panel.getByRole('radio', { name: /Everything \(312\)/ })).toBeVisible()
+  // Nothing is listed, and it is not an error.
+  await expect(panel.getByLabel('Filter quests')).toHaveCount(0)
+  await expect(panel.getByRole('alert')).toHaveCount(0)
+
+  // Assigned to me: only that issue, and the header says so.
+  await panel.getByRole('button', { name: 'Show these issues' }).click()
+  await expect(panel.getByRole('button', { name: /assigned to me · 1 of 312 open/ })).toBeVisible()
+  await expect(panel.getByRole('listitem')).toHaveCount(1)
+  await expect(panel.getByRole('button', { name: /#5 \[demo\] Bug/ })).toBeVisible()
+
+  // Switch to two labels: the recorded label query answers with three issues.
+  await panel.getByRole('button', { name: /assigned to me · / }).click()
+  await panel.getByRole('radio', { name: /Pick labels/ }).check()
+  await panel.getByRole('checkbox', { name: /^bug \(/ }).check()
+  await panel.getByRole('checkbox', { name: /^enhancement \(/ }).check()
+  await panel.getByRole('button', { name: 'Apply' }).click()
+  await expect(panel.getByRole('button', { name: /bug \+ enhancement · 3 of 312 open/ })).toBeVisible()
+  await expect(panel.getByRole('listitem')).toHaveCount(3)
+
+  // The choice survives a reload (it is stored on the server, not in the page).
+  await page.reload()
+  await nav(page).getByRole('button', { name: /^scoped/ }).click()
+  await expect(panel.getByRole('button', { name: /bug \+ enhancement · 3 of 312 open/ })).toBeVisible()
+
+  // Cancelling the picker changes nothing.
+  await panel.getByRole('button', { name: /bug \+ enhancement · / }).click()
+  await panel.getByRole('button', { name: 'Cancel' }).click()
+  await expect(panel.getByLabel('Filter quests')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Remove campaign scoped' }).click()
+  await page.getByRole('button', { name: 'Remove?' }).click()
+  await expect(nav(page).getByRole('button', { name: /^scoped/ })).toHaveCount(0)
+})
+
+test('the label chips narrow the list without another request to GitHub', async ({ page }) => {
+  await open(page)
+  const panel = questPanel(page)
+  await expect(panel.getByRole('listitem')).toHaveCount(6) // five open issues plus the hostile one
+  const requests: string[] = []
+  page.on('request', (r) => requests.push(r.url()))
+
+  const chips = panel.getByRole('group', { name: 'Filter by label' })
+  await chips.getByRole('button', { name: /^enhancement/ }).click()
+  await expect(panel.getByRole('listitem')).toHaveCount(3)
+  await chips.getByRole('button', { name: /^bug/ }).click()
+  await expect(panel.getByRole('listitem')).toHaveCount(4)
+  await chips.getByRole('button', { name: /^bug/ }).click()
+  await chips.getByRole('button', { name: /^enhancement/ }).click()
+  await expect(panel.getByRole('listitem')).toHaveCount(6)
+  expect(requests.filter((u) => u.includes('/quests'))).toEqual([]) // purely client-side
+})
+
+test('a list that was cut says so and points to narrowing the scope', async ({ page }) => {
+  await open(page)
+  await addCampaign(page, subdir, 'huge')
+  const panel = questPanel(page)
+  await panel.getByRole('radio', { name: /Pick labels/ }).check()
+  await panel.getByRole('checkbox', { name: /^huge \(/ }).check()
+  await panel.getByRole('button', { name: 'Show these issues' }).click()
+  await expect(panel.getByText(/Showing the newest 3 of 312 open issues. Narrow the scope to see the rest./)).toBeVisible()
+  await expect(panel.getByRole('listitem')).toHaveCount(3)
+
+  // Narrowing makes the notice go away.
+  await panel.getByRole('button', { name: /huge · / }).click()
+  await panel.getByRole('radio', { name: /Assigned to me/ }).check()
+  await panel.getByRole('button', { name: 'Apply' }).click()
+  await expect(panel.getByText(/Narrow the scope to see the rest/)).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Remove campaign huge' }).click()
+  await page.getByRole('button', { name: 'Remove?' }).click()
+  await expect(nav(page).getByRole('button', { name: /^huge/ })).toHaveCount(0)
 })

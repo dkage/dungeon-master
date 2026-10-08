@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, type AppState, type Campaign, type GithubStatus, type Quest, type QuestDetail, type QuestResult, type SessionInfo } from './api'
+import { ApiError, type AppState, type Campaign, type GithubStatus, type Quest, type QuestDetail, type QuestResult, type ScopeOptions, type SessionInfo } from './api'
 import { AppStore, type Client } from './store.svelte'
 
 const camp = (id: string, over: Partial<Campaign> = {}): Campaign => ({
-  id, name: `C-${id}`, dir: `/p/${id}`, remote: 'origin', labels: [], demo: false, repo: 'acme/x', ...over,
+  id, name: `C-${id}`, dir: `/p/${id}`, remote: 'origin', scope: { mode: 'labels', labels: ['tracked'] }, demo: false, repo: 'acme/x', ...over,
 })
 const sess = (id: string, campaign = 'c1', over: Partial<SessionInfo> = {}): SessionInfo => ({
   id, kind: 'hero', hero: 'opus', title: 'Opus', campaign, dir: '/p', created: '', exited: false, exitCode: 0, ...over,
@@ -29,6 +29,8 @@ function fakeClient(over: Partial<Client> = {}, state: Partial<AppState> = {}): 
     getQuests: vi.fn(async () => result([quest(1)])),
     getQuest: vi.fn(async (_c, n) => detailOf(n)),
     getGithub: vi.fn(async () => githubOk),
+    setScope: vi.fn(async (id, scope) => camp(id, { scope })),
+    getScopeOptions: vi.fn(async () => scopeOptions),
     ...over,
   }
 }
@@ -38,11 +40,16 @@ const quest = (number: number, over: Partial<Quest> = {}): Quest => ({
   blockedBy: [], subTotal: 0, subDone: 0, comments: 0, prs: [], updated: '', ...over,
 })
 const result = (quests: Quest[], over: Partial<QuestResult> = {}): QuestResult => ({
-  source: 'github', repo: 'acme/x', quests, fetchedAt: '2026-10-08T12:00:00Z', stale: false, ...over,
+  source: 'github', repo: 'acme/x', quests, totalOpen: quests.length, truncated: false,
+  fetchedAt: '2026-10-08T12:00:00Z', stale: false, ...over,
 })
 const detailOf = (n: number): QuestDetail => ({
   ...quest(n), author: 'alice', body: `body ${n}`, created: '', blocking: [], subIssues: [], commentList: [],
 })
+const scopeOptions: ScopeOptions = {
+  openTotal: 312, assigned: 3, login: 'me',
+  labels: [{ name: 'tracked', open: 14 }, { name: 'bug', open: 40 }],
+}
 const githubOk: GithubStatus = {
   rations: [{ resource: 'graphql', limit: 5000, remaining: 4936, used: 64, resetsAt: '2026-10-08T15:37:00Z', seenAt: '' }],
   camp: { active: false },
@@ -528,5 +535,88 @@ describe('github budget and background polling', () => {
     await vi.waitFor(() => expect(s.questsError).not.toBeNull())
     expect(s.questsError?.code).toBe('camp')
     expect(s.questsLoading).toBe(false)
+  })
+})
+
+describe('scope', () => {
+  it('loads the numbers behind the first-connection question for the selected campaign', async () => {
+    const c = fakeClient()
+    const s = new AppStore(c)
+    await s.refresh()
+    await s.loadScopeOptions()
+    expect(c.getScopeOptions).toHaveBeenCalledWith('c1')
+    expect(s.scopeOptions).toEqual(scopeOptions)
+    expect(s.scopeOptionsLoading).toBe(false)
+    expect(s.scopeOptionsError).toBeNull()
+  })
+
+  it('reports a failure to count, with its code', async () => {
+    const s = new AppStore(fakeClient({ getScopeOptions: err(503, 'No GitHub credentials found.', 'no_token') }))
+    await s.refresh()
+    await s.loadScopeOptions()
+    expect(s.scopeOptionsError).toEqual({ code: 'no_token', message: 'No GitHub credentials found.' })
+    expect(s.scopeOptions).toBeNull()
+    expect(s.scopeOptionsLoading).toBe(false)
+  })
+
+  it('drops counts that arrive after another campaign was selected', async () => {
+    const slow = deferred<ScopeOptions>()
+    const s = new AppStore(fakeClient({ getScopeOptions: vi.fn().mockReturnValue(slow.promise) }))
+    await s.refresh()
+    const pending = s.loadScopeOptions()
+    s.selectCampaign('c2')
+    slow.resolve(scopeOptions)
+    await pending
+    expect(s.scopeOptions).toBeNull() // c1's numbers must not describe c2
+  })
+
+  it('choosing a scope saves it, updates the campaign and reloads its quests', async () => {
+    const getQuests = vi.fn()
+      .mockResolvedValueOnce(result([quest(1)]))
+      .mockResolvedValueOnce(result([quest(7)], { scope: { mode: 'assigned', labels: [] } }))
+    const c = fakeClient({ getQuests })
+    const s = new AppStore(c)
+    await s.refresh()
+    await vi.waitFor(() => expect(s.quests).not.toBeNull())
+    s.pickingScope = true
+    expect(await s.chooseScope({ mode: 'assigned', labels: [] })).toBe(true)
+    expect(c.setScope).toHaveBeenCalledWith('c1', { mode: 'assigned', labels: [] })
+    expect(s.campaign?.scope).toEqual({ mode: 'assigned', labels: [] })
+    expect(s.pickingScope).toBe(false)
+    expect(s.quests?.quests[0].number).toBe(7)
+  })
+
+  it('a refused scope keeps the picker open and shows why', async () => {
+    const s = new AppStore(fakeClient({ setScope: err(400, 'choose at least one label') }))
+    await s.refresh()
+    s.pickingScope = true
+    expect(await s.chooseScope({ mode: 'labels', labels: [] })).toBe(false)
+    expect(s.error).toBe('choose at least one label')
+    expect(s.pickingScope).toBe(true)
+  })
+
+  it('a campaign that has not chosen yet gets the scope_needed code', async () => {
+    const s = new AppStore(fakeClient({ getQuests: err(409, 'Choose which of this repository\'s issues to show.', 'scope_needed') }))
+    await s.refresh()
+    await vi.waitFor(() => expect(s.questsError?.code).toBe('scope_needed'))
+  })
+
+  it('opening the picker for one campaign does not leak into the next', async () => {
+    const s = new AppStore(fakeClient())
+    await s.refresh()
+    await s.loadScopeOptions()
+    s.pickingScope = true
+    s.selectCampaign('c2')
+    expect(s.pickingScope).toBe(false)
+    expect(s.scopeOptions).toBeNull()
+  })
+
+  it('has nothing to choose without a campaign', async () => {
+    const c = fakeClient({}, { campaigns: [] })
+    const s = new AppStore(c)
+    await s.refresh()
+    expect(await s.chooseScope({ mode: 'all', labels: [] })).toBe(false)
+    await s.loadScopeOptions()
+    expect(c.getScopeOptions).not.toHaveBeenCalled()
   })
 })

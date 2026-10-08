@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  ApiError, addCampaign, createSession, deleteSession, getGithub, getQuest, getQuests, getState, removeCampaign, termUrl, updateCampaign,
+  ApiError, addCampaign, createSession, deleteSession, getGithub, getQuest, getQuests, getScopeOptions, getState, removeCampaign,
+  setScope, termUrl, updateCampaign,
 } from './api'
 
 function mockFetch(status: number, body?: unknown) {
@@ -48,7 +49,7 @@ describe('api', () => {
   it('campaign calls use the right verbs and paths', async () => {
     const f = mockFetch(201, { id: 'c1' })
     await addCampaign({ dir: '/p', name: 'P' })
-    await updateCampaign('c/1', { labels: ['a'] })
+    await updateCampaign('c/1', { demo: true })
     await removeCampaign('c1')
     const calls = f.mock.calls as unknown as [string, RequestInit][]
     expect(calls.map(([u, i]) => `${i.method} ${u}`)).toEqual([
@@ -57,7 +58,7 @@ describe('api', () => {
       'DELETE /api/campaigns/c1',
     ])
     expect(JSON.parse(calls[0][1].body as string)).toEqual({ dir: '/p', name: 'P' })
-    expect(JSON.parse(calls[1][1].body as string)).toEqual({ labels: ['a'] })
+    expect(JSON.parse(calls[1][1].body as string)).toEqual({ demo: true })
     for (const [, init] of calls) expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
   })
 
@@ -86,6 +87,20 @@ describe('api', () => {
       '/api/campaigns/c1/quests?refresh=1&background=1',
       '/api/github',
     ])
+  })
+
+  it('stores a scope with PUT and reads the counts with GET', async () => {
+    const f = mockFetch(200, {})
+    await setScope('c/1', { mode: 'labels', labels: ['tracked'] })
+    await getScopeOptions('c/1')
+    const calls = f.mock.calls as unknown as [string, RequestInit][]
+    expect(calls.map(([u, i]) => `${i.method} ${u}`)).toEqual([
+      'PUT /api/campaigns/c%2F1/scope',
+      'GET /api/campaigns/c%2F1/scope/options',
+    ])
+    expect(JSON.parse(calls[0][1].body as string)).toEqual({ mode: 'labels', labels: ['tracked'] })
+    expect(calls[0][1].headers).toEqual({ 'Content-Type': 'application/json' }) // writes carry JSON, reads do not
+    expect(calls[1][1].headers).toEqual({})
   })
 
   it('keeps the machine-readable error code', async () => {
