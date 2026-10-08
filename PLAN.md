@@ -246,8 +246,8 @@ Replace the hello-world. `go.mod`, folder layout, `dungeon serve` with an embedd
 (Local registry only. Resolve git root vs working dir; per-campaign optional label filter stored locally, which also covers monorepo subfolders.)
 Register a repo (path → `owner/repo`), campaign list, expedition list with status dots, attach/detach, persisted metadata.
 
-**M3 — GitHub quests**
-`gh` auth, issue sync with ETag, cache, quest list + detail pane (sanitized markdown, comments, labels), relationships (native or body fallback), derived room state.
+**M3 — GitHub quests** (done)
+Built: a `Source` interface with a GitHub GraphQL client (one request per page returns labels, assignees, parent, blockers and linked PRs; comments only when an issue is opened) and a demo source for exploring without GitHub; credentials from `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`; a 60s cache with throttled refresh, shared in-flight fetches and a stale fallback; derived state (open, in progress, locked, cleared); a right-hand panel with list, nesting, filter, counts and a detail view with sanitised markdown. Differences from the first sketch: GraphQL instead of REST + ETags, and the demo source is a per-campaign toggle persisted locally. Not built: Projects v2 status, the optional in-progress label, write-back.
 
 **M4 — Briefing + launch from a quest**
 Briefing assembler, "Summon hero on quest", one-expedition-per-tree gate, optional Torch label/comment (off by default).

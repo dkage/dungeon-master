@@ -313,6 +313,15 @@ test('a campaign without a GitHub repository offers demo quests, and can go back
   await expect(panel.getByRole('heading', { name: /#3 Build the signup form/ })).toBeVisible()
   await expect(panel.getByRole('button', { name: /#2 Design the welcome screen/ })).toBeVisible()
   await expect(panel.getByRole('link', { name: 'Open on GitHub' })).toHaveCount(0)
+  // Titles and headings inside an issue are content: they must not inherit the
+  // small uppercase style used for section labels.
+  const title = panel.getByRole('heading', { name: /#3 Build the signup form/ })
+  expect(await title.evaluate((e) => getComputedStyle(e).textTransform)).toBe('none')
+  await panel.getByRole('button', { name: /← Quests/ }).click()
+  await panel.getByRole('button', { name: /Login button unresponsive/ }).click()
+  const steps = panel.getByLabel('Description').getByRole('heading', { name: 'Steps' })
+  await expect(steps).toBeVisible()
+  expect(await steps.evaluate((e) => getComputedStyle(e).textTransform)).toBe('none')
   await panel.getByRole('button', { name: /← Quests/ }).click()
 
   await panel.getByRole('button', { name: 'Use real issues' }).click()

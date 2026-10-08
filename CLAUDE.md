@@ -2,7 +2,7 @@
 
 A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents against GitHub issues. One button starts an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native webview shell.
 
-Status: M0, M1 (heroes and terminal) and M2 (campaigns and the left panel) done; M3 (GitHub quests) is next. Plans: `PLAN.md` (v1), `PLAN_SKILLS.md` (skills), `release/PLAN_RELEASE.md` (releases), `PLAN_V2.md` (parking lot, not in v1). Read the relevant plan before building a milestone.
+Status: M0-M3 done (skeleton, heroes and terminal, campaigns, GitHub quests list and detail). Next: M4 (start a hero from a quest). `PLAN_EXPERIENCE.md`, if present, reorders upcoming work; read it first. Plans: `PLAN.md` (v1), `PLAN_SKILLS.md` (skills), `release/PLAN_RELEASE.md` (releases), `PLAN_V2.md` (parking lot, not in v1). Read the relevant plan before building a milestone.
 
 ## Scope and principles
 
@@ -10,6 +10,8 @@ Status: M0, M1 (heroes and terminal) and M2 (campaigns and the left panel) done;
 - **Invisible to the team.** All config is local (user state dir). No committed config files and no `.dungeon/` folder in user repos. The RPG theme exists only in the app UI; anything written to git or GitHub uses neutral wording. GitHub write-back is opt-in, off by default.
 - **State files** (`campaigns.json`, `sessions.json`, `party.toml`) live in the user config dir (`DUNGEON_HOME` overrides it), written atomically with 0600/0700 permissions. Derived data (git root, owner/repo) is recomputed on load, never persisted.
 - **Execution config stays local.** Heroes (model, flags, env, binary path) live in the user's `party.toml`, never in anything a repo can supply.
+- **GitHub credentials** come from `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`; they are used for GitHub requests only and never stored, logged, put in an error or sent to the browser. `DUNGEON_GITHUB_ENDPOINT` (tests only) accepts loopback URLs and nothing else.
+- **Issue text is untrusted.** Markdown is cut to a bare-tag allowlist, then sanitised; never pass anything but `renderMarkdown` output to `{@html}`.
 - **Localhost is an attack surface.** Loopback bind only, per-launch token, strict Host/Origin checks, JSON-only writes. Treat any weakening of `internal/server/guard.go` as a release blocker. The CSP deliberately allows inline *styles* (xterm.js builds its font, colour and selection rules as `<style>` elements; blocking them breaks the terminal) but never inline or foreign scripts; both are covered by tests. Issue text is untrusted input to agents.
 - **Own as little as possible for skills.** Use Matt Pocock's skills (MIT) as a pinned external source; fork only on a real gap, keeping his notice and credits.
 - **Independent design.** Write from the behaviour in the plans; do not copy code, prose or assets from other projects. `private/` is gitignored local notes: never commit it, never quote from it in tracked files.
@@ -28,6 +30,7 @@ internal/party/     party.toml loading and validation
 internal/campaign/  registry of working directories; git root and owner/repo resolution
 internal/history/   session records that survive restarts
 internal/fsutil/    atomic private file writes
+internal/quests/    quest model, derived state, cached service; github/ (GraphQL client, token from env or `gh`) and demo/ (sample data) are its sources
 internal/launcher/  claude argv, env scrubbing, binary lookup
 internal/testutil/  shared fixtures (fake claude)
 web/                Svelte 5 + Vite + TypeScript frontend, embedded via go:embed
@@ -37,7 +40,7 @@ web/e2e/            Playwright browser tests (drive the real binary)
 release/            everything about shipping: plan, scripts, packaging (index: release/README.md)
 ```
 
-Planned packages (see `PLAN.md` §4): `party`, `adapter`/`launcher`, `pty`, `session`, `github`, `quests`, `spells`, `briefing`, `config`.
+Still to come (see `PLAN.md` §4): `spells`, `briefing`.
 
 ## Commands
 

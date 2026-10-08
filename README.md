@@ -2,7 +2,7 @@
 
 A desktop cockpit for running CLI coding agents against your GitHub issues. Pick an issue, pick a skill, click a button, and an agent starts in a terminal with the right model, flags and context already set.
 
-> Status: early development. Heroes, terminals and campaigns work; GitHub quests are next. See [PLAN.md](PLAN.md) for the v1 plan, [PLAN_SKILLS.md](PLAN_SKILLS.md) for how skills fit in, [release/](release/README.md) for the release plan, and [PLAN_V2.md](PLAN_V2.md) for ideas that are not in v1.
+> Status: early development. Heroes, terminals, campaigns and the GitHub quest list and detail work; starting a hero from a quest is next. See [PLAN.md](PLAN.md) for the v1 plan, [PLAN_SKILLS.md](PLAN_SKILLS.md) for how skills fit in, [release/](release/README.md) for the release plan, and [PLAN_V2.md](PLAN_V2.md) for ideas that are not in v1.
 
 - v1 targets Claude Code only; other agents come later.
 - Everything is local: no accounts, no telemetry, and nothing is added to your repositories by default.
@@ -16,7 +16,7 @@ Requires Go, Node and the [Claude Code](https://claude.com/claude-code) CLI.
 make run        # builds the frontend and the binary, then serves on 127.0.0.1:7878
 ```
 
-Open the URL it prints (it carries a per-launch token that is exchanged for a cookie). Add a campaign (a project directory), then click a hero to start a session in it. Heroes come from `party.toml` in the config directory; without one, built-in Opus, Sonnet and Haiku heroes are offered.
+Open the URL it prints (it carries a per-launch token that is exchanged for a cookie). Add a campaign (a project directory), then click a hero to start a session in it. The right-hand panel lists the project's GitHub issues; it needs credentials from `gh auth login` (or `GH_TOKEN`), or you can load sample quests. Heroes come from `party.toml` in the config directory; without one, built-in Opus, Sonnet and Haiku heroes are offered.
 
 `make check` runs the Go and frontend tests; `make test-e2e` runs the browser tests (once: `cd web && npx playwright install chromium`).
 
