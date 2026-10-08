@@ -1,12 +1,15 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -53,21 +56,36 @@ func heroToken(t *testing.T, e *env) (sessionJSON, string, string) {
 	return sj, m[1], out
 }
 
+// gate sends a request to the Gatekeeper's socket, the way the shim does.
 func (e *env) gate(method, path string, body any, token string, mutate func(*http.Request)) (*http.Response, []byte) {
-	return e.req(method, path, body, func(r *http.Request) {
-		r.Header.Set("Authorization", "Bearer "+token)
-		if mutate != nil {
-			mutate(r)
-		}
-	})
+	e.t.Helper()
+	client, base := gatekeeper.Dialer(gatekeeper.URLPrefix+e.gateSock, nil)
+	var rd io.Reader
+	if body != nil {
+		b, _ := json.Marshal(body)
+		rd = bytes.NewReader(b)
+	}
+	req, _ := http.NewRequest(method, base+path, rd)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	if mutate != nil {
+		mutate(req)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	out, _ := io.ReadAll(resp.Body)
+	return resp, out
 }
 
 func TestSessionsGetTheShimFirstOnThePathAndTheRule(t *testing.T) {
 	e, _ := withGate(t)
 	_, tok, out := heroToken(t, e)
 	for _, want := range []string{
-		"path=/gk/bin" + string(os.PathListSeparator), // the shim directory is first
-		"gate-url=" + e.base,                          // sessions reach this server
+		"path=/gk/bin" + string(os.PathListSeparator),   // the shim directory is first
+		"gate-url=" + gatekeeper.URLPrefix + e.gateSock, // sessions reach the private socket, not the web port
 		"real-gh=/real/gh",
 		"arg=[--append-system-prompt]",
 		"arg=[" + gatekeeper.Rule + "]", // the rule is in the hero's instructions
@@ -100,7 +118,7 @@ func TestShellSessionsGetTheShimToo(t *testing.T) {
 	defer c.CloseNow()
 	send(t, c, "echo URL=$DUNGEON_GATE_URL BIN=$DUNGEON_GATE_BIN REAL=$DUNGEON_REAL_GH\n")
 	out := readUntil(t, c, "REAL=/real/gh")
-	if !strings.Contains(out, "URL="+e.base) || !strings.Contains(out, "BIN=/gk/bin") {
+	if !strings.Contains(out, "URL="+gatekeeper.URLPrefix+e.gateSock) || !strings.Contains(out, "BIN=/gk/bin") {
 		t.Fatalf("%s", out)
 	}
 	send(t, c, "echo FIRST=${PATH%%:*}\n")
@@ -126,54 +144,117 @@ func TestWithoutTheGatekeeperSessionsAreUntouched(t *testing.T) {
 	}
 }
 
-func TestAGateTokenOnlyOpensTheGatekeepersEndpoints(t *testing.T) {
+func TestTheGateSocketServesOnlyTheShimsTwoRoutes(t *testing.T) {
 	e, _ := withGate(t)
 	_, tok, _ := heroToken(t, e)
 
-	// It works for what the shim needs.
-	if resp, out := e.gate("POST", "/api/gatekeeper/slot", map[string]any{"command": "issue create"}, tok, nil); resp.StatusCode != http.StatusOK {
+	if resp, out := e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "issue create"}, tok, nil); resp.StatusCode != http.StatusOK {
 		t.Fatalf("slot: %d %s", resp.StatusCode, out)
 	}
-	// The ordinary access token works there as well (the same trust level).
-	if resp, _ := e.req("POST", "/api/gatekeeper/slot", map[string]any{"command": "issue create"}, nil); resp.StatusCode != http.StatusOK {
-		t.Fatalf("access token: %d", resp.StatusCode)
-	}
-	if resp, _ := e.gate("POST", "/api/gatekeeper/report", map[string]any{"message": "x"}, tok, nil); resp.StatusCode != http.StatusNoContent {
+	if resp, _ := e.gate("POST", "/gatekeeper/report", map[string]any{"message": "x"}, tok, nil); resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("report: %d", resp.StatusCode)
 	}
-	// And nothing else: it must not read state, start sessions, or touch campaigns.
+	// Nothing else exists there, not even the app's API with the session's token.
 	for _, tc := range []struct{ method, path string }{
-		{"GET", "/api/state"}, {"GET", "/api/github"}, {"POST", "/api/sessions"}, {"DELETE", "/api/sessions/" + "x"},
-		{"POST", "/api/campaigns"}, {"GET", "/api/campaigns/" + e.campaign + "/quests"}, {"PUT", "/api/campaigns/" + e.campaign + "/scope"},
+		{"GET", "/api/state"}, {"GET", "/api/github"}, {"POST", "/api/sessions"}, {"DELETE", "/api/sessions/x"},
+		{"POST", "/api/campaigns"}, {"GET", "/api/campaigns/" + e.campaign + "/quests"}, {"GET", "/"},
 	} {
 		resp, _ := e.gate(tc.method, tc.path, map[string]any{}, tok, nil)
-		if resp.StatusCode != http.StatusUnauthorized {
-			t.Errorf("%s %s with a gate token: %d, want 401", tc.method, tc.path, resp.StatusCode)
+		if resp.StatusCode < 400 {
+			t.Errorf("%s %s on the gate socket: %d", tc.method, tc.path, resp.StatusCode)
 		}
 	}
-	// Garbage and missing tokens are refused on the gate endpoints too.
+	// Garbage and missing tokens are refused.
 	for name, bad := range map[string]string{"unknown": "gate_deadbeef", "empty": "", "no prefix": "x"} {
-		if resp, _ := e.gate("POST", "/api/gatekeeper/slot", map[string]any{"command": "x"}, bad, nil); resp.StatusCode != http.StatusUnauthorized {
+		if resp, _ := e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "x"}, bad, nil); resp.StatusCode != http.StatusUnauthorized {
 			t.Errorf("%s token: %d", name, resp.StatusCode)
 		}
+	}
+	// The app's own access token is not a gate token.
+	if resp, _ := e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "x"}, testToken, nil); resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("access token on the gate: %d", resp.StatusCode)
+	}
+}
+
+// The reverse matters more: the port a browser can reach must not honour a
+// gate token at all.
+func TestTheWebPortIgnoresGateTokens(t *testing.T) {
+	e, _ := withGate(t)
+	_, tok, _ := heroToken(t, e)
+	for _, path := range []string{"/api/gatekeeper/slot", "/api/gatekeeper/report", "/gatekeeper/slot", "/api/state", "/api/github"} {
+		req, _ := http.NewRequest("POST", e.base+path, strings.NewReader("{}"))
+		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent {
+			t.Errorf("web port accepted a gate token on %s: %d", path, resp.StatusCode)
+		}
+	}
+}
+
+func TestTheGateSocketIsPrivateAndGoesAwayWithTheServer(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("modes do not exist on Windows; the directory ACL protects the socket")
+	}
+	qm, _ := quartermaster.New(quartermaster.Options{})
+	s := handlerServer(Config{Gatekeeper: &Gatekeeper{BinDir: "/b", RealGH: "/g"}, Quartermaster: qm}, 1)
+	if err := s.startGate(); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(s.gateSock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != 0o600 {
+		t.Errorf("socket mode %v, want 0600", fi.Mode().Perm())
+	}
+	di, _ := os.Stat(filepath.Dir(s.gateSock))
+	if di.Mode().Perm() != 0o700 {
+		t.Errorf("directory mode %v, want 0700", di.Mode().Perm())
+	}
+	s.stopGate(context.Background())
+	if _, err := os.Stat(s.gateSock); err == nil {
+		t.Error("the socket file outlived the server")
+	}
+}
+
+func TestAGateWithoutTheGatekeeperHasNoSocket(t *testing.T) {
+	e := startServer(t, nil)
+	if e.gateSock != "" {
+		t.Fatalf("socket %q although the Gatekeeper is off", e.gateSock)
+	}
+}
+
+func TestAnOversizedGateRequestIsRefused(t *testing.T) {
+	e, _ := withGate(t)
+	_, tok, _ := heroToken(t, e)
+	big := map[string]any{"command": strings.Repeat("x", 1<<20)}
+	if resp, _ := e.gate("POST", "/gatekeeper/slot", big, tok, nil); resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("1 MiB body: %d", resp.StatusCode)
 	}
 }
 
 func TestGateRequestsAreStrict(t *testing.T) {
 	e, _ := withGate(t)
 	_, tok, _ := heroToken(t, e)
-	if resp, _ := e.gate("POST", "/api/gatekeeper/slot", map[string]any{"command": "x", "extra": 1}, tok, nil); resp.StatusCode != http.StatusBadRequest {
+	if resp, _ := e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "x", "extra": 1}, tok, nil); resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("unknown field: %d", resp.StatusCode)
 	}
-	if resp, _ := e.gate("POST", "/api/gatekeeper/slot", map[string]any{}, tok, func(r *http.Request) { r.Header.Set("Content-Type", "text/plain") }); resp.StatusCode != http.StatusUnsupportedMediaType {
+	if resp, _ := e.gate("POST", "/gatekeeper/slot", map[string]any{}, tok, func(r *http.Request) { r.Header.Set("Content-Type", "text/plain") }); resp.StatusCode != http.StatusUnsupportedMediaType {
 		t.Errorf("not JSON: %d", resp.StatusCode)
 	}
-	if resp, _ := e.gate("GET", "/api/gatekeeper/slot", nil, tok, nil); resp.StatusCode == http.StatusOK {
+	if resp, _ := e.gate("GET", "/gatekeeper/slot", nil, tok, nil); resp.StatusCode == http.StatusOK {
 		t.Errorf("a GET must not be a way to take a slot: %d", resp.StatusCode)
 	}
-	// A browser page cannot ask for slots either: a foreign Origin is refused.
-	if resp, _ := e.gate("POST", "/api/gatekeeper/slot", map[string]any{"command": "x"}, tok, func(r *http.Request) { r.Header.Set("Origin", "http://evil.test") }); resp.StatusCode != http.StatusForbidden {
-		t.Errorf("foreign origin: %d", resp.StatusCode)
+	// Anything that looks like a web page is refused, whatever its Origin.
+	for _, origin := range []string{"http://evil.test", e.base, "null"} {
+		if resp, _ := e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "x"}, tok, func(r *http.Request) { r.Header.Set("Origin", origin) }); resp.StatusCode != http.StatusForbidden {
+			t.Errorf("origin %q: %d", origin, resp.StatusCode)
+		}
 	}
 }
 
@@ -181,13 +262,13 @@ func TestTokensStopWorkingWhenTheirSessionEnds(t *testing.T) {
 	e, _ := withGate(t)
 	s1, t1, _ := heroToken(t, e)
 	_, t2, _ := heroToken(t, e)
-	if resp, _ := e.gate("POST", "/api/gatekeeper/slot", map[string]any{"command": "x"}, t1, nil); resp.StatusCode != http.StatusOK {
+	if resp, _ := e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "x"}, t1, nil); resp.StatusCode != http.StatusOK {
 		t.Fatalf("live session: %d", resp.StatusCode)
 	}
 	e.req("DELETE", "/api/sessions/"+s1.ID, nil, nil)
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		resp, _ := e.gate("POST", "/api/gatekeeper/slot", map[string]any{"command": "x"}, t1, nil)
+		resp, _ := e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "x"}, t1, nil)
 		if resp.StatusCode == http.StatusUnauthorized {
 			break
 		}
@@ -196,7 +277,7 @@ func TestTokensStopWorkingWhenTheirSessionEnds(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	if resp, _ := e.gate("POST", "/api/gatekeeper/slot", map[string]any{"command": "x"}, t2, nil); resp.StatusCode != http.StatusOK {
+	if resp, _ := e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "x"}, t2, nil); resp.StatusCode != http.StatusOK {
 		t.Fatalf("another session's token was revoked: %d", resp.StatusCode)
 	}
 }
@@ -205,7 +286,7 @@ func TestSlotsArePacedThroughTheQuartermaster(t *testing.T) {
 	e, qm := withGate(t)
 	_, tok, _ := heroToken(t, e)
 	slot := func() (waited int64) {
-		resp, out := e.gate("POST", "/api/gatekeeper/slot", map[string]any{"command": "issue create"}, tok, nil)
+		resp, out := e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "issue create"}, tok, nil)
 		var body struct {
 			OK       bool  `json:"ok"`
 			WaitedMS int64 `json:"waitedMs"`
@@ -230,7 +311,7 @@ func TestWritesAreRefusedDuringCampAndWhenTheBudgetIsUsedUp(t *testing.T) {
 	e, qm := withGate(t, func(o *quartermaster.Options) { o.WritesPerHour = 1; o.MaxWait = 50 * time.Millisecond })
 	_, tok, _ := heroToken(t, e)
 	post := func() (*http.Response, []byte) {
-		return e.gate("POST", "/api/gatekeeper/slot", map[string]any{"command": "issue create"}, tok, nil)
+		return e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "issue create"}, tok, nil)
 	}
 	if resp, _ := post(); resp.StatusCode != http.StatusOK {
 		t.Fatal(resp.StatusCode)
@@ -257,7 +338,7 @@ func TestAReportedLimitPausesTheWholeApp(t *testing.T) {
 	if qm.Status().Camp.Active {
 		t.Fatal("camp before any report")
 	}
-	if resp, _ := e.gate("POST", "/api/gatekeeper/report", map[string]any{"message": "secondary rate limit", "retryAfter": 300}, tok, nil); resp.StatusCode != http.StatusNoContent {
+	if resp, _ := e.gate("POST", "/gatekeeper/report", map[string]any{"message": "secondary rate limit", "retryAfter": 300}, tok, nil); resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("%d", resp.StatusCode)
 	}
 	st := qm.Status().Camp
@@ -269,13 +350,13 @@ func TestAReportedLimitPausesTheWholeApp(t *testing.T) {
 	if !strings.Contains(string(out), `"active":true`) {
 		t.Fatalf("%s", out)
 	}
-	if resp, _ := e.gate("POST", "/api/gatekeeper/slot", map[string]any{"command": "issue create"}, tok, nil); resp.StatusCode != http.StatusTooManyRequests {
+	if resp, _ := e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "issue create"}, tok, nil); resp.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("slot during camp: %d", resp.StatusCode)
 	}
 	// A report with no time still pauses for the minimum.
 	e2, qm2 := withGate(t)
 	_, tok2, _ := heroToken(t, e2)
-	e2.gate("POST", "/api/gatekeeper/report", map[string]any{"message": "x"}, tok2, nil)
+	e2.gate("POST", "/gatekeeper/report", map[string]any{"message": "x"}, tok2, nil)
 	if !qm2.Status().Camp.Active {
 		t.Fatal("a report without Retry-After did not pause")
 	}
@@ -284,10 +365,10 @@ func TestAReportedLimitPausesTheWholeApp(t *testing.T) {
 func TestWithoutAQuartermasterEveryoneMayWrite(t *testing.T) {
 	e := startServer(t, func(c *Config) { c.Gatekeeper = &Gatekeeper{BinDir: "/gk/bin", RealGH: "/real/gh"} })
 	_, tok, _ := heroToken(t, e)
-	if resp, _ := e.gate("POST", "/api/gatekeeper/slot", map[string]any{"command": "x"}, tok, nil); resp.StatusCode != http.StatusOK {
+	if resp, _ := e.gate("POST", "/gatekeeper/slot", map[string]any{"command": "x"}, tok, nil); resp.StatusCode != http.StatusOK {
 		t.Fatalf("%d", resp.StatusCode)
 	}
-	if resp, _ := e.gate("POST", "/api/gatekeeper/report", map[string]any{"message": "x"}, tok, nil); resp.StatusCode != http.StatusNoContent {
+	if resp, _ := e.gate("POST", "/gatekeeper/report", map[string]any{"message": "x"}, tok, nil); resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("%d", resp.StatusCode)
 	}
 }
@@ -304,7 +385,7 @@ func TestTheShimTalksToTheServerEndToEnd(t *testing.T) {
 	os.WriteFile(fake, []byte("#!/bin/sh\necho \"$@\" >> "+calls+"\necho created\n"), 0o755)
 
 	envv := map[string]string{
-		gatekeeper.EnvGateURL: e.base, gatekeeper.EnvGateTok: tok, gatekeeper.EnvRealGH: fake,
+		gatekeeper.EnvGateURL: gatekeeper.URLPrefix + e.gateSock, gatekeeper.EnvGateTok: tok, gatekeeper.EnvRealGH: fake,
 	}
 	runShim := func(args ...string) int {
 		return gatekeeper.Run(context.Background(), gatekeeper.ShimOptions{

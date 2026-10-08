@@ -25,9 +25,6 @@ const (
 type guard struct {
 	token string
 	hosts map[string]bool
-	// gateOK says whether a bearer token is a live per-session Gatekeeper
-	// token. Such a token is accepted on /api/gatekeeper/ only.
-	gateOK func(string) bool
 }
 
 func newGuard(port int, token string) *guard {
@@ -78,7 +75,7 @@ func (g *guard) wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		if strings.HasPrefix(r.URL.Path, "/api/") && !g.authed(r) && !g.gateAuthed(r) {
+		if strings.HasPrefix(r.URL.Path, "/api/") && !g.authed(r) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -107,17 +104,6 @@ func (g *guard) authed(r *http.Request) bool {
 
 func isWebsocket(r *http.Request) bool {
 	return strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
-}
-
-// gateAuthed accepts a session's Gatekeeper token, but only for the
-// Gatekeeper's own endpoints: it can ask for write slots and report limits,
-// and opens nothing else.
-func (g *guard) gateAuthed(r *http.Request) bool {
-	if g.gateOK == nil || !strings.HasPrefix(r.URL.Path, "/api/gatekeeper/") {
-		return false
-	}
-	b, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-	return ok && g.gateOK(b)
 }
 
 func unsafeMethod(m string) bool {

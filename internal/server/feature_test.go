@@ -35,6 +35,7 @@ type env struct {
 	token    string
 	cfg      Config
 	gh       *fakeQuests // the GitHub source behind the quest service
+	gateSock string      // the Gatekeeper socket, empty when it is off
 }
 
 func startServer(t *testing.T, mutate func(*Config)) *env {
@@ -83,14 +84,18 @@ func startServer(t *testing.T, mutate func(*Config)) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := Handler(cfg, ln.Addr().(*net.TCPAddr).Port)
-	srv := &httptest.Server{Listener: ln, Config: &http.Server{Handler: h}}
+	s := handlerServer(cfg, ln.Addr().(*net.TCPAddr).Port)
+	if err := s.startGate(); err != nil {
+		t.Fatal(err)
+	}
+	srv := &httptest.Server{Listener: ln, Config: &http.Server{Handler: s.handler()}}
 	srv.Start()
 	t.Cleanup(func() {
 		cfg.Sessions.Shutdown()
+		s.stopGate(context.Background())
 		srv.Close()
 	})
-	return &env{t: t, base: srv.URL, host: ln.Addr().String(), dir: dir, campaign: camp.ID, token: testToken, cfg: cfg, gh: gh}
+	return &env{t: t, base: srv.URL, host: ln.Addr().String(), dir: dir, campaign: camp.ID, token: testToken, cfg: cfg, gh: gh, gateSock: s.gateSock}
 }
 
 func (e *env) req(method, path string, body any, mutate func(*http.Request)) (*http.Response, []byte) {

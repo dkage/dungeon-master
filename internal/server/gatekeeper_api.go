@@ -1,8 +1,11 @@
 package server
 
 import (
+	"context"
 	"errors"
+	"mime"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dkage/dungeon-master/internal/gatekeeper"
@@ -21,13 +24,61 @@ func (s *Server) gateTokenOK(tok string) bool {
 	return ok
 }
 
-// gateURL is where sessions reach this server.
-func (s *Server) gateURL() string {
-	if s.cfg.Gatekeeper != nil && s.cfg.Gatekeeper.URL != "" {
-		return s.cfg.Gatekeeper.URL
+// startGate listens on the Gatekeeper's private socket. A no-op when the
+// Gatekeeper is off.
+func (s *Server) startGate() error {
+	if s.cfg.Gatekeeper == nil {
+		return nil
 	}
-	return s.url
+	ln, path, err := gatekeeper.ListenSocket()
+	if err != nil {
+		return err
+	}
+	s.gateSock, s.gateLn = path, ln
+	s.gateSrv = &http.Server{Handler: s.gateHandler(), ReadHeaderTimeout: 5 * time.Second}
+	go func() { _ = s.gateSrv.Serve(ln) }()
+	return nil
 }
+
+// stopGate closes the socket, which removes its file.
+func (s *Server) stopGate(ctx context.Context) {
+	if s.gateSrv != nil {
+		_ = s.gateSrv.Shutdown(ctx)
+		_ = s.gateSrv.Close()
+		_ = s.gateLn.Close() // Serve may not have started yet; closing removes the file
+	}
+}
+
+// gateHandler serves only what the shim needs, to a session's token. It has
+// no cookie, no access token and no other route, and a request that carries
+// an Origin header (that is, one that comes from a web page) is refused.
+func (s *Server) gateHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST "+gatekeeper.SlotPath, s.handleSlot)
+	mux.HandleFunc("POST "+gatekeeper.ReportPath, s.handleReport)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Origin") != "" {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		tok, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !ok || !s.gateTokenOK(tok) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if ct, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); ct != "application/json" {
+			http.Error(w, "content type must be application/json", http.StatusUnsupportedMediaType)
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) gateURL() string { return gatekeeper.URLPrefix + s.gateSock }
 
 // sessionEnv adds the shim to a session's environment when the Gatekeeper is
 // on. Called with the session's id, which names its token.

@@ -73,9 +73,6 @@ type Gatekeeper struct {
 	BinDir string
 	// RealGH is the gh the shim runs.
 	RealGH string
-	// URL is where sessions reach this server; derived from the listener when
-	// empty.
-	URL string
 	// Tokens are the per-session credentials; created when nil.
 	Tokens *gatekeeper.Tokens
 }
@@ -87,6 +84,12 @@ type Server struct {
 	ln   net.Listener
 	g    *guard
 	url  string // where this server can be reached, set once it listens
+
+	// The Gatekeeper answers the shim on its own private socket, never on
+	// the browser-facing port.
+	gateSrv  *http.Server
+	gateLn   net.Listener
+	gateSock string
 }
 
 // TokenFile is where the access token is kept inside the config directory.
@@ -188,7 +191,11 @@ func (s *Server) Listen() (net.Listener, error) {
 	s.ln = ln
 	s.url = "http://" + ln.Addr().String()
 	s.g = newGuard(ln.Addr().(*net.TCPAddr).Port, s.cfg.Token)
-	s.g.gateOK = s.gateTokenOK
+	if err := s.startGate(); err != nil {
+		// Never a reason not to start: sessions just run the plain gh.
+		fmt.Fprintln(os.Stderr, "warning: gh writes in sessions will not be paced:", err)
+		s.cfg.Gatekeeper = nil
+	}
 	s.http = &http.Server{
 		Handler:           s.handler(),
 		ReadHeaderTimeout: 10 * time.Second,
@@ -202,15 +209,16 @@ func (s *Server) Serve(ln net.Listener) error { return s.http.Serve(ln) }
 // Shutdown stops the server gracefully.
 func (s *Server) Shutdown(ctx context.Context) error {
 	s.cfg.Sessions.Shutdown()
+	s.stopGate(ctx)
 	return s.http.Shutdown(ctx)
 }
 
 // Handler returns the guarded handler for a listener bound on the given
 // port. It exists so tests can drive the server without a real socket.
-func Handler(cfg Config, port int) http.Handler {
-	s := &Server{cfg: withDefaults(cfg), g: newGuard(port, cfg.Token), url: fmt.Sprintf("http://127.0.0.1:%d", port)}
-	s.g.gateOK = s.gateTokenOK
-	return s.handler()
+func Handler(cfg Config, port int) http.Handler { return handlerServer(cfg, port).handler() }
+
+func handlerServer(cfg Config, port int) *Server {
+	return &Server{cfg: withDefaults(cfg), g: newGuard(port, cfg.Token), url: fmt.Sprintf("http://127.0.0.1:%d", port)}
 }
 
 func (s *Server) handler() http.Handler {

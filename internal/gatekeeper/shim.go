@@ -20,12 +20,18 @@ import (
 
 // Environment variables the app sets in the sessions it starts.
 const (
-	EnvGateURL  = "DUNGEON_GATE_URL"   // the app's address, for slot requests
+	EnvGateURL  = "DUNGEON_GATE_URL"   // "unix:<socket path>", where the app answers slot requests
 	EnvGateTok  = "DUNGEON_GATE_TOKEN" // a token valid for this session only
 	EnvRealGH   = "DUNGEON_REAL_GH"    // the real gh, which the shim runs
 	EnvGateBin  = "DUNGEON_GATE_BIN"   // the directory holding the shim, removed from gh's own PATH
 	exitHeld    = 75                   // EX_TEMPFAIL: asked to try again later
 	exitMissing = 127                  // the real gh could not be found
+)
+
+// Paths of the two requests the shim makes, on the gate socket.
+const (
+	SlotPath   = "/gatekeeper/slot"
+	ReportPath = "/gatekeeper/report"
 )
 
 // ShimOptions is everything Run needs; zero values use the real process.
@@ -123,13 +129,14 @@ func askForSlot(ctx context.Context, o ShimOptions, gate, tok string) (held stri
 	ctx, cancel := context.WithTimeout(ctx, o.SlotTimeout)
 	defer cancel()
 	body, _ := json.Marshal(map[string]string{"command": summary(o.Args)})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(gate, "/")+"/api/gatekeeper/slot", bytes.NewReader(body))
+	client, base := Dialer(gate, o.HTTP)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+SlotPath, bytes.NewReader(body))
 	if err != nil {
 		return "", 0
 	}
 	req.Header.Set("Authorization", "Bearer "+tok)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := o.HTTP.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", 0 // the app is not there: fail open
 	}
@@ -169,13 +176,14 @@ func report(ctx context.Context, o ShimOptions, gate, tok, line string, retryAft
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	body, _ := json.Marshal(map[string]any{"message": line, "retryAfter": retryAfter})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(gate, "/")+"/api/gatekeeper/report", bytes.NewReader(body))
+	client, base := Dialer(gate, o.HTTP)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+ReportPath, bytes.NewReader(body))
 	if err != nil {
 		return
 	}
 	req.Header.Set("Authorization", "Bearer "+tok)
 	req.Header.Set("Content-Type", "application/json")
-	if resp, err := o.HTTP.Do(req); err == nil {
+	if resp, err := client.Do(req); err == nil {
 		resp.Body.Close()
 	}
 }

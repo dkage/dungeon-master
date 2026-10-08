@@ -107,15 +107,9 @@ func questsErr(w http.ResponseWriter, err error, repo string) {
 		httpErrCode(w, http.StatusBadGateway, "github_unauthorized",
 			"GitHub rejected the credentials. Run `gh auth login` again, or check GH_TOKEN.")
 	case errors.As(err, &rl) && rl.Paused:
-		until := "a while"
-		if !rl.Reset.IsZero() {
-			until = rl.Reset.Local().Format("15:04")
-		}
-		httpErrCode(w, http.StatusTooManyRequests, "camp",
-			"To stay inside GitHub's limits the app is not sending requests until "+until+
-				". Anything already loaded stays available.")
+		httpErrCode(w, http.StatusTooManyRequests, "camp", rl.UserMessage()+" Anything already loaded stays available.")
 	case errors.As(err, &rl):
-		httpErrCode(w, http.StatusTooManyRequests, "rate_limited", rl.Error()+". Try again later.")
+		httpErrCode(w, http.StatusTooManyRequests, "rate_limited", rl.UserMessage()+" Try again later.")
 	case errors.Is(err, quests.ErrNotFound):
 		httpErrCode(w, http.StatusNotFound, "repo_not_found",
 			"GitHub could not find "+repo+", or the credentials cannot see it.")

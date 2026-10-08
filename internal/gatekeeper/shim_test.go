@@ -59,7 +59,7 @@ func newGate(t *testing.T) *gate {
 			return
 		}
 		switch r.URL.Path {
-		case "/api/gatekeeper/slot":
+		case SlotPath:
 			g.slots++
 			var body map[string]string
 			json.NewDecoder(r.Body).Decode(&body)
@@ -71,7 +71,7 @@ func newGate(t *testing.T) *gate {
 				return
 			}
 			json.NewEncoder(w).Encode(map[string]any{"ok": true, "waitedMs": 0})
-		case "/api/gatekeeper/report":
+		case ReportPath:
 			var body map[string]any
 			json.NewDecoder(r.Body).Decode(&body)
 			g.reports = append(g.reports, body)
