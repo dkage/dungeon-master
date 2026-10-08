@@ -3,11 +3,28 @@
 
 Pure functions only: nothing here reads or writes a real file.
 """
+import os
+import subprocess
+import sys
+import tempfile
 import unittest
 
-from mdfmt import find_runts, format_text, split_row, width_of
+from mdfmt import decode, find_runts, format_bytes, format_text, split_row, width_of
+
+SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mdfmt.py")
 
 W = 120
+
+
+def put(path, data):
+    with open(path, "wb") as f:
+        f.write(data)
+
+
+def get(path):
+    with open(path, "rb") as f:
+        return f.read()
+
 LONG = ("word " * 40).strip()  # 199 columns, wraps at 120
 
 
@@ -221,6 +238,149 @@ class Runts(unittest.TestCase):
     def test_reflow_removes_the_runt(self):
         text = "is done except the deferred SQLite\ncopy\nand write queue (phases C and D).\n"
         self.assertEqual(find_runts(fmt(text, reflow=True), W), [])
+
+
+class LineEndings(unittest.TestCase):
+    """Files from Windows (CRLF), classic Mac (CR), mixed files, BOMs: same result, original style kept."""
+
+    DOC = "# T\ntext " + LONG + "\n- a\n- b\n|a|b|\n|-|-|\n|1|2|\n```\ncode  \n```\nend\n"
+
+    def fmt_b(self, text, eol="\n", bom=False, reflow=False):
+        data = text.replace("\n", eol).encode("utf-8")
+        return format_bytes((b"\xef\xbb\xbf" if bom else b"") + data, W, reflow)
+
+    def test_crlf_in_crlf_out_same_content_as_lf(self):
+        lf = self.fmt_b(self.DOC)
+        crlf = self.fmt_b(self.DOC, "\r\n")
+        self.assertEqual(crlf, lf.replace(b"\n", b"\r\n"))
+
+    def test_crlf_output_has_no_bare_lf_or_cr(self):
+        out = self.fmt_b(self.DOC, "\r\n")
+        self.assertEqual(out.count(b"\n"), out.count(b"\r\n"))
+        self.assertEqual(out.count(b"\r"), out.count(b"\r\n"))
+
+    def test_lf_stays_lf(self):
+        self.assertNotIn(b"\r", self.fmt_b(self.DOC))
+
+    def test_classic_mac_cr_stays_cr(self):
+        out = self.fmt_b(self.DOC, "\r")
+        self.assertNotIn(b"\n", out)
+        self.assertEqual(out.replace(b"\r", b"\n"), self.fmt_b(self.DOC))
+
+    def test_crlf_does_not_create_hard_breaks_or_stray_cr(self):
+        out, eol, _ = decode(self.fmt_b("a\nb\n", "\r\n"))
+        self.assertEqual((out, eol), ("a\nb\n", "\r\n"))
+
+    def test_mixed_endings_go_to_the_most_common(self):
+        data = b"# T\r\n\r\ntext\r\nmore\nlast\r\n"
+        out = format_bytes(data, W)
+        self.assertEqual(out.count(b"\n"), out.count(b"\r\n"))
+        data = b"# T\n\ntext\nmore\r\nlast\n"
+        self.assertNotIn(b"\r", format_bytes(data, W))
+
+    def test_bom_is_kept_and_front_matter_still_recognised(self):
+        doc = "---\nname: x\ndescription: " + LONG + "\n---\n# T\ntext\n"
+        out = self.fmt_b(doc, bom=True)
+        self.assertTrue(out.startswith(b"\xef\xbb\xbf---\n"))
+        self.assertIn(b"description: " + LONG.encode(), out)  # front matter not wrapped
+        self.assertIn(b"\n# T\n\ntext\n", out)
+
+    def test_bom_with_crlf(self):
+        out = self.fmt_b("# T\ntext\n", "\r\n", bom=True)
+        self.assertEqual(out, b"\xef\xbb\xbf# T\r\n\r\ntext\r\n")
+
+    def test_missing_final_newline_gets_one_in_the_files_style(self):
+        self.assertEqual(format_bytes(b"a\r\nb", W), b"a\r\nb\r\n")
+        self.assertEqual(format_bytes(b"a\nb", W), b"a\nb\n")
+
+    def test_idempotent_in_every_style(self):
+        for eol in ("\n", "\r\n", "\r"):
+            for bom in (False, True):
+                once = self.fmt_b(self.DOC, eol, bom)
+                self.assertEqual(format_bytes(once, W), once)
+
+    def test_crlf_code_block_stays_crlf_and_untouched(self):
+        out = self.fmt_b("```\n" + "x " * 100 + "\n\n\n```\n", "\r\n")
+        self.assertEqual(out, ("```\n" + "x " * 100 + "\n\n\n```\n").replace("\n", "\r\n").encode())
+
+    def test_whitespace_only_lines_count_as_blank(self):
+        self.assertEqual(fmt("a\n \t \n\t\nb\n"), "a\n\nb\n")
+
+    def test_runts_work_on_crlf_text(self):
+        text, _, _ = decode(("is " + "x " * 55 + "end\r\ncopy\r\nand more\r\n").encode())
+        self.assertEqual([t for _, t in find_runts(text, W)], ["copy"])
+
+    def test_non_breaking_space_is_not_a_break_point(self):
+        nbsp = "a\u00a0b"
+        self.assertIn(nbsp, fmt("x " * 58 + nbsp + " tail\n"))
+
+    def test_invalid_utf8_is_rejected_not_mangled(self):
+        with self.assertRaises(UnicodeDecodeError):
+            decode(b"caf\xe9\n")
+
+
+class CommandLine(unittest.TestCase):
+    """The real script on real (temporary) files: bytes in, bytes out."""
+
+    def run_cli(self, *args):
+        return subprocess.run([sys.executable, "-B", SCRIPT, *args], capture_output=True, text=True)
+
+    def test_crlf_file_is_formatted_in_place_and_stays_crlf(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "a.md")
+            put(p, b"# T\r\ntext\r\n|a|b|\r\n|-|-|\r\n|1|2|\r\n")
+            self.assertEqual(self.run_cli(p).returncode, 0)
+            self.assertEqual(get(p),
+                             b"# T\r\n\r\ntext\r\n\r\n| a | b |\r\n|---|---|\r\n| 1 | 2 |\r\n")
+
+    def test_lf_file_stays_lf_and_bom_survives(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "a.md")
+            put(p, b"\xef\xbb\xbf# T\ntext\n")
+            self.run_cli(p)
+            self.assertEqual(get(p), b"\xef\xbb\xbf# T\n\ntext\n")
+
+    def test_check_does_not_write_and_reports_with_exit_1(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "a.md")
+            put(p, b"# T\r\ntext\r\n")
+            r = self.run_cli("--check", p)
+            self.assertEqual(r.returncode, 1)
+            self.assertEqual(get(p), b"# T\r\ntext\r\n")
+
+    def test_clean_crlf_file_is_not_touched_at_all(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "a.md")
+            put(p, b"# T\r\n\r\ntext\r\n")
+            before = os.stat(p).st_mtime_ns
+            r = self.run_cli(p)
+            self.assertEqual((r.returncode, r.stdout), (0, ""))
+            self.assertEqual(os.stat(p).st_mtime_ns, before)
+
+    def test_non_utf8_file_is_left_alone_with_exit_2(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "a.md")
+            put(p, b"caf\xe9\n")
+            r = self.run_cli(p)
+            self.assertEqual(r.returncode, 2)
+            self.assertEqual(get(p), b"caf\xe9\n")
+
+    def test_missing_file_does_not_stop_the_others(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "a.md")
+            put(p, b"# T\ntext\n")
+            r = self.run_cli(os.path.join(d, "nope.md"), p)
+            self.assertEqual(r.returncode, 2)
+            self.assertEqual(get(p), b"# T\n\ntext\n")
+
+    def test_runts_flag_reports_without_writing(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "a.md")
+            body = ("is " + "x " * 55 + "end\r\ncopy\r\nand more\r\n").encode()
+            put(p, body)
+            r = self.run_cli("--runts", p)
+            self.assertIn(":2: copy", r.stdout)
+            self.assertEqual(get(p), body)
 
 
 if __name__ == "__main__":

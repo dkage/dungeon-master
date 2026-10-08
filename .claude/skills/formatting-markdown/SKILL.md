@@ -38,6 +38,10 @@ It rewrites the files in place (`--check` only reports). It leaves front matter,
 definitions alone, never joins lines you kept apart, and is idempotent. It reports lines it cannot wrap (wide table
 rows, long URLs) on stderr.
 
+It works on raw bytes: a file's own line endings (LF, Windows CRLF, classic CR) and a UTF-8 BOM are detected and put
+back, so formatting on macOS never turns a Windows file into LF or the reverse. A file that is not valid UTF-8 is
+skipped untouched (exit 2).
+
 Two extra modes, both opt-in:
 
 - `--runts` changes nothing and lists "runt" lines: short leftovers of an old wrap, such as a lone `copy` on a line

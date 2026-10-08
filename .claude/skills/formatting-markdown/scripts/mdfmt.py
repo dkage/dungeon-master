@@ -362,6 +362,29 @@ def format_lines(lines, width, reflow=False):
     return out
 
 
+def decode(data):
+    """bytes -> (text with \\n endings, eol, bom). The file's own line-ending style is returned so it can be put back:
+    CRLF (Windows), CR (classic Mac) or LF. Mixed endings go to whichever is most common (LF on a tie)."""
+    bom = data.startswith(b"\xef\xbb\xbf")
+    text = data[3:].decode("utf-8") if bom else data.decode("utf-8")
+    crlf = text.count("\r\n")
+    lone_cr = text.count("\r") - crlf
+    lf = text.count("\n") - crlf
+    eol = "\r\n" if crlf > lf and crlf >= lone_cr else "\r" if lone_cr > lf and lone_cr > crlf else "\n"
+    return text.replace("\r\n", "\n").replace("\r", "\n"), eol, bom
+
+
+def encode(text, eol, bom):
+    out = text.replace("\n", eol).encode("utf-8")
+    return b"\xef\xbb\xbf" + out if bom else out
+
+
+def format_bytes(data, width, reflow=False):
+    """The whole pipeline on raw file contents: keeps the file's line endings and BOM."""
+    text, eol, bom = decode(data)
+    return encode(format_text(text, width, reflow), eol, bom)
+
+
 def format_text(text, width, reflow=False):
     lines = text.split("\n")
     head = []
@@ -409,27 +432,35 @@ def main():
                     help="only report runt lines (short leftovers of an old wrap), as 'runt: FILE:LINE: text'; "
                          "changes nothing")
     args = ap.parse_args()
-    dirty = False
+    dirty = failed = False
     for path in args.files:
-        with open(path, encoding="utf-8") as f:
-            old = f.read()
+        try:
+            with open(path, "rb") as f:
+                old = f.read()
+            text, _, _ = decode(old)
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"skipped {path}: {e}", file=sys.stderr)
+            failed = True
+            continue
         if args.runts:
-            for no, l in find_runts(format_text(old, args.width), args.width):
+            for no, l in find_runts(format_text(text, args.width), args.width):
                 print(f"runt: {path}:{no}: {l}")
             continue
-        new = format_text(old, args.width, args.reflow)
+        new = format_bytes(old, args.width, args.reflow)
         if new != old:
             dirty = True
             if args.check:
                 print(f"would reformat {path}")
             else:
-                with open(path, "w", encoding="utf-8") as f:
+                with open(path, "wb") as f:  # binary: no newline translation on any platform
                     f.write(new)
                 print(f"reformatted {path}")
-        for no, l in enumerate(new.split("\n"), 1):
+        for no, l in enumerate(decode(new)[0].split("\n"), 1):
             if width_of(l) > args.width and not FENCE_RE.match(l):
                 kind = "table row" if l.lstrip().startswith("|") else "line"
                 print(f"  {path}:{no}: {kind} is {width_of(l)} wide (cannot be wrapped)", file=sys.stderr)
+    if failed:
+        return 2
     return 1 if (dirty and args.check) else 0
 
 
