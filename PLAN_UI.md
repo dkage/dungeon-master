@@ -21,7 +21,7 @@ This file describes behaviour in our own terms.
 │ │ Sample [sample]│ │                                  │ feature · open · ready  [Brief]  │
 │ └────────────────┘ │                                  │ (markdown body)                  │
 │                    │                                  │                                  │
-│ ⚙ Settings         │                                  │ [Opus ▾] [Open] [▶ /tdd] [More▾] │
+│ ⚙ Settings        │                                  │ [Opus ▾] [Open] [▶ /tdd] [More▾] │
 └────────────────────┴──────────────────────────────────┴──────────────────────────────────┘
 ```
 
