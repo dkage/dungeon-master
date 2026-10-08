@@ -2,21 +2,20 @@
   import type { AppStore } from './store.svelte'
 
   let { store }: { store: AppStore } = $props()
-  const canLaunch = $derived(!store.busy)
+  const campaign = $derived(store.campaign)
+  const canLaunch = $derived(!store.busy && !!campaign)
 </script>
 
 <header class="toolbar">
-  <label class="dir">
-    <span>Start in</span>
-    <input
-      type="text"
-      spellcheck="false"
-      autocomplete="off"
-      placeholder="/absolute/path/to/project"
-      value={store.dir}
-      oninput={(e) => store.setDir(e.currentTarget.value)}
-    />
-  </label>
+  <div class="where">
+    {#if campaign}
+      <strong>{campaign.name}</strong>
+      <span class="repo" class:none={!campaign.repo}>{campaign.repo ?? 'no GitHub repo'}</span>
+      <code class="path" title={campaign.dir}>{campaign.dir}</code>
+    {:else}
+      <span class="hint">No campaign selected</span>
+    {/if}
+  </div>
 
   <div class="heroes" role="group" aria-label="Heroes">
     {#each store.heroes as hero (hero.id)}

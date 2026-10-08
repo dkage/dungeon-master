@@ -1,27 +1,28 @@
 import * as realApi from './api'
-import type { AppState, Hero, SessionInfo } from './api'
+import type { AppState, Campaign, CampaignInput, CampaignPatch, Hero, SessionInfo } from './api'
 
-export type Client = Pick<typeof realApi, 'getState' | 'createSession' | 'deleteSession'>
+export type Client = Pick<
+  typeof realApi,
+  'getState' | 'createSession' | 'deleteSession' | 'addCampaign' | 'updateCampaign' | 'removeCampaign'
+>
 
-const DIR_KEY = 'dungeon.dir'
+const CAMPAIGN_KEY = 'dungeon.campaign'
 
-function loadDir(): string {
+function load(key: string): string {
   try {
-    return localStorage.getItem(DIR_KEY) ?? ''
+    return localStorage.getItem(key) ?? ''
   } catch {
     return ''
   }
 }
 
-function saveDir(dir: string) {
+function save(key: string, value: string) {
   try {
-    localStorage.setItem(DIR_KEY, dir)
+    localStorage.setItem(key, value)
   } catch {
-    /* storage unavailable: the field simply is not remembered */
+    /* storage unavailable: the choice is simply not remembered */
   }
 }
-
-const absolute = /^(\/|[A-Za-z]:[\\/])/
 
 export type Target = { hero: string } | { shell: true }
 
@@ -30,21 +31,25 @@ export class AppStore {
   claude = $state<AppState['claude']>({ found: true })
   defaultHeroes = $state(false)
   heroes = $state<Hero[]>([])
+  campaigns = $state<Campaign[]>([])
   sessions = $state<SessionInfo[]>([])
+  campaignId = $state<string | null>(load(CAMPAIGN_KEY) || null)
   activeId = $state<string | null>(null)
   error = $state<string | null>(null)
   busy = $state(false)
-  dir = $state(loadDir())
 
   constructor(private client: Client = realApi) {}
+
+  get campaign(): Campaign | undefined {
+    return this.campaigns.find((c) => c.id === this.campaignId)
+  }
 
   get active(): SessionInfo | undefined {
     return this.sessions.find((s) => s.id === this.activeId)
   }
 
-  setDir(dir: string) {
-    this.dir = dir
-    saveDir(dir)
+  sessionsOf(campaignId: string): SessionInfo[] {
+    return this.sessions.filter((s) => s.campaign === campaignId)
   }
 
   async refresh() {
@@ -54,25 +59,95 @@ export class AppStore {
       this.claude = st.claude
       this.defaultHeroes = st.defaultHeroes
       this.heroes = st.heroes
+      this.campaigns = st.campaigns
       this.sessions = st.sessions
-      if (!this.sessions.some((s) => s.id === this.activeId)) {
-        this.activeId = this.sessions.at(-1)?.id ?? null
-      }
+      this.normalise()
       this.error = null
     } catch (e) {
       this.error = message(e)
     }
   }
 
+  /** Keep the selection pointing at things that exist. */
+  private normalise() {
+    if (!this.campaigns.some((c) => c.id === this.campaignId)) {
+      this.pickCampaign(this.campaigns[0]?.id ?? null)
+    }
+    const mine = this.campaignId ? this.sessionsOf(this.campaignId) : []
+    if (!mine.some((s) => s.id === this.activeId)) this.activeId = mine.at(-1)?.id ?? null
+  }
+
+  private pickCampaign(id: string | null) {
+    this.campaignId = id
+    save(CAMPAIGN_KEY, id ?? '')
+  }
+
+  selectCampaign(id: string) {
+    if (!this.campaigns.some((c) => c.id === id)) return
+    this.pickCampaign(id)
+    if (this.active?.campaign !== id) this.activeId = this.sessionsOf(id).at(-1)?.id ?? null
+  }
+
+  selectSession(id: string) {
+    const s = this.sessions.find((x) => x.id === id)
+    if (!s) return
+    this.pickCampaign(s.campaign)
+    this.activeId = id
+  }
+
+  async addCampaign(input: CampaignInput): Promise<boolean> {
+    this.busy = true
+    try {
+      const c = await this.client.addCampaign(input)
+      this.campaigns = [...this.campaigns, c]
+      this.selectCampaign(c.id)
+      this.error = null
+      return true
+    } catch (e) {
+      this.error = message(e)
+      return false
+    } finally {
+      this.busy = false
+    }
+  }
+
+  async updateCampaign(id: string, patch: CampaignPatch): Promise<boolean> {
+    try {
+      const c = await this.client.updateCampaign(id, patch)
+      this.campaigns = this.campaigns.map((x) => (x.id === id ? c : x))
+      this.error = null
+      return true
+    } catch (e) {
+      this.error = message(e)
+      return false
+    }
+  }
+
+  async removeCampaign(id: string) {
+    try {
+      await this.client.removeCampaign(id)
+    } catch (e) {
+      const status = (e as { status?: number }).status
+      if (status !== 404) {
+        this.error = message(e)
+        return
+      }
+    }
+    this.campaigns = this.campaigns.filter((c) => c.id !== id)
+    this.sessions = this.sessions.filter((s) => s.campaign !== id)
+    this.error = null
+    this.normalise()
+  }
+
   async launch(target: Target) {
-    const dir = this.dir.trim()
-    if (!absolute.test(dir)) {
-      this.error = 'Enter an absolute directory path to start in.'
+    const campaign = this.campaign
+    if (!campaign) {
+      this.error = 'Add or select a campaign first.'
       return
     }
     this.busy = true
     try {
-      const sess = await this.client.createSession({ ...target, dir })
+      const sess = await this.client.createSession({ ...target, campaign: campaign.id })
       this.sessions = [...this.sessions, sess]
       this.activeId = sess.id
       this.error = null
@@ -81,10 +156,6 @@ export class AppStore {
     } finally {
       this.busy = false
     }
-  }
-
-  select(id: string) {
-    if (this.sessions.some((s) => s.id === id)) this.activeId = id
   }
 
   async close(id: string) {
@@ -98,10 +169,13 @@ export class AppStore {
         return
       }
     }
-    const i = this.sessions.findIndex((s) => s.id === id)
+    const campaign = this.sessions.find((s) => s.id === id)?.campaign
+    const before = campaign ? this.sessionsOf(campaign) : []
+    const i = before.findIndex((s) => s.id === id)
     this.sessions = this.sessions.filter((s) => s.id !== id)
     if (this.activeId === id) {
-      this.activeId = this.sessions[Math.min(i, this.sessions.length - 1)]?.id ?? null
+      const after = campaign ? this.sessionsOf(campaign) : []
+      this.activeId = after[Math.min(i, after.length - 1)]?.id ?? null
     }
   }
 

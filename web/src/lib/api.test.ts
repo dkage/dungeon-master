@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, createSession, deleteSession, getState, termUrl } from './api'
+import {
+  ApiError, addCampaign, createSession, deleteSession, getState, removeCampaign, termUrl, updateCampaign,
+} from './api'
 
 function mockFetch(status: number, body?: unknown) {
   const fn = vi.fn(async () => ({
@@ -29,10 +31,10 @@ describe('api', () => {
 
   it('POST sends JSON with the content type the guard requires', async () => {
     const f = mockFetch(201, { id: 's1' })
-    await createSession({ hero: 'opus', dir: '/x' })
+    await createSession({ hero: 'opus', campaign: 'c1' })
     const [, init] = f.mock.calls[0] as unknown as [string, RequestInit]
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
-    expect(JSON.parse(init.body as string)).toEqual({ hero: 'opus', dir: '/x' })
+    expect(JSON.parse(init.body as string)).toEqual({ hero: 'opus', campaign: 'c1' })
   })
 
   it('DELETE also sends the JSON content type and escapes the id', async () => {
@@ -43,9 +45,25 @@ describe('api', () => {
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
   })
 
+  it('campaign calls use the right verbs and paths', async () => {
+    const f = mockFetch(201, { id: 'c1' })
+    await addCampaign({ dir: '/p', name: 'P' })
+    await updateCampaign('c/1', { labels: ['a'] })
+    await removeCampaign('c1')
+    const calls = f.mock.calls as unknown as [string, RequestInit][]
+    expect(calls.map(([u, i]) => `${i.method} ${u}`)).toEqual([
+      'POST /api/campaigns',
+      'PATCH /api/campaigns/c%2F1',
+      'DELETE /api/campaigns/c1',
+    ])
+    expect(JSON.parse(calls[0][1].body as string)).toEqual({ dir: '/p', name: 'P' })
+    expect(JSON.parse(calls[1][1].body as string)).toEqual({ labels: ['a'] })
+    for (const [, init] of calls) expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+  })
+
   it('surfaces the server error message', async () => {
     mockFetch(400, { error: 'dir is not an existing directory' })
-    await expect(createSession({ hero: 'x', dir: '/nope' })).rejects.toMatchObject({
+    await expect(createSession({ hero: 'x', campaign: 'cnope' })).rejects.toMatchObject({
       status: 400,
       message: 'dir is not an existing directory',
     })

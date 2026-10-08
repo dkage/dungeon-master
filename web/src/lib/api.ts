@@ -6,15 +6,29 @@ export interface Hero {
   label: string
 }
 
+export interface Campaign {
+  id: string
+  name: string
+  dir: string
+  remote: string
+  labels: string[]
+  gitRoot?: string
+  /** "owner/repo" on github.com, when the remote could be resolved. */
+  repo?: string
+}
+
 export interface SessionInfo {
   id: string
   kind: 'hero' | 'shell'
   hero?: string
   title: string
+  campaign: string
   dir: string
   created: string
   exited: boolean
   exitCode: number
+  /** Was running when Dungeon last stopped; only the record remains. */
+  lost?: boolean
 }
 
 export interface AppState {
@@ -22,13 +36,23 @@ export interface AppState {
   claude: { found: boolean; path?: string; error?: string }
   defaultHeroes: boolean
   heroes: Hero[]
+  campaigns: Campaign[]
   sessions: SessionInfo[]
 }
 
+export interface CampaignInput {
+  dir: string
+  name?: string
+  remote?: string
+  labels?: string[]
+}
+
+export type CampaignPatch = Partial<Omit<CampaignInput, 'dir'>>
+
 export interface CreateRequest {
+  campaign: string
   hero?: string
   shell?: boolean
-  dir: string
   opener?: string
   cols?: number
   rows?: number
@@ -73,6 +97,12 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T 
 }
 
 export const getState = () => call<AppState>('GET', '/api/state') as Promise<AppState>
+export const addCampaign = (req: CampaignInput) =>
+  call<Campaign>('POST', '/api/campaigns', req) as Promise<Campaign>
+export const updateCampaign = (id: string, patch: CampaignPatch) =>
+  call<Campaign>('PATCH', `/api/campaigns/${encodeURIComponent(id)}`, patch) as Promise<Campaign>
+export const removeCampaign = (id: string) =>
+  call<void>('DELETE', `/api/campaigns/${encodeURIComponent(id)}`) as Promise<void>
 export const createSession = (req: CreateRequest) =>
   call<SessionInfo>('POST', '/api/sessions', req) as Promise<SessionInfo>
 export const deleteSession = (id: string) =>
