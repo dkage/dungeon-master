@@ -29,13 +29,30 @@ Sources: [REST rate limits](https://docs.github.com/en/rest/using-the-rest-api/r
 
 | What | Visible? | How |
 |---|---|---|
-| Primary REST and GraphQL budget | **Yes, free and authoritative** | `x-ratelimit-limit / remaining / used / reset / resource` headers on *every* response; `GET /rate_limit`; the GraphQL field `rateLimit { cost remaining resetAt }` |
+| Primary budget (REST `core` and `graphql` are separate buckets) | **Yes, free and authoritative** | `x-ratelimit-limit / remaining / used / reset / resource` headers on *every* response; `GET /rate_limit`; the GraphQL field `rateLimit { cost remaining resetAt }` |
 | Usage by other tools on the same token | **Yes**, same counters | the headers show what is left for the whole account, so `gh` and scripts are already included |
 | Secondary limits (points/min, content creation per minute/hour, CPU) | **No counters are exposed** | we must track our own writes, and react to `403/429` with `retry-after` |
 
 Verified against the owner's account: `GET /rate_limit` returned identical numbers on two consecutive calls (it is free); a GraphQL response carried `X-Ratelimit-Limit: 5000`, `Remaining`, `Reset`, `Resource: graphql`, and `rateLimit { cost: 1 }`.
 
 So: **read the primary budget from the response headers of every request (no extra calls, no own counting), and keep our own persisted counters only for what GitHub does not show: our writes per rolling minute and hour.** The self-limit must be far below GitHub's, because other tools share the budget and the content-creation numbers are approximate.
+
+## 2b. What the `gh` CLI actually uses (measured)
+
+Traced with `GH_DEBUG=api` against the owner's repository on 2026-10-08.
+
+| Command | Requests it makes | API |
+|---|---|---|
+| `gh issue list` | 1 query (`IssueList`) | GraphQL |
+| `gh issue view` | `IssueByNumber` (+ a second query for details) | GraphQL |
+| `gh issue create` | `IssueRepositoryInfo` query, then the `IssueCreate` mutation; each `--label`, `--assignee`, `--milestone` or `--project` adds more lookup queries | GraphQL |
+| `gh issue edit --add-label` | `IssueByNumber`, `RepositoryLabelList`, then the `LabelAdd` mutation (3 requests) | GraphQL |
+| `gh issue comment` / `close` | `IssueByNumber` query, then the mutation (2 requests) | GraphQL |
+| `gh api repos/...` | 1 request | REST (a separate `core` budget) |
+
+So `gh issue ...` is **GraphQL, not REST**, and counts against the **GraphQL** budget (5,000 points per hour, 2,000 points per minute secondary, mutations 5 points, plus the content-creation caps). It does no pacing and no lookup caching: a loop creating 50 issues with labels and assignees sends roughly 150 to 200 requests, 50 of them content-creating mutations, in whatever time the loop takes, and each created issue also notifies people. That is the shape of what locked the account.
+
+GraphQL has every mutation we need: `createIssue`, `updateIssue`, `closeIssue`, `reopenIssue`, `addComment`, `createLabel`, `addLabelsToLabelable`, `addSubIssue`, `addBlockedBy`, `removeBlockedBy` (confirmed by introspection). **Dungeon Master will use GraphQL for everything**, so reads and writes share one budget and one accounting model with `gh issue`, and the lookups (repository id, label ids, user ids) are cached in the mirror so a create costs **one** request instead of two to four.
 
 ## 3. Design
 
