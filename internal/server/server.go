@@ -12,7 +12,11 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"os"
 	"time"
+
+	"dungeon/internal/party"
+	"dungeon/internal/session"
 )
 
 // Config is everything New needs.
@@ -26,6 +30,19 @@ type Config struct {
 	// Assets is the built frontend. May be nil or lack index.html, in which
 	// case a built-in page is served.
 	Assets fs.FS
+
+	// Party is the loaded hero set.
+	Party party.Party
+	// Claude is the resolved claude binary; empty when it was not found, in
+	// which case ClaudeErr says why and hero launches are refused.
+	Claude    string
+	ClaudeErr string
+	// Shell is the user's shell for free terminals.
+	Shell string
+	// Sessions runs the PTYs. New creates one when nil.
+	Sessions *session.Manager
+	// BaseEnv is the environment children inherit. Defaults to os.Environ.
+	BaseEnv func() []string
 }
 
 // Server wires the handler, the guard and the listener together.
@@ -57,7 +74,18 @@ func New(cfg Config) (*Server, error) {
 	if !isLoopbackHost(host) {
 		return nil, fmt.Errorf("server: %q is not a loopback address", host)
 	}
+	cfg = withDefaults(cfg)
 	return &Server{cfg: cfg}, nil
+}
+
+func withDefaults(cfg Config) Config {
+	if cfg.Sessions == nil {
+		cfg.Sessions = session.NewManager()
+	}
+	if cfg.BaseEnv == nil {
+		cfg.BaseEnv = os.Environ
+	}
+	return cfg
 }
 
 // Listen binds the address and finishes building the handler, now that the
@@ -80,12 +108,15 @@ func (s *Server) Listen() (net.Listener, error) {
 func (s *Server) Serve(ln net.Listener) error { return s.http.Serve(ln) }
 
 // Shutdown stops the server gracefully.
-func (s *Server) Shutdown(ctx context.Context) error { return s.http.Shutdown(ctx) }
+func (s *Server) Shutdown(ctx context.Context) error {
+	s.cfg.Sessions.Shutdown()
+	return s.http.Shutdown(ctx)
+}
 
 // Handler returns the guarded handler for a listener bound on the given
 // port. It exists so tests can drive the server without a real socket.
 func Handler(cfg Config, port int) http.Handler {
-	s := &Server{cfg: cfg, g: newGuard(port, cfg.Token)}
+	s := &Server{cfg: withDefaults(cfg), g: newGuard(port, cfg.Token)}
 	return s.handler()
 }
 
@@ -94,6 +125,7 @@ func (s *Server) handler() http.Handler {
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "version": s.cfg.Version})
 	})
+	s.routes(mux)
 	mux.Handle("/api/", http.NotFoundHandler())
 	mux.Handle("/", s.static())
 	return s.g.wrap(mux)

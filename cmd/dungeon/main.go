@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"dungeon/internal/server"
-	"dungeon/web"
 )
 
 // Stamped at build time with -ldflags -X.
@@ -71,12 +70,17 @@ func serve(args []string) error {
 	if err != nil {
 		return err
 	}
-	srv, err := server.New(server.Config{
-		Addr:    *addr,
-		Token:   token,
-		Version: version,
-		Assets:  web.Assets(),
-	})
+	cfg, err := buildConfig(context.Background(), *addr, token)
+	if err != nil {
+		return err
+	}
+	if cfg.Claude == "" {
+		fmt.Fprintln(os.Stderr, "warning:", cfg.ClaudeErr)
+	}
+	if cfg.Party.Defaulted {
+		fmt.Fprintln(os.Stderr, "note: no party.toml found; using the built-in heroes")
+	}
+	srv, err := server.New(cfg)
 	if err != nil {
 		return err
 	}

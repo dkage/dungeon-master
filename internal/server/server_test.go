@@ -157,3 +157,20 @@ func TestNewRejectsNonLoopback(t *testing.T) {
 		t.Error("empty token accepted")
 	}
 }
+
+func TestWebsocketUpgradeRequiresOrigin(t *testing.T) {
+	upgrade := func(r *http.Request) {
+		r.Header.Set("Upgrade", "websocket")
+		r.Header.Set("Authorization", "Bearer "+testToken)
+	}
+	if rec := do(t, "GET", "/api/sessions/s1/term", upgrade); rec.Code != http.StatusForbidden {
+		t.Fatalf("upgrade without Origin: got %d", rec.Code)
+	}
+	rec := do(t, "GET", "/api/sessions/s1/term", func(r *http.Request) {
+		upgrade(r)
+		r.Header.Set("Origin", "http://127.0.0.1:7878")
+	})
+	if rec.Code == http.StatusForbidden || rec.Code == http.StatusUnauthorized {
+		t.Fatalf("legitimate upgrade blocked by guard: %d", rec.Code)
+	}
+}

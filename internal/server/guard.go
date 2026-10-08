@@ -44,6 +44,12 @@ func (g *guard) wrap(next http.Handler) http.Handler {
 			http.Error(w, "forbidden origin", http.StatusForbidden)
 			return
 		}
+		// Browsers always send Origin on websocket upgrades. Requiring it
+		// closes cross-site websocket hijacking, which CORS does not cover.
+		if isWebsocket(r) && r.Header.Get("Origin") == "" {
+			http.Error(w, "origin required", http.StatusForbidden)
+			return
+		}
 		if unsafeMethod(r.Method) && !isJSON(r.Header.Get("Content-Type")) {
 			http.Error(w, "content type must be application/json", http.StatusUnsupportedMediaType)
 			return
@@ -88,6 +94,10 @@ func (g *guard) authed(r *http.Request) bool {
 		return g.tokenOK(b)
 	}
 	return false
+}
+
+func isWebsocket(r *http.Request) bool {
+	return strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
 }
 
 func unsafeMethod(m string) bool {
