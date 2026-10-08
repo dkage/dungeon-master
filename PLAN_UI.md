@@ -197,8 +197,8 @@ Where heroes are stored: a local file, `party.toml`, in the app's config directo
 this screen existed it was the only way to define heroes; from now on **users never need to know it exists**.
 
 Decided: **the app owns the file.** Settings is the way to edit heroes. The app rewrites the whole file atomically
-(0600) on every change, with a header line saying it is managed by the app. Hand edits still work and are picked up
-(the TOML library does not keep comments, so they are lost on the next save), and a file with errors shows the error
+(0600) on every change, with a header line saying it is managed by the app. Hand edits still work and are picked up (the
+TOML library does not keep comments, so they are lost on the next save), and a file with errors shows the error
 and its line while the last good set of heroes keeps working. "Open in editor" stays in Local files (§6.3) for people
 who want it.
 
@@ -289,8 +289,8 @@ is mostly data, not a rewrite:
 4. **Design tokens** carry every colour, font, radius and shadow. Components use only tokens. A pack's palettes are
    token files; switching sets `data-pack` and `data-palette` on the root element.
 5. **Flavour text** (empty-state lines, hints) is part of the words table, so a pack can replace it or leave it out.
-6. **No per-pack components in v1.** Packs change words, tokens, icons and the map skin. Component variants per pack
-   (a different button shape, framed panels) are a later step, and only through tokens or a small set of named
+6. **No per-pack components in v1.** Packs change words, tokens, icons and the map skin. Component variants per pack (a
+   different button shape, framed panels) are a later step, and only through tokens or a small set of named
    variants, never by forking components.
 
 ### Rules for packs

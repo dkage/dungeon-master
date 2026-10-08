@@ -56,12 +56,13 @@ the centre. With the map on the right you watch the agents and the map together,
 - **Map | List toggle** at the top of the map. The list (M3's panel) is the precise, searchable view of the same data,
   and the accessible alternative to the map. Selection is shared: picking in one picks in the other.
 - **Detail footer**, pinned, never scrolls away:
-  - left: **hero picker** (combo), defaulting to the campaign's last-used hero, then the global default;
-  - right: **recommended spell** as the primary button ("Start with /tdd"), then **More** with the other spells grouped
-    Plan / Do / Check, plus a plain **Open** button that starts the hero on the quest without a spell (see
-    `PLAN_UI.md` §5.3).
-  - The button says what will happen: hero, spell and quest. Disabled states say why ("claude not found", "another
-    session is working in this folder").
+    - left: **hero picker** (combo), defaulting to the campaign's last-used hero, then the global default;
+    - right: **recommended spell** as the primary button ("Start with /tdd"), then **More** with the other spells
+      grouped
+      Plan / Do / Check, plus a plain **Open** button that starts the hero on the quest without a spell (see
+      `PLAN_UI.md` §5.3).
+    - The button says what will happen: hero, spell and quest. Disabled states say why ("claude not found", "another
+      session is working in this folder").
 - **Expand the map**: one key (M) or a button makes the map fill the centre temporarily, for large repositories. Escape
   returns. The terminal keeps running.
 - **Narrow screens**: the right column becomes a drawer (as today), with map and detail stacked.
@@ -80,7 +81,7 @@ shape or glyph too.
 | Needs you            | bright, pulsing ring     | `?`      | the agent is waiting for an answer        |
 | Assigned (elsewhere) | lit, muted               | `@`      | someone else holds it                     |
 | Locked               | dark, behind a door      | `!` grey | blocked by an open issue                  |
-| Cleared              | faint, desaturated       | `✓`      | closed; hidden by default, toggle to show |
+| Cleared              | faint, desaturated       | `✓`     | closed; hidden by default, toggle to show |
 | Outside scope        | outline only, small      | none     | a blocker or parent not in the scope      |
 
 The `!` and `?` borrow the familiar MMO convention: a mark over something means "there is something for you here", a
@@ -229,8 +230,8 @@ the list. Selecting a room and pressing the main button starts the right hero wi
 
 ## 7. Accessibility and tests
 
-- The map is an SVG with `role="application"` only where it must be; rooms are focusable with an accessible name
-  ("#42 Validate email addresses, open, blocked by #41"). Arrow keys move along links; Enter selects; the List view is
+- The map is an SVG with `role="application"` only where it must be; rooms are focusable with an accessible name ("#42
+  Validate email addresses, open, blocked by #41"). Arrow keys move along links; Enter selects; the List view is
   always one key away.
 - State is never colour alone (glyphs and shapes per §3), and contrast is checked for each state on the dark floor.
 - Unit tests: the layout function (halls, outskirts, stubs, stable positions), state-to-visual mapping.
