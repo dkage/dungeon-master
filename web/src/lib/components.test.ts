@@ -269,9 +269,39 @@ describe('QuestsPanel', () => {
     expect(setDemo).toHaveBeenCalledWith(false)
   })
 
-  it('warns when showing stale data', () => {
-    render(QuestsPanel, { store: questStore(questResult(sample, { stale: true, warning: 'GitHub rate limit reached' })) })
-    expect(screen.getByRole('status')).toHaveTextContent('Showing older data. GitHub rate limit reached')
+  it('warns when showing stale data, saying what the user sees meanwhile', () => {
+    render(QuestsPanel, { store: questStore(questResult(sample, { stale: true, warning: 'GitHub took too long to answer.' })) })
+    expect(screen.getByRole('status')).toHaveTextContent('GitHub took too long to answer. Showing saved data.')
+  })
+
+  const paused = (st: AppStore) => {
+    st.github = {
+      rations: [{ resource: 'graphql', limit: 5000, remaining: 4000, used: 1000, resetsAt: '2026-10-08T15:37:00Z', seenAt: '' }],
+      camp: { active: true, until: '2026-10-08T15:12:00Z' },
+    }
+  }
+
+  it('says in plain words that requests are paused and what is shown meanwhile', () => {
+    render(QuestsPanel, { store: questStore(questResult(sample), paused) })
+    const banner = screen.getByText(/Paused until/)
+    expect(banner).toHaveTextContent('GitHub asked this app to slow down. Showing saved data.')
+    expect(banner.textContent).not.toMatch(/camp|rations/i)
+  })
+
+  it('hides the GitHub budget, pause and stale notices for sample quests', () => {
+    render(
+      QuestsPanel,
+      {
+        store: questStore(questResult(sample, { source: 'demo', repo: undefined, stale: true, warning: 'x' }), (st) => {
+          st.campaigns[0].demo = true
+          paused(st)
+        }),
+      },
+    )
+    expect(screen.getByText(/Showing sample quests/)).toBeInTheDocument()
+    expect(screen.queryByText(/GitHub requests:/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Paused until/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Showing saved data/)).not.toBeInTheDocument()
   })
 
   it('offers demo quests when the campaign has no repository', async () => {
@@ -441,29 +471,29 @@ describe('Rations', () => {
 
   it('shows the GraphQL budget, not the REST one', () => {
     render(Rations, { status: status(4936) })
-    expect(screen.getByText('Rations 4,936 / 5,000')).toBeInTheDocument()
+    expect(screen.getByText(/GitHub requests: 4,936 of 5,000 left, resets /)).toBeInTheDocument()
   })
 
   it('explains itself in plain words', () => {
     render(Rations, { status: status(4936) })
-    const t = screen.getByText(/Rations 4,936/).getAttribute('title') ?? ''
-    expect(t).toContain('GitHub requests')
-    expect(t).toContain('this hour')
+    const t = screen.getByText(/GitHub requests: 4,936/).getAttribute('title') ?? ''
+    expect(t).toContain('GitHub allows')
+    expect(t).toContain('per hour')
     expect(t).toContain('shared with every other tool')
   })
 
   it('turns to a warning below 20%', () => {
     const { unmount } = render(Rations, { status: status(999) })
-    expect(screen.getByText(/Rations 999/)).toHaveClass('low')
+    expect(screen.getByText(/GitHub requests: 999 /)).toHaveClass('low')
     unmount()
     render(Rations, { status: status(120) })
-    expect(screen.getByText(/Rations 120/)).toHaveClass('low')
+    expect(screen.getByText(/GitHub requests: 120 /)).toHaveClass('low')
   })
 
   it('is not low at 20% and above', () => {
     render(Rations, { status: status(1000) })
-    expect(screen.getByText(/Rations 1,000/)).not.toHaveClass('low')
-    expect(screen.queryByText(/Rations 4/)).not.toBeInTheDocument()
+    expect(screen.getByText(/GitHub requests: 1,000 /)).not.toHaveClass('low')
+    expect(screen.queryByText(/GitHub requests: 4/)).not.toBeInTheDocument()
   })
 
   it('shows nothing until a budget is known', () => {
@@ -484,18 +514,18 @@ describe('QuestsPanel camp and budget', () => {
       }
     })
     render(QuestsPanel, { store: s })
-    expect(screen.getByText('Rations 4,800 / 5,000')).toBeInTheDocument()
-    expect(screen.queryByText(/Camp until/)).not.toBeInTheDocument()
+    expect(screen.getByText(/GitHub requests: 4,800 of 5,000 left/)).toBeInTheDocument()
+    expect(screen.queryByText(/Paused until/)).not.toBeInTheDocument()
   })
 
-  it('says when the app is in camp, and that the last copy is shown', () => {
+  it('says in plain words that requests are paused and saved data is shown', () => {
     const s = questStore(questResult([quest(1)]), (st) => {
       st.github = { rations: [], camp: { active: true, until: '2026-10-08T15:12:00Z', reason: 'GitHub sent Retry-After' } }
     })
     render(QuestsPanel, { store: s })
-    const banner = screen.getByText(/Camp until/)
+    const banner = screen.getByText(/Paused until/)
     expect(banner).toHaveTextContent('GitHub asked this app to slow down')
-    expect(banner).toHaveTextContent('Showing the last copy.')
+    expect(banner).toHaveTextContent('Showing saved data.')
   })
 
   it('does not claim a copy exists when there is none', () => {
@@ -504,7 +534,7 @@ describe('QuestsPanel camp and budget', () => {
       st.questsError = { code: 'camp', message: 'The app is not sending requests until 15:12.' }
     })
     render(QuestsPanel, { store: s })
-    expect(screen.getByText(/Camp until/)).not.toHaveTextContent('Showing the last copy')
+    expect(screen.getByText(/Paused until/)).not.toHaveTextContent('Showing saved data')
     expect(screen.getByRole('alert')).toHaveTextContent('not sending requests until 15:12')
   })
 })

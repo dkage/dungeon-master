@@ -166,7 +166,7 @@ func (s *Service) List(ctx context.Context, c campaign.Campaign, refresh bool) (
 	l, ferr := s.fetch(ctx, t)
 	if ferr != nil {
 		if have {
-			return s.result(t, c, cached, true, ferr.Error()), nil
+			return s.result(t, c, cached, true, Friendly(ferr)), nil
 		}
 		return Result{}, ferr
 	}

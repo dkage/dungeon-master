@@ -329,7 +329,7 @@ describe('App', () => {
       fakeServer()
       render(App)
       const panel = await screen.findByRole('complementary', { name: 'Quests' })
-      expect(await within(panel).findByText('Rations 4,936 / 5,000')).toBeInTheDocument()
+      expect(await within(panel).findByText(/GitHub requests: 4,936 of 5,000 left/)).toBeInTheDocument()
     })
 
     it('re-reads the quests in the background every minute, but not while the page is hidden', async () => {

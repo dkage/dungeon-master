@@ -13,9 +13,8 @@
   <span
     class="rations"
     class:low
-    title={`Rations: how many GitHub requests are left this hour (${fmt(graphql.remaining)} of ${fmt(graphql.limit)}). ` +
-      `They are shared with every other tool that uses your GitHub login, and replenish at ${at(graphql.resetsAt)}.`}
+    title="GitHub allows a fixed number of requests per hour. This count is shared with every other tool that uses your GitHub login."
   >
-    Rations {fmt(graphql.remaining)} / {fmt(graphql.limit)}
+    GitHub requests: {fmt(graphql.remaining)} of {fmt(graphql.limit)} left, resets {at(graphql.resetsAt)}
   </span>
 {/if}

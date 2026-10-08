@@ -516,11 +516,14 @@ func (c *Client) once(ctx context.Context, query string, vars map[string]any, ou
 		// has asked us to slow down, or while the budget is under its reserve.
 		var camp *quartermaster.CampError
 		if errors.As(err, &camp) {
-			return &quests.RateLimitError{Reset: camp.Until, Paused: true}
+			return &quests.RateLimitError{Reset: camp.Until, Paused: true, Reason: "GitHub asked this app to slow down"}
 		}
 		var ration *quartermaster.RationError
 		if errors.As(err, &ration) {
-			return &quests.RateLimitError{Reset: ration.Reset, Paused: true}
+			return &quests.RateLimitError{
+				Reset: ration.Reset, Paused: true,
+				Reason: fmt.Sprintf("the hourly GitHub request budget is nearly used up (%d left)", ration.Remaining),
+			}
 		}
 		// The error text of net/http can include the URL but never headers.
 		return fmt.Errorf("quests: reaching GitHub: %w", err)

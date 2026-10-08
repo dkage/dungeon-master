@@ -382,11 +382,11 @@ test('on a narrow window the quest panel is a drawer opened from the toolbar', a
 test('the panel shows the GitHub budget the Quartermaster read from the response headers', async ({ page }) => {
   await open(page)
   const panel = questPanel(page)
-  const chip = panel.getByText('Rations 4,936 / 5,000')
+  const chip = panel.getByText(/GitHub requests: 4,936 of 5,000 left/)
   await expect(chip).toBeVisible()
   await expect(chip).toHaveAttribute('title', /shared with every other tool/)
   // Not paused, so no camp banner.
-  await expect(panel.getByText(/Camp until/)).toHaveCount(0)
+  await expect(panel.getByText(/Paused until/)).toHaveCount(0)
   // The API behind it is the one the UI reads.
   const status = await page.evaluate(async () => (await fetch('/api/github', { credentials: 'same-origin' })).json())
   expect(status.camp.active).toBe(false)

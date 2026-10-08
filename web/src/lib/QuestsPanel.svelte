@@ -59,13 +59,13 @@
       </div>
     </header>
 
-    {#if store.github && store.github.rations.length > 0}
+    {#if !demo && store.github && store.github.rations.length > 0}
       <div class="budgetline"><Rations status={store.github} /></div>
     {/if}
-    {#if store.github?.camp.active}
+    {#if !demo && store.github?.camp.active}
       <p class="banner warn" role="status">
-        Camp until {new Date(store.github.camp.until ?? '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}:
-        GitHub asked this app to slow down, so requests are paused. {result ? 'Showing the last copy.' : ''}
+        Paused until {new Date(store.github.camp.until ?? '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}:
+        GitHub asked this app to slow down. {result ? 'Showing saved data.' : ''}
       </p>
     {/if}
     {#if result?.scope && !demo && !store.pickingScope}
@@ -86,8 +86,8 @@
         <button type="button" class="link" onclick={() => store.setDemo(false)}>Use real issues</button>
       </p>
     {/if}
-    {#if result?.stale}
-      <p class="banner warn" role="status">Showing older data. {result.warning}</p>
+    {#if !demo && result?.stale}
+      <p class="banner warn" role="status">{result.warning ? `${result.warning} ` : ''}Showing saved data.</p>
     {/if}
 
     {#if asking}

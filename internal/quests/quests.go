@@ -160,6 +160,9 @@ type RateLimitError struct {
 	// Paused is set when the app itself is not sending requests: GitHub asked
 	// it to slow down earlier, or the remaining budget is below the reserve.
 	Paused bool
+	// Reason says why, in words fit for the user ("GitHub asked this app to
+	// slow down"). Empty means the default for the case.
+	Reason string
 }
 
 func (e *RateLimitError) Error() string {
@@ -170,6 +173,44 @@ func (e *RateLimitError) Error() string {
 		return "quests: GitHub rate limit reached"
 	}
 	return "quests: GitHub rate limit reached, resets at " + e.Reset.Local().Format("15:04")
+}
+
+// UserMessage is the same fact in plain words for the interface: what
+// happened and until when.
+func (e *RateLimitError) UserMessage() string {
+	if e.Paused {
+		reason := e.Reason
+		if reason == "" {
+			reason = "GitHub asked this app to slow down"
+		}
+		if e.Reset.IsZero() {
+			return "Paused: " + reason + "."
+		}
+		return "Paused until " + e.Reset.Local().Format("15:04") + ": " + reason + "."
+	}
+	if e.Reset.IsZero() {
+		return "GitHub's rate limit is reached."
+	}
+	return "GitHub's rate limit is reached; it resets at " + e.Reset.Local().Format("15:04") + "."
+}
+
+// Friendly turns an error into a short sentence for the interface, without
+// Go-style prefixes.
+func Friendly(err error) string {
+	var rl *RateLimitError
+	switch {
+	case errors.As(err, &rl):
+		return rl.UserMessage()
+	case errors.Is(err, ErrNoToken):
+		return "no GitHub credentials were found."
+	case errors.Is(err, ErrUnauthorized):
+		return "GitHub rejected the credentials."
+	case errors.Is(err, ErrNotFound):
+		return "GitHub could not find it."
+	case errors.Is(err, context.DeadlineExceeded):
+		return "GitHub took too long to answer."
+	}
+	return strings.TrimPrefix(err.Error(), "quests: ")
 }
 
 // Derive computes a quest's state from its own fields.
