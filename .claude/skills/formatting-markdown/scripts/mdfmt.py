@@ -10,7 +10,7 @@
 Usage: mdfmt.py [--width N] [--check] [--reflow] [--runts] FILE...
   --check   change nothing; exit 1 if any file would change.
   --reflow  also join and re-wrap the lines of each paragraph (opt-in; never used by the hook).
-  --runts   only report short leftover lines of an old wrap; change nothing.
+  --runts   only report short leftover lines of an old wrap, and emphasis stranded at a line end; change nothing.
 Standard library only. Idempotent.
 """
 import argparse
@@ -37,7 +37,8 @@ def width_of(s):
     for ch in s:
         if unicodedata.combining(ch) or ch in "‍️︎":
             continue
-        n += 2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1
+        wide = unicodedata.east_asian_width(ch) in ("W", "F") or "\u2700" <= ch <= "\u27bf"  # Dingbats: PhpStorm
+        n += 2 if wide else 1
     return n
 
 
@@ -164,10 +165,26 @@ def wrap(text, width):
     return lines
 
 
+STRONG_ONLY_RE = re.compile(r"^\s*(\*\*[^*]+\*\*|__[^_]+__)\s*$")
+
+
+def pull_up_parentheses(raw):
+    """PhpStorm joins a line that starts with "(" onto the line before it and wraps the pair again. Do the same, so
+    Reformat Code finds nothing to change. A bold-only line above (a pseudo-heading) and a hard break keep the break."""
+    out = []
+    for line in raw:
+        if out and line.lstrip().startswith("(") and not out[-1].endswith("  ") and not STRONG_ONLY_RE.match(out[-1]):
+            out[-1] = out[-1].rstrip() + " " + line.strip()
+        else:
+            out.append(line)
+    return out
+
+
 def format_paragraph(raw, width, reflow=False):
     """Wrap lines that are too long. With reflow, also join the lines of a paragraph and re-wrap them
     (hard breaks stay). Without it no line the author kept apart is ever joined."""
     raw = raw[:-1] + [raw[-1].rstrip()]  # a hard break after the last line breaks nothing
+    raw = pull_up_parentheses(raw)
     out = []
     if reflow:
         segments, cur = [], []
@@ -220,7 +237,21 @@ def list_numbers(lines, i, ind, delim):
     return nums
 
 
-def format_lines(lines, width, reflow=False):
+TOML_KEY_RE = re.compile(r"^(\s*[A-Za-z0-9_.\-\"']+)\s*=\s*(\S.*)$")
+
+
+def format_toml(lines):
+    """PhpStorm formats TOML in a fenced block: `key = value` with single spaces (no aligned columns)."""
+    out, in_string = [], False
+    for l in lines:
+        m = None if in_string else TOML_KEY_RE.match(l)
+        out.append(f"{m.group(1)} = {m.group(2)}" if m else l)
+        if l.count('"""') % 2 or l.count("'''") % 2:
+            in_string = not in_string
+    return out
+
+
+def format_lines(lines, width, reflow=False, list_extra=0):
     width = max(width, 30)
     out, i, n = [], 0, len(lines)
     pending_blank = False
@@ -257,6 +288,8 @@ def format_lines(lines, width, reflow=False):
             while j < n and not re.match(r"^ {0,3}" + fence[0] + "{%d,} *$" % len(fence), lines[j].rstrip("\n")):
                 j += 1
             block = [l.rstrip("\n") for l in lines[i:j + 1]]
+            if line.strip()[len(fence):].strip().lower().startswith("toml"):
+                block = [block[0]] + format_toml(block[1:-1]) + block[-1:]
             verbatim_block(block, True)
             i = j + 1
             continue
@@ -313,6 +346,8 @@ def format_lines(lines, width, reflow=False):
         if m:
             ind, marker, spaces, rest = len(m.group(1)), m.group(2), m.group(3), m.group(4)
             offset = ind + len(marker) + (len(spaces) if 1 <= len(spaces) <= 4 else 1)
+            if list_extra:
+                ind = list_extra  # a nested list: marker 4 columns right of the parent's marker
             inner = [rest]
             j = i + 1
             while j < n:
@@ -349,7 +384,7 @@ def format_lines(lines, width, reflow=False):
             else:
                 olist = None
             new_off = ind + len(out_marker) + 1
-            body = format_lines(inner, width - new_off, reflow)
+            body = format_lines(inner, width - new_off, reflow, max(0, 3 - len(out_marker)))
             begin()
             head = " " * ind + out_marker
             if not body:
@@ -453,6 +488,21 @@ def find_runts(text, width):
     return found
 
 
+DANGLING_RE = re.compile(r"\s(\*\*|\*|__|~~)$")
+
+
+def find_dangling(text):
+    """Lines that end with an emphasis opener on its own (`... reads **`): the closing text starts the next line, so
+    Markdown shows the stars instead of bold. PhpStorm's Reformat Code can produce this. Returns [(line, text)]."""
+    found, in_fence = [], False
+    for no, line in enumerate(text.split("\n"), 1):
+        if FENCE_RE.match(line):
+            in_fence = not in_fence
+        elif not in_fence and DANGLING_RE.search(line.rstrip()) and not line.lstrip().startswith(("|", "- *", "* *")):
+            found.append((no, line.strip()))
+    return found
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("files", nargs="+")
@@ -461,8 +511,8 @@ def main():
     ap.add_argument("--reflow", action="store_true",
                     help="also join the lines of each paragraph and re-wrap them (review the diff afterwards)")
     ap.add_argument("--runts", action="store_true",
-                    help="only report runt lines (short leftovers of an old wrap), as 'runt: FILE:LINE: text'; "
-                         "changes nothing")
+                    help="only report runt lines (short leftovers of an old wrap) as 'runt: FILE:LINE: text', and "
+                         "emphasis stranded at a line end as 'dangling: ...'; changes nothing")
     args = ap.parse_args()
     dirty = failed = False
     for path in args.files:
@@ -475,8 +525,11 @@ def main():
             failed = True
             continue
         if args.runts:
-            for no, l in find_runts(format_text(text, args.width), args.width):
+            formatted = format_text(text, args.width)
+            for no, l in find_runts(formatted, args.width):
                 print(f"runt: {path}:{no}: {l}")
+            for no, l in find_dangling(formatted):
+                print(f"dangling: {path}:{no}: {l[-60:]}")
             continue
         new = format_bytes(old, args.width, args.reflow)
         if new != old:

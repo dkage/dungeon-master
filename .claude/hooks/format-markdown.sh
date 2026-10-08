@@ -1,7 +1,7 @@
 #!/bin/bash
 # PostToolUse hook (Write|Edit|MultiEdit): format any Markdown file Claude just wrote.
 # Reads the hook JSON on stdin, runs mdfmt.py on the file when it is a .md/.markdown file, then reports "runt"
-# lines (short leftovers of an old wrap) back to Claude as context so it can fix them with a normal edit.
+# lines (short leftovers of an old wrap) and "dangling" emphasis markers back to Claude as context so it can fix them with a normal edit.
 # Never blocks: a formatter problem must not break the edit.
 file=$(python3 -c 'import sys,json
 try: print(json.load(sys.stdin).get("tool_input",{}).get("file_path",""))
@@ -23,7 +23,8 @@ runts=$(python3 "$mdfmt" --runts "$file" 2>/dev/null)
 if [ -n "$runts" ]; then
   python3 -c 'import sys,json
 print(json.dumps({"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":
-  "Markdown formatter: these lines look like leftovers of an old wrap (short, then the sentence carries on in lowercase). "
-  "Join them into the line below with a normal edit, or run mdfmt.py --reflow on the file if it is yours to reflow:\n"+sys.argv[1]}}))' "$runts"
+  "Markdown formatter found line-break problems. runt = a short leftover of an old wrap: join it into the line below "
+  "with a normal edit, or run mdfmt.py --reflow if the file is yours to reflow. dangling = an emphasis marker (** or *) "
+  "stranded at a line end, which renders as literal stars: rewrap so the marker stays with its text:\n"+sys.argv[1]}}))' "$runts"
 fi
 exit 0

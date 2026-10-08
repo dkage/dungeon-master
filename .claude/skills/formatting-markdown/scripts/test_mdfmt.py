@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 
-from mdfmt import decode, find_runts, format_bytes, format_text, split_row, width_of
+from mdfmt import decode, find_dangling, find_runts, format_bytes, format_text, split_row, width_of
 
 SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mdfmt.py")
 
@@ -220,12 +220,12 @@ class Numbering(unittest.TestCase):
         self.assertEqual(fmt("1. a\n\n2. b\n\n9. c\n"), "1. a\n\n2. b\n\n3. c\n")
 
     def test_item_with_nested_content_does_not_split_the_list(self):
-        text = "1. a\n   - x\n   - y\n2. b\n7. c\n"
-        self.assertEqual(fmt(text), "1. a\n   - x\n   - y\n2. b\n3. c\n")
+        text = "1. a\n    - x\n    - y\n2. b\n7. c\n"
+        self.assertEqual(fmt(text), "1. a\n    - x\n    - y\n2. b\n3. c\n")
 
     def test_nested_ordered_list_is_numbered_on_its_own(self):
-        text = "1. a\n   1. x\n   5. y\n2. b\n"
-        self.assertEqual(fmt(text), "1. a\n   1. x\n   2. y\n2. b\n")
+        text = "1. a\n    1. x\n    5. y\n2. b\n"
+        self.assertEqual(fmt(text), "1. a\n    1. x\n    2. y\n2. b\n")
 
     def test_paragraph_between_ends_the_list(self):
         self.assertEqual(fmt("1. a\n\ntext\n\n4. b\n"), "1. a\n\ntext\n\n4. b\n")
@@ -257,6 +257,99 @@ class Numbering(unittest.TestCase):
 
     def test_reflow_keeps_numbering_right(self):
         self.assertEqual(fmt("1. a\n   more\n5. b\n", reflow=True), "1. a more\n2. b\n")
+
+
+class PhpStormRules(unittest.TestCase):
+    """What PhpStorm's Reformat Code does beyond wrapping (found by diffing its output on the real plans)."""
+
+    def test_nested_bullet_is_indented_four_from_the_parent_marker(self):
+        self.assertEqual(fmt("- a\n  - b\n  - c\n"), "- a\n    - b\n    - c\n")
+
+    def test_nested_under_ordered_item_lands_on_column_four(self):
+        self.assertEqual(fmt("1. a\n   - b\n"), "1. a\n    - b\n")
+        self.assertEqual(fmt("1. a\n    - b\n"), "1. a\n    - b\n")
+
+    def test_second_level_nesting_adds_four_more(self):
+        self.assertEqual(fmt("- a\n  - b\n    - c\n"), "- a\n    - b\n        - c\n")
+
+    def test_nested_continuation_text_hangs_under_the_nested_marker(self):
+        out = fmt("- a\n  - " + LONG + "\n").split("\n")
+        self.assertTrue(out[0] == "- a" and out[1].startswith("    - word"))
+        self.assertTrue(out[2].startswith("      word"))  # 4 + width of "- "
+        self.assertTrue(all(width_of(l) <= W for l in out))
+
+    def test_nested_indent_is_stable(self):
+        once = fmt("- a\n  - b\n    - c\n1. x\n   - y\n")
+        self.assertEqual(fmt(once), once)
+
+    def test_toml_block_uses_single_spaces_around_equals(self):
+        out = fmt("```toml\nlabel = \"a\"\nargs  = [\"x\"]\nenv   = []\n```\n")
+        self.assertEqual(out, "```toml\nlabel = \"a\"\nargs = [\"x\"]\nenv = []\n```\n")
+
+    def test_toml_comments_tables_and_multiline_strings_are_left_alone(self):
+        code = "```toml\n# a  = b\n[hero]\ntext = \"\"\"\nx   = y\n\"\"\"\n```\n"
+        self.assertEqual(fmt(code), code)
+
+    def test_other_languages_are_not_touched(self):
+        code = "```go\nx   = 1\n```\n```\na   = b\n```\n"
+        self.assertEqual(fmt(code), "```go\nx   = 1\n```\n\n```\na   = b\n```\n")
+
+    def test_checkmark_counts_two_columns_in_a_table(self):
+        out = fmt("|a|b|\n|-|-|\n|`\u2713`|x|\n|`!` grey|y|\n")
+        self.assertIn("| `\u2713`     | x |", out)  # 8-wide column: the check mark is 3 wide (backticks) + 1
+        self.assertEqual(width_of("\u2713"), 2)
+        self.assertEqual([width_of(c) for c in "\u25b6\u2318\u00b7\u2192\u00a7"], [1] * 5)
+
+    def test_line_starting_with_a_parenthesis_is_pulled_up_and_rewrapped(self):
+        a = "word " * 18 + "end"
+        out = fmt(a + "\n(and a parenthetical that goes on " + "more " * 12 + "tail\n").split("\n")
+        self.assertTrue(out[0].startswith(a + " (and a"))
+        self.assertTrue(all(width_of(l) <= W for l in out))
+
+    def test_parenthesis_that_does_not_fit_stays_on_its_line(self):
+        text = "x " * 55 + "end\n(`dungeon serve --long-flag --another`), tail\n"
+        self.assertEqual(fmt(text), text)
+
+    def test_parenthesis_after_a_bold_label_keeps_its_break(self):
+        text = "**M2 - Campaigns**\n(Local registry only.)\n"
+        self.assertEqual(fmt(text), text)
+
+    def test_parenthesis_after_a_hard_break_keeps_its_break(self):
+        text = "one  \n(two)\n"
+        self.assertEqual(fmt(text), text)
+
+    def test_bold_start_is_not_pulled_up(self):
+        """PhpStorm moves a lone `**` to the previous line and breaks the emphasis; we must not."""
+        text = "reads\n**`tracked \u00b7 14 of 312 open`**, with one click\n"
+        self.assertEqual(fmt(text), text)
+
+    def test_parenthesis_rule_is_idempotent(self):
+        text = "x " * 50 + "end\n(a b c " + "d " * 40 + ")\nnext line\n"
+        once = fmt(text)
+        self.assertEqual(fmt(once), once)
+
+    def test_reflow_still_works_with_the_parenthesis_rule(self):
+        self.assertEqual(fmt("a\n(b)\nc\n", reflow=True), "a (b) c\n")
+
+
+class Dangling(unittest.TestCase):
+    def test_flags_an_opener_stranded_at_the_end_of_a_line(self):
+        text = "The header always reads **\n`tracked 14 of 312 open`**, with one click\n"
+        self.assertEqual(find_dangling(text), [(1, "The header always reads **")])
+
+    def test_closing_markers_and_normal_bold_are_fine(self):
+        self.assertEqual(find_dangling("a **bold**\nand *it*\nor __x__\n"), [])
+
+    def test_ignores_code_blocks_and_tables(self):
+        self.assertEqual(find_dangling("```\nx = a **\n```\n| a ** |\n"), [])
+
+    def test_runts_mode_reports_it(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "a.md")
+            put(p, b"reads **\n`x`** more\n")
+            r = subprocess.run([sys.executable, "-B", SCRIPT, "--runts", p], capture_output=True, text=True)
+            self.assertIn("dangling:", r.stdout)
+            self.assertEqual(get(p), b"reads **\n`x`** more\n")
 
 
 class Invariants(unittest.TestCase):
