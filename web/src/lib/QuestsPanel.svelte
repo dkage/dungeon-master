@@ -2,6 +2,7 @@
   import type { AppStore } from './store.svelte'
   import { STATE_LABEL, counts, labelText, timeAgo, visibleRows } from './quests'
   import QuestDetail from './QuestDetail.svelte'
+  import Rations from './Rations.svelte'
 
   let { store }: { store: AppStore } = $props()
 
@@ -42,6 +43,15 @@
       </div>
     </header>
 
+    {#if store.github && store.github.rations.length > 0}
+      <div class="budgetline"><Rations status={store.github} /></div>
+    {/if}
+    {#if store.github?.camp.active}
+      <p class="banner warn" role="status">
+        Camp until {new Date(store.github.camp.until ?? '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}:
+        GitHub asked this app to slow down, so requests are paused. {result ? 'Showing the last copy.' : ''}
+      </p>
+    {/if}
     {#if demo}
       <p class="banner">
         Showing sample quests.

@@ -117,7 +117,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .source { font-size: 12px; color: var(--muted); font-family: ui-monospace, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .source.demo { font-family: inherit; font-style: italic; }
 .qtools { display: flex; align-items: center; gap: 4px; }
-.age { font-size: 12px; color: var(--muted); }
+.age { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.budgetline { padding: 6px 12px 0; }
 .pad { padding: 12px; margin: 0; }
 .banner { margin: 0; padding: 6px 12px; font-size: 13px; background: var(--bg); color: var(--muted); border-bottom: 1px solid var(--line); }
 .banner.warn { background: var(--warn-bg); color: var(--warn); }
@@ -191,3 +192,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .signin h1 { font-size: 22px; margin: 0 0 12px; }
 .signin p { color: var(--muted); }
 .signin button { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 600; }
+
+.rations { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; line-height: 18px; white-space: nowrap; }
+.rations.low { color: var(--warn); border-color: var(--warn); }

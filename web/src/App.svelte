@@ -8,8 +8,31 @@
 
   let { store = new AppStore() }: { store?: AppStore } = $props()
 
+  // While the page is visible: keep the GitHub budget fresh, and re-read the
+  // quests now and then as low-priority background work. The server answers
+  // most of these from its cache, so they cost GitHub nothing.
+  const BUDGET_EVERY = 30_000
+  const QUESTS_EVERY = 60_000
+
   onMount(() => {
     store.refresh()
+    const visible = () => document.visibilityState === 'visible'
+    const budget = setInterval(() => visible() && store.loadGithub(), BUDGET_EVERY)
+    const quests = setInterval(() => {
+      if (visible() && store.campaignId && !store.unauthorised) void store.loadQuests(false, true)
+    }, QUESTS_EVERY)
+    const onFocus = () => {
+      if (visible() && store.campaignId) {
+        void store.loadQuests(false, true)
+        void store.loadGithub()
+      }
+    }
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      clearInterval(budget)
+      clearInterval(quests)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
   })
 
   // Sessions of every campaign stay mounted (hidden) so switching is instant

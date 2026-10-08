@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, type AppState, type Campaign, type Quest, type QuestDetail, type QuestResult, type SessionInfo } from './api'
+import { ApiError, type AppState, type Campaign, type GithubStatus, type Quest, type QuestDetail, type QuestResult, type SessionInfo } from './api'
 import { AppStore, type Client } from './store.svelte'
 
 const camp = (id: string, over: Partial<Campaign> = {}): Campaign => ({
@@ -28,6 +28,7 @@ function fakeClient(over: Partial<Client> = {}, state: Partial<AppState> = {}): 
     removeCampaign: vi.fn(async () => undefined),
     getQuests: vi.fn(async () => result([quest(1)])),
     getQuest: vi.fn(async (_c, n) => detailOf(n)),
+    getGithub: vi.fn(async () => githubOk),
     ...over,
   }
 }
@@ -42,6 +43,10 @@ const result = (quests: Quest[], over: Partial<QuestResult> = {}): QuestResult =
 const detailOf = (n: number): QuestDetail => ({
   ...quest(n), author: 'alice', body: `body ${n}`, created: '', blocking: [], subIssues: [], commentList: [],
 })
+const githubOk: GithubStatus = {
+  rations: [{ resource: 'graphql', limit: 5000, remaining: 4936, used: 64, resetsAt: '2026-10-08T15:37:00Z', seenAt: '' }],
+  camp: { active: false },
+}
 const deferred = <T>() => {
   let resolve!: (v: T) => void
   let reject!: (e: unknown) => void
@@ -253,7 +258,7 @@ describe('quests', () => {
     const s = new AppStore(c)
     await s.refresh()
     await vi.waitFor(() => expect(s.quests).not.toBeNull())
-    expect(c.getQuests).toHaveBeenCalledWith('c1', false)
+    expect(c.getQuests).toHaveBeenCalledWith('c1', false, false)
     expect(s.questsFor).toBe('c1')
     expect(s.quests?.quests.map((q) => q.number)).toEqual([1])
     expect(s.questsLoading).toBe(false)
@@ -273,7 +278,7 @@ describe('quests', () => {
     expect(s.quests).toBeNull() // nothing of c1 under c2
     expect(s.questNumber).toBeNull()
     expect(s.questsLoading).toBe(true)
-    expect(getQuests).toHaveBeenLastCalledWith('c2', false)
+    expect(getQuests).toHaveBeenLastCalledWith('c2', false, false)
     d.resolve(result([quest(9)]))
     await vi.waitFor(() => expect(s.quests?.quests[0].number).toBe(9))
     expect(s.questsFor).toBe('c2')
@@ -327,7 +332,7 @@ describe('quests', () => {
     const s = new AppStore(c)
     await s.refresh()
     await s.loadQuests(true)
-    expect(c.getQuests).toHaveBeenLastCalledWith('c1', true)
+    expect(c.getQuests).toHaveBeenLastCalledWith('c1', true, false)
   })
 
   it('opens a quest, loads its detail, and can close it', async () => {
@@ -419,7 +424,7 @@ describe('quests', () => {
     await vi.waitFor(() => expect(s.questsFor).toBe('c1'))
     await s.removeCampaign('c1')
     await vi.waitFor(() => expect(s.questsFor).toBe('c2'))
-    expect(c.getQuests).toHaveBeenLastCalledWith('c2', false)
+    expect(c.getQuests).toHaveBeenLastCalledWith('c2', false, false)
   })
 
   it('selecting a session of another campaign switches the quest list', async () => {
@@ -471,5 +476,57 @@ describe('signed-out tabs', () => {
     await s.refresh()
     expect(s.unauthorised).toBe(false)
     expect(s.error).toBe('boom')
+  })
+})
+
+describe('github budget and background polling', () => {
+  it('reads the budget after quests load, and keeps the last value if a later read fails', async () => {
+    const getGithub = vi.fn().mockResolvedValueOnce(githubOk).mockRejectedValue(new ApiError(502, 'down'))
+    const s = new AppStore(fakeClient({ getGithub }))
+    await s.refresh()
+    await vi.waitFor(() => expect(s.github).toEqual(githubOk))
+    await s.loadGithub()
+    expect(s.github).toEqual(githubOk) // not wiped by the failure
+    expect(s.error).toBeNull() // and a budget hiccup is not an error banner
+  })
+
+  it('a 401 on the budget call signs the tab out', async () => {
+    const s = new AppStore(fakeClient({ getGithub: err(401, 'no') }))
+    await s.refresh()
+    await vi.waitFor(() => expect(s.unauthorised).toBe(true))
+  })
+
+  it('a background load is low priority, shows no spinner, and keeps the list if it fails', async () => {
+    const getQuests = vi.fn()
+      .mockResolvedValueOnce(result([quest(1)]))
+      .mockRejectedValueOnce(new ApiError(429, 'camp', 'camp'))
+    const s = new AppStore(fakeClient({ getQuests }))
+    await s.refresh()
+    await vi.waitFor(() => expect(s.quests).not.toBeNull())
+    const pending = s.loadQuests(false, true)
+    expect(s.questsLoading).toBe(false)
+    await pending
+    expect(getQuests).toHaveBeenLastCalledWith('c1', false, true)
+    expect(s.quests?.quests).toHaveLength(1) // still shown
+    expect(s.questsError).toBeNull() // no error flashed for background work
+  })
+
+  it('a background load updates the list when it succeeds', async () => {
+    const getQuests = vi.fn()
+      .mockResolvedValueOnce(result([quest(1)]))
+      .mockResolvedValueOnce(result([quest(1), quest(2)]))
+    const s = new AppStore(fakeClient({ getQuests }))
+    await s.refresh()
+    await vi.waitFor(() => expect(s.quests).not.toBeNull())
+    await s.loadQuests(false, true)
+    expect(s.quests?.quests).toHaveLength(2)
+  })
+
+  it('a foreground load still shows a spinner and the error', async () => {
+    const s = new AppStore(fakeClient({ getQuests: err(429, 'camp until 15:12', 'camp') }))
+    await s.refresh()
+    await vi.waitFor(() => expect(s.questsError).not.toBeNull())
+    expect(s.questsError?.code).toBe('camp')
+    expect(s.questsLoading).toBe(false)
   })
 })

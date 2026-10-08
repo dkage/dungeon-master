@@ -39,7 +39,13 @@ function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: b
         heroes: [{ id: 'opus', label: 'Opus' }], campaigns, sessions,
       })
     }
-    const qm = path.match(/^\/api\/campaigns\/([^/]+)\/quests(?:\/(\d+))?(\?refresh=1)?$/)
+    if (method === 'GET' && path === '/api/github') {
+      return json(200, {
+        rations: [{ resource: 'graphql', limit: 5000, remaining: 4936, used: 64, resetsAt: '2026-10-08T15:37:00Z', seenAt: '' }],
+        camp: { active: false },
+      })
+    }
+    const qm = path.match(/^\/api\/campaigns\/([^/]+)\/quests(?:\/(\d+))?(\?[a-z0-9=&]+)?$/)
     if (method === 'GET' && qm) {
       const camp = campaigns.find((c) => c.id === qm[1]) as { demo?: boolean; repo?: string } | undefined
       if (!camp) return json(404, { error: 'no such campaign' })
@@ -297,6 +303,57 @@ describe('App', () => {
       await fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
       expect(await screen.findByRole('button', { name: 'Opus' })).toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'This tab is not signed in' })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('budget and background polling', () => {
+    it('shows the rations next to the quests', async () => {
+      fakeServer()
+      render(App)
+      const panel = await screen.findByRole('complementary', { name: 'Quests' })
+      expect(await within(panel).findByText('Rations 4,936 / 5,000')).toBeInTheDocument()
+    })
+
+    it('re-reads the quests in the background every minute, but not while the page is hidden', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+      try {
+        const calls = fakeServer()
+        render(App)
+        const panel = await screen.findByRole('complementary', { name: 'Quests' })
+        await within(panel).findByText('Real first issue')
+        const polled = () => calls.filter((c) => c.path.includes('background=1')).length
+        expect(polled()).toBe(0)
+
+        await vi.advanceTimersByTimeAsync(61_000)
+        await waitFor(() => expect(polled()).toBe(1))
+        // Never hits the refresh path: background polling lets the server use its cache.
+        expect(calls.some((c) => c.path.includes('refresh=1'))).toBe(false)
+
+        Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+        await vi.advanceTimersByTimeAsync(130_000)
+        expect(polled()).toBe(1) // paused while hidden
+        Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+        document.dispatchEvent(new Event('visibilitychange')) // coming back refreshes once, straight away
+        await waitFor(() => expect(polled()).toBe(2))
+      } finally {
+        Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+        vi.useRealTimers()
+      }
+    })
+
+    it('keeps the budget fresh every 30 seconds', async () => {
+      vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+      try {
+        const calls = fakeServer()
+        render(App)
+        await screen.findByRole('complementary', { name: 'Quests' })
+        await waitFor(() => expect(calls.filter((c) => c.path === '/api/github').length).toBeGreaterThan(0))
+        const before = calls.filter((c) => c.path === '/api/github').length
+        await vi.advanceTimersByTimeAsync(31_000)
+        await waitFor(() => expect(calls.filter((c) => c.path === '/api/github').length).toBe(before + 1))
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 })

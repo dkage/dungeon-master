@@ -6,6 +6,8 @@ import { AppStore } from './store.svelte'
 import type { Campaign, Quest, QuestDetail as QuestDetailT, QuestResult, SessionInfo } from './api'
 import QuestsPanel from './QuestsPanel.svelte'
 import QuestDetail from './QuestDetail.svelte'
+import Rations from './Rations.svelte'
+import type { GithubStatus } from './api'
 
 const camp = (id: string, over: Partial<Campaign> = {}): Campaign => ({
   id, name: `Camp ${id}`, dir: `/p/${id}`, remote: 'origin', labels: [], demo: false, repo: `acme/${id}`, ...over,
@@ -18,7 +20,7 @@ function store(setup: (s: AppStore) => void = () => {}) {
   const s = new AppStore({
     getState: vi.fn(), createSession: vi.fn(), deleteSession: vi.fn(),
     addCampaign: vi.fn(), updateCampaign: vi.fn(), removeCampaign: vi.fn(),
-    getQuests: vi.fn(), getQuest: vi.fn(),
+    getQuests: vi.fn(), getQuest: vi.fn(), getGithub: vi.fn(),
   })
   s.heroes = [{ id: 'opus', label: 'Opus' }, { id: 'sonnet', label: 'Sonnet' }]
   s.campaigns = [camp('c1'), camp('c2', { repo: undefined })]
@@ -422,5 +424,85 @@ describe('Toolbar quests toggle', () => {
     await fireEvent.click(btn)
     expect(s.questsOpen).toBe(true)
     expect(btn).toHaveAttribute('aria-pressed', 'true')
+  })
+})
+
+describe('Rations', () => {
+  const status = (remaining: number, over: Partial<GithubStatus> = {}): GithubStatus => ({
+    rations: [
+      { resource: 'core', limit: 5000, remaining: 1, used: 4999, resetsAt: new Date().toISOString(), seenAt: '' },
+      { resource: 'graphql', limit: 5000, remaining, used: 5000 - remaining, resetsAt: '2026-10-08T15:37:00Z', seenAt: '' },
+    ],
+    camp: { active: false },
+    ...over,
+  })
+
+  it('shows the GraphQL budget, not the REST one', () => {
+    render(Rations, { status: status(4936) })
+    expect(screen.getByText('Rations 4,936 / 5,000')).toBeInTheDocument()
+  })
+
+  it('explains itself in plain words', () => {
+    render(Rations, { status: status(4936) })
+    const t = screen.getByText(/Rations 4,936/).getAttribute('title') ?? ''
+    expect(t).toContain('GitHub requests')
+    expect(t).toContain('this hour')
+    expect(t).toContain('shared with every other tool')
+  })
+
+  it('turns to a warning below 20%', () => {
+    const { unmount } = render(Rations, { status: status(999) })
+    expect(screen.getByText(/Rations 999/)).toHaveClass('low')
+    unmount()
+    render(Rations, { status: status(120) })
+    expect(screen.getByText(/Rations 120/)).toHaveClass('low')
+  })
+
+  it('is not low at 20% and above', () => {
+    render(Rations, { status: status(1000) })
+    expect(screen.getByText(/Rations 1,000/)).not.toHaveClass('low')
+    expect(screen.queryByText(/Rations 4/)).not.toBeInTheDocument()
+  })
+
+  it('shows nothing until a budget is known', () => {
+    const { container, unmount } = render(Rations, { status: null })
+    expect(container.querySelector('.rations')).toBeNull()
+    unmount()
+    const r = render(Rations, { status: { rations: [], camp: { active: false } } })
+    expect(r.container.querySelector('.rations')).toBeNull()
+  })
+})
+
+describe('QuestsPanel camp and budget', () => {
+  it('shows the rations in the header', () => {
+    const s = questStore(questResult([quest(1)]), (st) => {
+      st.github = {
+        rations: [{ resource: 'graphql', limit: 5000, remaining: 4800, used: 200, resetsAt: '2026-10-08T15:37:00Z', seenAt: '' }],
+        camp: { active: false },
+      }
+    })
+    render(QuestsPanel, { store: s })
+    expect(screen.getByText('Rations 4,800 / 5,000')).toBeInTheDocument()
+    expect(screen.queryByText(/Camp until/)).not.toBeInTheDocument()
+  })
+
+  it('says when the app is in camp, and that the last copy is shown', () => {
+    const s = questStore(questResult([quest(1)]), (st) => {
+      st.github = { rations: [], camp: { active: true, until: '2026-10-08T15:12:00Z', reason: 'GitHub sent Retry-After' } }
+    })
+    render(QuestsPanel, { store: s })
+    const banner = screen.getByText(/Camp until/)
+    expect(banner).toHaveTextContent('GitHub asked this app to slow down')
+    expect(banner).toHaveTextContent('Showing the last copy.')
+  })
+
+  it('does not claim a copy exists when there is none', () => {
+    const s = questStore(null, (st) => {
+      st.github = { rations: [], camp: { active: true, until: '2026-10-08T15:12:00Z' } }
+      st.questsError = { code: 'camp', message: 'The app is not sending requests until 15:12.' }
+    })
+    render(QuestsPanel, { store: s })
+    expect(screen.getByText(/Camp until/)).not.toHaveTextContent('Showing the last copy')
+    expect(screen.getByRole('alert')).toHaveTextContent('not sending requests until 15:12')
   })
 })

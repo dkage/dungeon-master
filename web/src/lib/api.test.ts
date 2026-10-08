@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  ApiError, addCampaign, createSession, deleteSession, getQuest, getQuests, getState, removeCampaign, termUrl, updateCampaign,
+  ApiError, addCampaign, createSession, deleteSession, getGithub, getQuest, getQuests, getState, removeCampaign, termUrl, updateCampaign,
 } from './api'
 
 function mockFetch(status: number, body?: unknown) {
@@ -73,6 +73,19 @@ describe('api', () => {
       'GET /api/campaigns/c1/quests/42',
     ])
     for (const [, init] of f.mock.calls as unknown as [string, RequestInit][]) expect(init.headers).toEqual({})
+  })
+
+  it('marks background polling and reads the GitHub budget', async () => {
+    const f = mockFetch(200, {})
+    await getQuests('c1', false, true)
+    await getQuests('c1', true, true)
+    await getGithub()
+    const urls = (f.mock.calls as unknown as [string, RequestInit][]).map(([u]) => u)
+    expect(urls).toEqual([
+      '/api/campaigns/c1/quests?background=1',
+      '/api/campaigns/c1/quests?refresh=1&background=1',
+      '/api/github',
+    ])
   })
 
   it('keeps the machine-readable error code', async () => {

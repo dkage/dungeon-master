@@ -125,6 +125,20 @@ export interface QuestDetail extends Quest {
   commentList: QuestComment[]
 }
 
+export interface Ration {
+  resource: string
+  limit: number
+  remaining: number
+  used: number
+  resetsAt: string
+  seenAt: string
+}
+
+export interface GithubStatus {
+  rations: Ration[]
+  camp: { active: boolean; until?: string; reason?: string; level?: number }
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -173,8 +187,11 @@ export const updateCampaign = (id: string, patch: CampaignPatch) =>
   call<Campaign>('PATCH', `/api/campaigns/${encodeURIComponent(id)}`, patch) as Promise<Campaign>
 export const removeCampaign = (id: string) =>
   call<void>('DELETE', `/api/campaigns/${encodeURIComponent(id)}`) as Promise<void>
-export const getQuests = (campaignId: string, refresh = false) =>
-  call<QuestResult>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/quests${refresh ? '?refresh=1' : ''}`) as Promise<QuestResult>
+export const getQuests = (campaignId: string, refresh = false, background = false) => {
+  const q = [refresh && 'refresh=1', background && 'background=1'].filter(Boolean).join('&')
+  return call<QuestResult>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/quests${q ? `?${q}` : ''}`) as Promise<QuestResult>
+}
+export const getGithub = () => call<GithubStatus>('GET', '/api/github') as Promise<GithubStatus>
 export const getQuest = (campaignId: string, number: number) =>
   call<QuestDetail>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}`) as Promise<QuestDetail>
 export const createSession = (req: CreateRequest) =>

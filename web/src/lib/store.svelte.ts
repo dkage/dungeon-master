@@ -1,12 +1,12 @@
 import * as realApi from './api'
 import type {
-  AppState, Campaign, CampaignInput, CampaignPatch, Hero, QuestDetail, QuestResult, SessionInfo,
+  AppState, Campaign, CampaignInput, CampaignPatch, GithubStatus, Hero, QuestDetail, QuestResult, SessionInfo,
 } from './api'
 
 export type Client = Pick<
   typeof realApi,
   | 'getState' | 'createSession' | 'deleteSession' | 'addCampaign' | 'updateCampaign' | 'removeCampaign'
-  | 'getQuests' | 'getQuest'
+  | 'getQuests' | 'getQuest' | 'getGithub'
 >
 
 const CAMPAIGN_KEY = 'dungeon.campaign'
@@ -60,6 +60,8 @@ export class AppStore {
   detail = $state<QuestDetail | null>(null)
   detailError = $state<Failure | null>(null)
   detailLoading = $state(false)
+  /** The GitHub request budget and whether requests are paused. */
+  github = $state<GithubStatus | null>(null)
   /** Whether the quest panel is open on narrow screens. */
   questsOpen = $state(false)
   /**
@@ -132,8 +134,13 @@ export class AppStore {
 
   // --- quests ---
 
-  /** Loads the selected campaign's quests; refresh bypasses the server cache. */
-  async loadQuests(refresh = false) {
+  /**
+   * Loads the selected campaign's quests; refresh bypasses the server cache.
+   * A background load is polling nobody asked for: it does not show a spinner,
+   * keeps what is on screen if it fails, and tells the server it is
+   * low-priority so it leaves more of the GitHub budget in reserve.
+   */
+  async loadQuests(refresh = false, background = false) {
     const id = this.campaignId
     const seq = ++this.questsSeq
     if (!id) {
@@ -151,18 +158,31 @@ export class AppStore {
       this.closeQuest()
     }
     this.questsFor = id
-    this.questsLoading = true
+    if (!background) this.questsLoading = true
     try {
-      const res = await this.client.getQuests(id, refresh)
+      const res = await this.client.getQuests(id, refresh, background)
       if (seq !== this.questsSeq) return
       this.quests = res
       this.questsError = null
     } catch (e) {
       if (seq !== this.questsSeq) return
-      this.questsError = this.noticeAuth(failure(e), e)
-      this.quests = null
+      const f = this.noticeAuth(failure(e), e)
+      if (!background) {
+        this.questsError = f
+        this.quests = null
+      }
     } finally {
-      if (seq === this.questsSeq) this.questsLoading = false
+      if (seq === this.questsSeq && !background) this.questsLoading = false
+      if (seq === this.questsSeq) void this.loadGithub()
+    }
+  }
+
+  /** Reads the GitHub budget; a failure just leaves the last known value. */
+  async loadGithub() {
+    try {
+      this.github = await this.client.getGithub()
+    } catch (e) {
+      this.noticeAuth(failure(e), e)
     }
   }
 

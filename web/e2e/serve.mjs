@@ -65,6 +65,12 @@ const github = createServer((req, res) => {
   req.on('data', (d) => (body += d))
   req.on('end', () => {
     res.setHeader('Content-Type', 'application/json')
+    // The budget headers the real GitHub sends; the Quartermaster reads them.
+    res.setHeader('X-Ratelimit-Limit', '5000')
+    res.setHeader('X-Ratelimit-Remaining', '4936')
+    res.setHeader('X-Ratelimit-Used', '64')
+    res.setHeader('X-Ratelimit-Reset', String(Math.floor(Date.now() / 1000) + 1800))
+    res.setHeader('X-Ratelimit-Resource', 'graphql')
     if (req.headers.authorization !== 'Bearer e2e-token') {
       res.statusCode = 401
       return res.end('{}')

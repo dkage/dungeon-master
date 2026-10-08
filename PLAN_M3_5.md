@@ -164,12 +164,12 @@ Needed when the app itself creates issues in bulk.
 
 ## 7. Phases and status
 
-| Phase            | Contents                                                                                                   | Status               |
-|------------------|------------------------------------------------------------------------------------------------------------|----------------------|
-| A. Quartermaster | RoundTripper, rations from headers, floors, serial, camp, persistence, `/api/github`, UI chip (reads only) | in progress          |
-| B. Scope         | server-side scope, counts, first-connection picker, scope header, type chips, 300-cut fix                  | planned              |
-| E. Gatekeeper    | instruction rule, `gh` shim with a per-session token, and the write pacing                                 | planned, **confirm** |
-| C. Chronicle     | SQLite copy and sync                                                                                       | deferred             |
-| D. Caravan       | paced bulk writes                                                                                          | deferred             |
+| Phase            | Contents                                                                                                   | Status                        |
+|------------------|------------------------------------------------------------------------------------------------------------|-------------------------------|
+| A. Quartermaster | RoundTripper, rations from headers, floors, serial, camp, persistence, `/api/github`, UI chip (reads only) | done                          |
+| B. Scope         | server-side scope, counts, first-connection picker, scope header, type chips, 300-cut fix                  | next                          |
+| E. Gatekeeper    | instruction rule, `gh` shim with a per-session token, and the write pacing                                 | confirmed: after B, before M4 |
+| C. Chronicle     | SQLite copy and sync                                                                                       | deferred                      |
+| D. Caravan       | paced bulk writes                                                                                          | deferred                      |
 
 The first roadmap import goes through the Quartermaster (an idempotent import command), after phase B.

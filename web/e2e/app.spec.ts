@@ -362,3 +362,17 @@ test('on a narrow window the quest panel is a drawer opened from the toolbar', a
   await panel.getByRole('button', { name: 'Close quests' }).click()
   await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).not.toBeInViewport()
 })
+
+test('the panel shows the GitHub budget the Quartermaster read from the response headers', async ({ page }) => {
+  await open(page)
+  const panel = questPanel(page)
+  const chip = panel.getByText('Rations 4,936 / 5,000')
+  await expect(chip).toBeVisible()
+  await expect(chip).toHaveAttribute('title', /shared with every other tool/)
+  // Not paused, so no camp banner.
+  await expect(panel.getByText(/Camp until/)).toHaveCount(0)
+  // The API behind it is the one the UI reads.
+  const status = await page.evaluate(async () => (await fetch('/api/github', { credentials: 'same-origin' })).json())
+  expect(status.camp.active).toBe(false)
+  expect(status.rations[0]).toMatchObject({ resource: 'graphql', limit: 5000, remaining: 4936 })
+})

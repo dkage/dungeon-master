@@ -52,6 +52,7 @@ internal/party/     party.toml loading and validation
 internal/campaign/  registry of working directories; git root and owner/repo resolution
 internal/history/   session records that survive restarts
 internal/fsutil/    atomic private file writes
+internal/quartermaster/ gatekeeper for ALL GitHub requests (an http.RoundTripper): serial, reads the budget from headers, pauses ("camp") when GitHub says slow down. New GitHub code must use its transport
 internal/quests/    quest model, derived state, cached service; github/ (GraphQL client, token from env or `gh`) and demo/ (sample data) are its sources
 internal/launcher/  claude argv, env scrubbing, binary lookup
 internal/testutil/  shared fixtures (fake claude)
