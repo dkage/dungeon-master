@@ -3,6 +3,8 @@
 package session
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -220,7 +222,26 @@ type Manager struct {
 	mu       sync.Mutex
 	sessions map[string]*Session
 	order    []string
-	next     int
+}
+
+// newID returns a short random id, unique among live sessions. Random rather
+// than sequential so ids stay unique across restarts, when old records are
+// reloaded from disk.
+func (m *Manager) newID() (string, error) {
+	for range 8 {
+		b := make([]byte, 4)
+		if _, err := rand.Read(b); err != nil {
+			return "", fmt.Errorf("session: id: %w", err)
+		}
+		id := "s" + hex.EncodeToString(b)
+		m.mu.Lock()
+		_, taken := m.sessions[id]
+		m.mu.Unlock()
+		if !taken {
+			return id, nil
+		}
+	}
+	return "", errors.New("session: could not allocate an id")
 }
 
 // NewManager returns an empty manager.
@@ -230,11 +251,10 @@ func NewManager() *Manager {
 
 // Spawn starts a process and registers it.
 func (m *Manager) Spawn(spec Spec) (*Session, error) {
-	m.mu.Lock()
-	m.next++
-	id := fmt.Sprintf("s%d", m.next)
-	m.mu.Unlock()
-
+	id, err := m.newID()
+	if err != nil {
+		return nil, err
+	}
 	s, err := start(id, spec)
 	if err != nil {
 		return nil, err

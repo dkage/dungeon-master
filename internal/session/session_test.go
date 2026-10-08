@@ -125,3 +125,26 @@ func TestResizeAndBadSpec(t *testing.T) {
 		t.Fatal("bad size accepted")
 	}
 }
+
+func TestIDsAreUniqueAndRandom(t *testing.T) {
+	m := NewManager()
+	defer m.Shutdown()
+	seen := map[string]bool{}
+	for range 5 {
+		s, err := m.Spawn(Spec{Argv: []string{"sh", "-c", "sleep 1"}, Env: Environ()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(s.ID) != 9 || s.ID[0] != 's' || seen[s.ID] {
+			t.Fatalf("bad or duplicate id %q", s.ID)
+		}
+		seen[s.ID] = true
+	}
+	// A fresh manager does not restart from the same ids.
+	m2 := NewManager()
+	defer m2.Shutdown()
+	s, _ := m2.Spawn(Spec{Argv: []string{"sh", "-c", "sleep 1"}, Env: Environ()})
+	if seen[s.ID] {
+		t.Fatalf("id %q repeated across managers", s.ID)
+	}
+}
