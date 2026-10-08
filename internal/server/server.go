@@ -13,9 +13,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/dkage/dungeon-master/internal/campaign"
+	"github.com/dkage/dungeon-master/internal/fsutil"
 	"github.com/dkage/dungeon-master/internal/history"
 	"github.com/dkage/dungeon-master/internal/party"
 	"github.com/dkage/dungeon-master/internal/quests"
@@ -64,6 +67,37 @@ type Server struct {
 	g    *guard
 }
 
+// TokenFile is where the access token is kept inside the config directory.
+const TokenFile = "token"
+
+var tokenPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
+// LoadOrCreateToken returns the access token stored at path, creating one if
+// there is none, or replacing it when rotate is set or the file is not a
+// valid token. Keeping the token between runs means a browser tab and its
+// cookie survive a restart; the file is private to the user (0600), like the
+// rest of Dungeon Master's state. created reports whether a new token was
+// written.
+func LoadOrCreateToken(path string, rotate bool) (token string, created bool, err error) {
+	if !rotate {
+		if b, rerr := os.ReadFile(path); rerr == nil {
+			if t := strings.TrimSpace(string(b)); tokenPattern.MatchString(t) {
+				return t, false, nil
+			}
+		} else if !errors.Is(rerr, os.ErrNotExist) {
+			return "", false, rerr
+		}
+	}
+	token, err = NewToken()
+	if err != nil {
+		return "", false, err
+	}
+	if err := fsutil.WriteFileAtomic(path, []byte(token+"\n")); err != nil {
+		return "", false, err
+	}
+	return token, true, nil
+}
+
 // NewToken returns a fresh random token.
 func NewToken() (string, error) {
 	b := make([]byte, 32)
@@ -73,17 +107,26 @@ func NewToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// CheckAddr reports whether addr is a host:port on a loopback address. Callers
+// use it to refuse a bad address before they touch any state.
+func CheckAddr(addr string) error {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return fmt.Errorf("server: bad address %q: %w", addr, err)
+	}
+	if !isLoopbackHost(host) {
+		return fmt.Errorf("server: %q is not a loopback address", host)
+	}
+	return nil
+}
+
 // New validates the config. It does not listen yet.
 func New(cfg Config) (*Server, error) {
 	if cfg.Token == "" {
 		return nil, errors.New("server: empty token")
 	}
-	host, _, err := net.SplitHostPort(cfg.Addr)
-	if err != nil {
-		return nil, fmt.Errorf("server: bad address %q: %w", cfg.Addr, err)
-	}
-	if !isLoopbackHost(host) {
-		return nil, fmt.Errorf("server: %q is not a loopback address", host)
+	if err := CheckAddr(cfg.Addr); err != nil {
+		return nil, err
 	}
 	cfg = withDefaults(cfg)
 	return &Server{cfg: cfg}, nil

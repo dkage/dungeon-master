@@ -273,4 +273,30 @@ describe('App', () => {
       expect(await within(panel).findByText('Real first issue')).toBeInTheDocument()
     })
   })
+
+  describe('signed out', () => {
+    function refuse() {
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 401, json: async () => { throw new Error('no body') } })))
+    }
+
+    it('explains itself instead of showing an empty app that looks like lost data', async () => {
+      refuse()
+      render(App)
+      expect(await screen.findByRole('heading', { name: 'This tab is not signed in' })).toBeInTheDocument()
+      expect(screen.getByText(/safe: they are stored on/)).toBeInTheDocument()
+      expect(screen.queryByText(/Add one to start/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('navigation', { name: 'Campaigns' })).not.toBeInTheDocument()
+      expect(screen.queryByPlaceholderText('/absolute/path/to/project')).not.toBeInTheDocument()
+    })
+
+    it('recovers when "Try again" succeeds after signing in elsewhere', async () => {
+      refuse()
+      render(App)
+      await screen.findByRole('heading', { name: 'This tab is not signed in' })
+      fakeServer() // the browser is now signed in
+      await fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(await screen.findByRole('button', { name: 'Opus' })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'This tab is not signed in' })).not.toBeInTheDocument()
+    })
+  })
 })

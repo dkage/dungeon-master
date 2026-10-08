@@ -185,3 +185,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .comment { margin: 0 0 12px; padding: 8px 10px; background: var(--bg); border-radius: 8px; }
 .who { margin: 0 0 4px; color: var(--muted); font-size: 12px; }
 .who strong { color: var(--text); }
+
+/* --- signed-out screen --- */
+.signin { max-width: 36rem; margin: 12vh auto 0; padding: 0 20px; }
+.signin h1 { font-size: 22px; margin: 0 0 12px; }
+.signin p { color: var(--muted); }
+.signin button { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text); font-weight: 600; }

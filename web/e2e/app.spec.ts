@@ -51,6 +51,20 @@ test('unauthenticated API access is refused, the page itself loads', async ({ pl
   await anon.dispose()
 })
 
+test('a browser that is not signed in is told so, and never sees an empty app that looks like lost data', async ({ browser, baseURL }) => {
+  const ctx = await browser.newContext() // no cookie, no token
+  const page = await ctx.newPage()
+  await page.goto(baseURL!)
+  await expect(page.getByRole('heading', { name: 'This tab is not signed in' })).toBeVisible()
+  await expect(page.getByText('Add one to start')).toHaveCount(0)
+  await expect(page.getByPlaceholder('/absolute/path/to/project')).toHaveCount(0)
+  // Opening the signed-in link fixes it.
+  await page.goto(url)
+  await expect(hero(page, 'Opus')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'This tab is not signed in' })).toHaveCount(0)
+  await ctx.close()
+})
+
 test('a campaign shows the GitHub repo resolved from its git remote', async ({ page }) => {
   await open(page)
   await expect(nav(page).getByText('acme/demo')).toBeVisible()

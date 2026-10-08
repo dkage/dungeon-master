@@ -3,6 +3,8 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -207,6 +209,91 @@ func TestContentSecurityPolicy(t *testing.T) {
 	for _, must := range []string{"frame-ancestors", "base-uri", "object-src", "form-action"} {
 		if directives[must] != "'none'" {
 			t.Errorf("%s = %q, want 'none'", must, directives[must])
+		}
+	}
+}
+
+func TestTokenPersistsBetweenRuns(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state", "token")
+	first, created, err := LoadOrCreateToken(path, false)
+	if err != nil || !created || !tokenPattern.MatchString(first) {
+		t.Fatalf("first: %q created=%v err=%v", first, created, err)
+	}
+	if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o600 {
+		t.Fatalf("token file mode %v", fi.Mode().Perm())
+	}
+	second, created, err := LoadOrCreateToken(path, false)
+	if err != nil || created || second != first {
+		t.Fatalf("second run should reuse the token: %q created=%v err=%v", second, created, err)
+	}
+}
+
+func TestTokenRotation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "token")
+	first, _, _ := LoadOrCreateToken(path, false)
+	rotated, created, err := LoadOrCreateToken(path, true)
+	if err != nil || !created || rotated == first {
+		t.Fatalf("rotate: %q created=%v err=%v", rotated, created, err)
+	}
+	if again, _, _ := LoadOrCreateToken(path, false); again != rotated {
+		t.Fatal("the rotated token was not stored")
+	}
+}
+
+func TestInvalidStoredTokenIsReplaced(t *testing.T) {
+	for name, content := range map[string]string{
+		"empty": "", "short": "abc123", "not hex": strings.Repeat("z", 64),
+		"too long": strings.Repeat("a", 65), "newlines only": "\n\n",
+	} {
+		path := filepath.Join(t.TempDir(), "token")
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		tok, created, err := LoadOrCreateToken(path, false)
+		if err != nil || !created || !tokenPattern.MatchString(tok) {
+			t.Errorf("%s: %q created=%v err=%v", name, tok, created, err)
+		}
+	}
+	// A valid token with a trailing newline (hand-edited) is accepted.
+	path := filepath.Join(t.TempDir(), "token")
+	good := strings.Repeat("ab", 32)
+	_ = os.WriteFile(path, []byte(good+"\n"), 0o600)
+	if tok, created, _ := LoadOrCreateToken(path, false); created || tok != good {
+		t.Errorf("valid token rejected: %q %v", tok, created)
+	}
+}
+
+func TestTokenFileUnreadableIsAnError(t *testing.T) {
+	dir := t.TempDir()
+	// A directory where the file should be cannot be read as a token.
+	if err := os.Mkdir(filepath.Join(dir, "token"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := LoadOrCreateToken(filepath.Join(dir, "token"), false); err == nil {
+		t.Fatal("expected an error")
+	}
+}
+
+func TestSessionCookieOutlivesTheBrowser(t *testing.T) {
+	rec := do(t, "GET", "/?token="+testToken, nil)
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == cookieName {
+			if c.MaxAge != cookieMaxAge || c.MaxAge < 24*60*60 || !c.HttpOnly || c.SameSite != http.SameSiteStrictMode {
+				t.Fatalf("cookie: %+v", c)
+			}
+			return
+		}
+	}
+	t.Fatal("no session cookie set")
+}
+
+func TestCheckAddr(t *testing.T) {
+	for addr, ok := range map[string]bool{
+		"127.0.0.1:7878": true, "localhost:0": true, "[::1]:9": true,
+		"0.0.0.0:80": false, ":80": false, "192.168.1.5:80": false, "nonsense": false, "": false,
+	} {
+		if err := CheckAddr(addr); (err == nil) != ok {
+			t.Errorf("%q: err=%v, want ok=%v", addr, err, ok)
 		}
 	}
 }

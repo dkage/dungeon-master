@@ -16,7 +16,7 @@ Requires Go, Node and the [Claude Code](https://claude.com/claude-code) CLI.
 make run        # builds the frontend and the binary, then serves on 127.0.0.1:7878
 ```
 
-Open the URL it prints (it carries a per-launch token that is exchanged for a cookie). Add a campaign (a project directory), then click a hero to start a session in it. The right-hand panel lists the project's GitHub issues; it needs credentials from `gh auth login` (or `GH_TOKEN`), or you can load sample quests. Heroes come from `party.toml` in the config directory; without one, built-in Opus, Sonnet and Haiku heroes are offered.
+Open the URL it prints (it carries an access token that is exchanged for a cookie). The token is stored in the config directory, so a browser that is already signed in stays signed in across restarts; `dungeon serve --new-token` replaces it. Add a campaign (a project directory), then click a hero to start a session in it. The right-hand panel lists the project's GitHub issues; it needs credentials from `gh auth login` (or `GH_TOKEN`), or you can load sample quests. Heroes come from `party.toml` in the config directory; without one, built-in Opus, Sonnet and Haiku heroes are offered.
 
 `make check` runs the Go and frontend tests; `make test-e2e` runs the browser tests (once: `cd web && npx playwright install chromium`).
 

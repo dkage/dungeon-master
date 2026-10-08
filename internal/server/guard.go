@@ -8,7 +8,10 @@ import (
 	"strings"
 )
 
-const cookieName = "dungeon_session"
+const (
+	cookieName   = "dungeon_session"
+	cookieMaxAge = 30 * 24 * 60 * 60 // seconds
+)
 
 // guard is the trust boundary for a localhost server that can drive
 // terminals. It defends against pages in the user's browser (cross-origin
@@ -64,6 +67,9 @@ func (g *guard) wrap(next http.Handler) http.Handler {
 				Path:     "/",
 				HttpOnly: true,
 				SameSite: http.SameSiteStrictMode,
+				// Outlives the browser session; the token behind it only
+				// changes when the user rotates it.
+				MaxAge: cookieMaxAge,
 			})
 			http.Redirect(w, r, r.URL.Path, http.StatusSeeOther)
 			return

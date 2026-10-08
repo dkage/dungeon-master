@@ -12,8 +12,23 @@ import (
 	"testing"
 
 	"github.com/dkage/dungeon-master/internal/campaign"
+	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/server"
 	"github.com/dkage/dungeon-master/internal/testutil"
 )
+
+// TestMain keeps every test away from the developer's real config directory.
+// Individual tests override DUNGEON_HOME with their own temp directory.
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "dungeon-cmd-test-*")
+	if err != nil {
+		panic(err)
+	}
+	os.Setenv("DUNGEON_HOME", dir)
+	code := m.Run()
+	os.RemoveAll(dir)
+	os.Exit(code)
+}
 
 func TestRunCommands(t *testing.T) {
 	if err := run(nil); err == nil {
@@ -231,5 +246,40 @@ func TestGitHubEndpointOverrideIsLoopbackOnly(t *testing.T) {
 	t.Setenv("DUNGEON_GITHUB_ENDPOINT", "https://evil.test/graphql")
 	if _, err := buildConfig(context.Background(), "127.0.0.1:0", "tok"); err == nil {
 		t.Fatal("buildConfig accepted a remote endpoint")
+	}
+}
+
+func TestServeKeepsTheTokenAcrossRuns(t *testing.T) {
+	// serve prints its URL and blocks, so exercise the same path it uses.
+	home := t.TempDir()
+	t.Setenv("DUNGEON_HOME", home)
+	dir, err := party.ConfigDir()
+	if err != nil || dir != home {
+		t.Fatalf("config dir %q %v", dir, err)
+	}
+	path := filepath.Join(dir, server.TokenFile)
+	a, created, err := server.LoadOrCreateToken(path, false)
+	if err != nil || !created {
+		t.Fatal(a, created, err)
+	}
+	b, created, _ := server.LoadOrCreateToken(path, false)
+	if created || a != b {
+		t.Fatalf("token changed between runs: %q -> %q", a, b)
+	}
+	if err := run([]string{"serve", "--addr", "0.0.0.0:0", "--new-token"}); err == nil || !strings.Contains(err.Error(), "loopback") {
+		t.Fatalf("the flag must parse and a non-loopback bind still fail: %v", err)
+	}
+}
+
+func TestServeRefusesABadAddressBeforeTouchingState(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("DUNGEON_HOME", home)
+	for _, addr := range []string{"0.0.0.0:0", "10.1.2.3:80", "nonsense"} {
+		if err := run([]string{"serve", "--addr", addr}); err == nil {
+			t.Errorf("%s accepted", addr)
+		}
+	}
+	if entries, _ := os.ReadDir(home); len(entries) != 0 {
+		t.Fatalf("a refused start left files behind: %v", entries)
 	}
 }

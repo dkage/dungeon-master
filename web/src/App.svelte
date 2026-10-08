@@ -17,6 +17,20 @@
   const live = $derived(store.sessions.filter((s) => !s.lost))
 </script>
 
+{#if store.unauthorised}
+  <main class="signin" aria-labelledby="signin-title">
+    <h1 id="signin-title">This tab is not signed in</h1>
+    <p>
+      Dungeon Master did not accept this browser's access token. Your campaigns and sessions are safe: they are stored on
+      this computer.
+    </p>
+    <p>
+      Open the link printed in the terminal where you ran <code>make run</code> or <code>dungeon serve</code>. It ends in
+      <code>?token=…</code> and signs this browser in. The token is kept between restarts, so you only need to do this once.
+    </p>
+    <button type="button" onclick={() => store.refresh()}>Try again</button>
+  </main>
+{:else}
 <div class="app">
   <Sidebar {store} />
   <div class="main">
@@ -38,3 +52,4 @@
   </div>
   <QuestsPanel {store} />
 </div>
+{/if}

@@ -10,9 +10,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/dkage/dungeon-master/internal/party"
 	"github.com/dkage/dungeon-master/internal/server"
 )
 
@@ -62,11 +64,20 @@ commands:
 func serve(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	addr := fs.String("addr", "127.0.0.1:7878", "loopback address to listen on (port 0 picks a free one)")
+	newToken := fs.Bool("new-token", false, "replace the stored access token, signing out every browser")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	token, err := server.NewToken()
+	// Refuse a bad address before creating or reading any state.
+	if err := server.CheckAddr(*addr); err != nil {
+		return err
+	}
+	dir, err := party.ConfigDir()
+	if err != nil {
+		return err
+	}
+	token, created, err := server.LoadOrCreateToken(filepath.Join(dir, server.TokenFile), *newToken)
 	if err != nil {
 		return err
 	}
@@ -93,7 +104,12 @@ func serve(args []string) error {
 	defer stop()
 
 	fmt.Printf("dungeon %s listening on http://%s/?token=%s\n", version, ln.Addr(), token)
-	fmt.Println("open that URL once; the token is per launch and is exchanged for a session cookie.")
+	if created {
+		fmt.Println("created a new access token; open that URL once to sign this browser in.")
+	} else {
+		fmt.Println("reusing the stored access token, so a browser that was already signed in stays signed in.")
+	}
+	fmt.Printf("token file: %s (use --new-token to replace it)\n", filepath.Join(dir, server.TokenFile))
 
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()

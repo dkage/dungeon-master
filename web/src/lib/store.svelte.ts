@@ -62,6 +62,12 @@ export class AppStore {
   detailLoading = $state(false)
   /** Whether the quest panel is open on narrow screens. */
   questsOpen = $state(false)
+  /**
+   * The server refused this tab's credentials (it was restarted with another
+   * token, or this browser never opened the signed-in link). Shown as its own
+   * screen: an empty list would look like lost data.
+   */
+  unauthorised = $state(false)
 
   // Responses that arrive after a newer request, or after the selection moved
   // on, are dropped so one campaign's quests never show under another.
@@ -82,6 +88,16 @@ export class AppStore {
     return this.sessions.filter((s) => s.campaign === campaignId)
   }
 
+  private fail(e: unknown): string {
+    if ((e as { status?: number }).status === 401) this.unauthorised = true
+    return message(e)
+  }
+
+  private noticeAuth(f: Failure, e: unknown): Failure {
+    if ((e as { status?: number }).status === 401) this.unauthorised = true
+    return f
+  }
+
   async refresh() {
     try {
       const st = await this.client.getState()
@@ -91,11 +107,12 @@ export class AppStore {
       this.heroes = st.heroes
       this.campaigns = st.campaigns
       this.sessions = st.sessions
+      this.unauthorised = false
       this.normalise()
       this.error = null
       if (this.campaignId && this.questsFor !== this.campaignId) void this.loadQuests()
     } catch (e) {
-      this.error = message(e)
+      this.error = this.fail(e)
     }
   }
 
@@ -142,7 +159,7 @@ export class AppStore {
       this.questsError = null
     } catch (e) {
       if (seq !== this.questsSeq) return
-      this.questsError = failure(e)
+      this.questsError = this.noticeAuth(failure(e), e)
       this.quests = null
     } finally {
       if (seq === this.questsSeq) this.questsLoading = false
@@ -163,7 +180,7 @@ export class AppStore {
       this.detail = d
     } catch (e) {
       if (seq !== this.detailSeq) return
-      this.detailError = failure(e)
+      this.detailError = this.noticeAuth(failure(e), e)
     } finally {
       if (seq === this.detailSeq) this.detailLoading = false
     }
@@ -217,7 +234,7 @@ export class AppStore {
       this.error = null
       return true
     } catch (e) {
-      this.error = message(e)
+      this.error = this.fail(e)
       return false
     } finally {
       this.busy = false
@@ -231,7 +248,7 @@ export class AppStore {
       this.error = null
       return true
     } catch (e) {
-      this.error = message(e)
+      this.error = this.fail(e)
       return false
     }
   }
@@ -242,7 +259,7 @@ export class AppStore {
     } catch (e) {
       const status = (e as { status?: number }).status
       if (status !== 404) {
-        this.error = message(e)
+        this.error = this.fail(e)
         return
       }
     }
@@ -266,7 +283,7 @@ export class AppStore {
       this.activeId = sess.id
       this.error = null
     } catch (e) {
-      this.error = message(e)
+      this.error = this.fail(e)
     } finally {
       this.busy = false
     }
@@ -279,7 +296,7 @@ export class AppStore {
       // Already gone on the server is fine; anything else is worth showing.
       const status = (e as { status?: number }).status
       if (status !== 404) {
-        this.error = message(e)
+        this.error = this.fail(e)
         return
       }
     }

@@ -433,3 +433,43 @@ describe('quests', () => {
     expect(s.questsFor).toBe('c2')
   })
 })
+
+describe('signed-out tabs', () => {
+  it('flags a refused tab instead of looking like an empty app', async () => {
+    const s = new AppStore(fakeClient({ getState: err(401, 'not authorised') }))
+    await s.refresh()
+    expect(s.unauthorised).toBe(true)
+    expect(s.campaigns).toEqual([])
+  })
+
+  it('clears the flag once the server accepts the tab again', async () => {
+    const getState = vi.fn().mockRejectedValueOnce(new ApiError(401, 'no')).mockResolvedValueOnce(baseState)
+    const s = new AppStore(fakeClient({ getState }))
+    await s.refresh()
+    expect(s.unauthorised).toBe(true)
+    await s.refresh()
+    expect(s.unauthorised).toBe(false)
+    expect(s.campaigns).toHaveLength(2)
+  })
+
+  it('notices a 401 on any later call too', async () => {
+    const s = new AppStore(fakeClient({ createSession: err(401, 'no') }))
+    await s.refresh()
+    await s.launch({ shell: true })
+    expect(s.unauthorised).toBe(true)
+    const q = new AppStore(fakeClient({ getQuests: err(401, 'no') }))
+    await q.refresh()
+    await vi.waitFor(() => expect(q.unauthorised).toBe(true))
+    const d = new AppStore(fakeClient({ getQuest: err(401, 'no') }))
+    await d.refresh()
+    await d.selectQuest(1)
+    expect(d.unauthorised).toBe(true)
+  })
+
+  it('does not flag other failures', async () => {
+    const s = new AppStore(fakeClient({ getState: err(500, 'boom') }))
+    await s.refresh()
+    expect(s.unauthorised).toBe(false)
+    expect(s.error).toBe('boom')
+  })
+})
