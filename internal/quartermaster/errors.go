@@ -29,3 +29,11 @@ func (e *RationError) Error() string {
 	return fmt.Sprintf("GitHub request budget is low (%d left on %s, keeping %d in reserve); resets at %s",
 		e.Remaining, e.Resource, e.Floor, e.Reset.Local().Format("15:04"))
 }
+
+// TooBusyError is returned when the next write slot is further away than the
+// caller is willing to wait. Nothing is reserved.
+type TooBusyError struct{ Wait time.Duration }
+
+func (e *TooBusyError) Error() string {
+	return fmt.Sprintf("the GitHub write budget is used up for now; the next slot is in %s", e.Wait.Round(time.Second))
+}

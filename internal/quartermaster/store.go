@@ -16,6 +16,9 @@ type State struct {
 	Reason    string    `json:"reason,omitempty"`
 	Level     int       `json:"level"`
 	LastTrip  time.Time `json:"lastTrip"`
+	// Writes are the times of recent writes (the last hour), so a restart
+	// cannot reset the pacing.
+	Writes []time.Time `json:"writes,omitempty"`
 }
 
 // Store persists State.

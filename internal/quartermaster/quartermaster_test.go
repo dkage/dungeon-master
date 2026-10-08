@@ -25,6 +25,16 @@ type fakeClock struct {
 func (c *fakeClock) Now() time.Time      { c.mu.Lock(); defer c.mu.Unlock(); return c.t }
 func (c *fakeClock) Add(d time.Duration) { c.mu.Lock(); c.t = c.t.Add(d); c.mu.Unlock() }
 
+// Sleep advances the clock instead of waiting, so an hour of pacing runs
+// instantly. It still honours cancellation.
+func (c *fakeClock) Sleep(ctx context.Context, d time.Duration) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	c.Add(d)
+	return nil
+}
+
 var t0 = time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
 
 // github is a fake GitHub whose next response is chosen by the test.

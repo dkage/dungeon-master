@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"slices"
 	"strconv"
@@ -45,11 +46,26 @@ func ClassOf(ctx context.Context) Class {
 }
 
 // Clock is the time source; tests replace it.
-type Clock interface{ Now() time.Time }
+type Clock interface {
+	Now() time.Time
+	// Sleep waits for d, or returns early with the context's error.
+	Sleep(ctx context.Context, d time.Duration) error
+}
 
 type realClock struct{}
 
 func (realClock) Now() time.Time { return time.Now() }
+
+func (realClock) Sleep(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
 
 // Options configures a Quartermaster. Zero values pick the defaults.
 type Options struct {
@@ -66,6 +82,21 @@ type Options struct {
 	// Recovery is how long without a limit signal resets the growth. Default
 	// 30 minutes.
 	Recovery time.Duration
+
+	// Write pacing, for Reserve. GitHub allows roughly 80 content-creating
+	// requests a minute and 500 an hour and asks for at least a second between
+	// writes; the defaults keep to about a quarter of that.
+	//
+	// WriteGap is the least time between two writes (default 3 s), plus up to
+	// WriteJitter (default 1 s) chosen at random.
+	WriteGap, WriteJitter time.Duration
+	// WritesPerMinute and WritesPerHour are rolling caps (default 15 and 150).
+	WritesPerMinute, WritesPerHour int
+	// MaxWait is the longest Reserve will wait for a slot before giving up
+	// with a TooBusyError (default 2 minutes).
+	MaxWait time.Duration
+	// Rand returns a number in [0,1) for the jitter. Default math/rand.
+	Rand func() float64
 }
 
 // Quartermaster implements the gatekeeping.
@@ -77,11 +108,18 @@ type Quartermaster struct {
 	maxCamp  time.Duration
 	recovery time.Duration
 
-	slot chan struct{} // one request in flight
+	writeGap, writeJitter          time.Duration
+	writesPerMinute, writesPerHour int
+	maxWait                        time.Duration
+	rand                           func() float64
 
-	mu      sync.Mutex
-	rations map[string]Ration
-	state   State
+	slot    chan struct{} // one request in flight
+	writeMu sync.Mutex    // one writer waiting for a slot at a time
+
+	mu       sync.Mutex
+	rations  map[string]Ration
+	state    State
+	gapAfter time.Duration // the gap (with jitter) owed after the latest write
 }
 
 // New builds a Quartermaster and loads any saved pause.
@@ -105,6 +143,26 @@ func New(o Options) (*Quartermaster, error) {
 	if o.Recovery <= 0 {
 		o.Recovery = 30 * time.Minute
 	}
+	if o.WriteGap <= 0 {
+		o.WriteGap = 3 * time.Second
+	}
+	if o.WriteJitter < 0 {
+		o.WriteJitter = 0
+	} else if o.WriteJitter == 0 {
+		o.WriteJitter = time.Second
+	}
+	if o.WritesPerMinute <= 0 {
+		o.WritesPerMinute = 15
+	}
+	if o.WritesPerHour <= 0 {
+		o.WritesPerHour = 150
+	}
+	if o.MaxWait <= 0 {
+		o.MaxWait = 2 * time.Minute
+	}
+	if o.Rand == nil {
+		o.Rand = rand.Float64
+	}
 	st, err := o.Store.Load()
 	if err != nil {
 		return nil, err
@@ -112,7 +170,11 @@ func New(o Options) (*Quartermaster, error) {
 	return &Quartermaster{
 		clock: o.Clock, store: o.Store, floors: floors,
 		minCamp: o.MinCamp, maxCamp: o.MaxCamp, recovery: o.Recovery,
+		writeGap: o.WriteGap, writeJitter: o.WriteJitter,
+		writesPerMinute: o.WritesPerMinute, writesPerHour: o.WritesPerHour,
+		maxWait: o.MaxWait, rand: o.Rand,
 		slot: make(chan struct{}, 1), rations: map[string]Ration{}, state: st,
+		gapAfter: o.WriteGap,
 	}, nil
 }
 
@@ -307,6 +369,92 @@ func (q *Quartermaster) trip(now time.Time, wait time.Duration, reason string) {
 	_ = q.store.Save(snapshot) // best effort: the pause still holds in memory
 }
 
+// Reserve waits for a write slot and claims it. Everything that creates or
+// changes something on GitHub (the app's own writes and the Gatekeeper's `gh`
+// commands) calls it before sending, so the pacing is one shared fact: at
+// least WriteGap between writes (plus jitter), no more than WritesPerMinute in
+// any rolling minute and WritesPerHour in any rolling hour. The times are
+// stored, so restarting cannot reset them.
+//
+// It returns CampError while in camp, and TooBusyError when the next slot is
+// further than MaxWait away (nothing is reserved then). waited is how long it
+// slept.
+func (q *Quartermaster) Reserve(ctx context.Context) (waited time.Duration, err error) {
+	q.writeMu.Lock()
+	defer q.writeMu.Unlock()
+	start := q.clock.Now()
+	for {
+		now := q.clock.Now()
+		q.mu.Lock()
+		if q.state.CampUntil.After(now) {
+			ce := &CampError{Until: q.state.CampUntil, Reason: q.state.Reason}
+			q.mu.Unlock()
+			return 0, ce
+		}
+		wait := q.writeWaitLocked(now)
+		if wait <= 0 {
+			q.state.Writes = append(q.pruneWrites(now), now)
+			q.gapAfter = q.writeGap + time.Duration(q.rand()*float64(q.writeJitter))
+			snapshot := q.state
+			snapshot.Writes = append([]time.Time(nil), snapshot.Writes...)
+			q.mu.Unlock()
+			_ = q.store.Save(snapshot)
+			return now.Sub(start), nil
+		}
+		q.mu.Unlock()
+		if wait > q.maxWait {
+			return 0, &TooBusyError{Wait: wait}
+		}
+		if err := q.clock.Sleep(ctx, wait); err != nil {
+			return 0, err
+		}
+	}
+}
+
+// pruneWrites drops writes older than an hour and returns the rest.
+func (q *Quartermaster) pruneWrites(now time.Time) []time.Time {
+	cut := now.Add(-time.Hour)
+	i := 0
+	for i < len(q.state.Writes) && !q.state.Writes[i].After(cut) {
+		i++
+	}
+	return append([]time.Time(nil), q.state.Writes[i:]...)
+}
+
+// writeWaitLocked is how long until a write is allowed; zero or less means now.
+func (q *Quartermaster) writeWaitLocked(now time.Time) time.Duration {
+	ws := q.pruneWrites(now)
+	if len(ws) == 0 {
+		return 0
+	}
+	allowed := ws[len(ws)-1].Add(q.gapAfter)
+	// Rolling minute: the cap-th most recent write must be a minute old.
+	inMinute := 0
+	for _, w := range ws {
+		if w.After(now.Add(-time.Minute)) {
+			inMinute++
+		}
+	}
+	if inMinute >= q.writesPerMinute {
+		if t := ws[len(ws)-q.writesPerMinute].Add(time.Minute); t.After(allowed) {
+			allowed = t
+		}
+	}
+	// Rolling hour.
+	if len(ws) >= q.writesPerHour {
+		if t := ws[len(ws)-q.writesPerHour].Add(time.Hour); t.After(allowed) {
+			allowed = t
+		}
+	}
+	return allowed.Sub(now)
+}
+
+// WriteStats counts writes in the rolling windows.
+type WriteStats struct {
+	LastMinute int `json:"lastMinute"`
+	LastHour   int `json:"lastHour"`
+}
+
 // Status is a snapshot for the UI.
 func (q *Quartermaster) Status() Status {
 	now := q.clock.Now()
@@ -340,6 +488,14 @@ func (q *Quartermaster) Status() Status {
 	if q.state.CampUntil.After(now) {
 		st.Camp = Camp{Active: true, Until: q.state.CampUntil, Reason: q.state.Reason, Level: q.state.Level}
 	}
+	for _, w := range q.state.Writes {
+		if w.After(now.Add(-time.Hour)) {
+			st.Writes.LastHour++
+		}
+		if w.After(now.Add(-time.Minute)) {
+			st.Writes.LastMinute++
+		}
+	}
 	return st
 }
 
@@ -363,8 +519,9 @@ type Camp struct {
 
 // Status is what the UI shows.
 type Status struct {
-	Rations []Ration `json:"rations"`
-	Camp    Camp     `json:"camp"`
+	Rations []Ration   `json:"rations"`
+	Camp    Camp       `json:"camp"`
+	Writes  WriteStats `json:"writes"`
 }
 
 func atoi(s string) (int, bool) {
