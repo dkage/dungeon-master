@@ -161,3 +161,45 @@ test('campaigns and expeditions survive a page reload, with scrollback replayed'
   await expect(expeditions(page).getByRole('button', { name: /^Opus/ })).toBeVisible()
   await expect(screenText(page)).toContainText('FAKE-CLAUDE')
 })
+
+test('the terminal renders with its own font, colours and selection (CSP must allow xterm styles)', async ({ page }) => {
+  // xterm builds its font, colour and selection rules as <style> elements. A
+  // Content-Security-Policy that blocks them leaves a proportional font, no
+  // colours and no selection highlight, so fail on any CSP violation too.
+  const violations: string[] = []
+  page.on('console', (m) => {
+    if (/content security policy/i.test(m.text())) violations.push(m.text())
+  })
+  await open(page)
+  await hero(page, 'Shell').click()
+  await page.locator('.pane:not([hidden]) .xterm').click()
+  await page.keyboard.type("printf '\\033[31mRED-TEXT\\033[0m plain-text\\n'")
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('RED-TEXT plain-text')
+
+  const font = await screenText(page).evaluate((e) => getComputedStyle(e).fontFamily)
+  expect(font).toMatch(/monospace|Menlo/)
+
+  const colour = (text: RegExp) =>
+    page.locator('.pane:not([hidden]) .xterm-rows span').filter({ hasText: text }).last()
+      .evaluate((e) => getComputedStyle(e).color)
+  const red = await colour(/^RED-TEXT$/)
+  const plain = await colour(/plain-text$/)
+  expect(red).not.toBe(plain)
+  expect(red).toMatch(/rgb\((\d+), (\d+), (\d+)\)/)
+  const [r, g, b] = red.match(/\d+/g)!.map(Number)
+  expect(r).toBeGreaterThan(g + 40) // actually red, not white or grey
+  expect(r).toBeGreaterThan(b + 40)
+
+  // Dragging over the output paints a visible selection.
+  const box = (await page.locator('.pane:not([hidden]) .xterm-screen').boundingBox())!
+  await page.mouse.move(box.x + 4, box.y + 6)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 300, box.y + 40, { steps: 6 })
+  await page.mouse.up()
+  const sel = page.locator('.pane:not([hidden]) .xterm-selection div').first()
+  await expect(sel).toBeAttached()
+  expect(await sel.evaluate((e) => getComputedStyle(e).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)')
+
+  expect(violations).toEqual([])
+})
