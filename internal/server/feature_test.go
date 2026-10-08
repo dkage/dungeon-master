@@ -16,6 +16,8 @@ import (
 
 	"github.com/coder/websocket"
 
+	"dungeon/internal/campaign"
+	"dungeon/internal/history"
 	"dungeon/internal/party"
 	"dungeon/internal/session"
 	"dungeon/internal/testutil"
@@ -23,11 +25,13 @@ import (
 
 // env is a real server on a loopback port, wired to the fake claude.
 type env struct {
-	t     *testing.T
-	base  string
-	host  string
-	dir   string // a real directory sessions can start in
-	token string
+	t        *testing.T
+	base     string
+	host     string
+	dir      string // the directory of the pre-registered campaign
+	campaign string // that campaign's id
+	token    string
+	cfg      Config
 }
 
 func startServer(t *testing.T, mutate func(*Config)) *env {
@@ -54,6 +58,11 @@ func startServer(t *testing.T, mutate func(*Config)) *env {
 	if mutate != nil {
 		mutate(&cfg)
 	}
+	cfg = withDefaults(cfg)
+	camp, err := cfg.Campaigns.Add(context.Background(), campaign.Input{Dir: dir, Name: "demo"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -65,7 +74,7 @@ func startServer(t *testing.T, mutate func(*Config)) *env {
 		cfg.Sessions.Shutdown()
 		srv.Close()
 	})
-	return &env{t: t, base: srv.URL, host: ln.Addr().String(), dir: dir, token: testToken}
+	return &env{t: t, base: srv.URL, host: ln.Addr().String(), dir: dir, campaign: camp.ID, token: testToken, cfg: cfg}
 }
 
 func (e *env) req(method, path string, body any, mutate func(*http.Request)) (*http.Response, []byte) {
@@ -95,8 +104,8 @@ func (e *env) req(method, path string, body any, mutate func(*http.Request)) (*h
 
 func (e *env) create(body map[string]any) sessionJSON {
 	e.t.Helper()
-	if _, ok := body["dir"]; !ok {
-		body["dir"] = e.dir
+	if _, ok := body["campaign"]; !ok {
+		body["campaign"] = e.campaign
 	}
 	resp, out := e.req("POST", "/api/sessions", body, nil)
 	if resp.StatusCode != http.StatusCreated {
@@ -168,7 +177,7 @@ func TestStateWithoutClaude(t *testing.T) {
 	if !strings.Contains(string(out), `"found":false`) || !strings.Contains(string(out), "not on PATH") {
 		t.Fatalf("state: %s", out)
 	}
-	resp, out := e.req("POST", "/api/sessions", map[string]any{"hero": "opus", "dir": e.dir}, nil)
+	resp, out := e.req("POST", "/api/sessions", map[string]any{"hero": "opus", "campaign": e.campaign}, nil)
 	if resp.StatusCode != http.StatusServiceUnavailable || !strings.Contains(string(out), "not on PATH") {
 		t.Fatalf("hero launch without claude: %d %s", resp.StatusCode, out)
 	}
@@ -179,7 +188,7 @@ func TestStateWithoutClaude(t *testing.T) {
 func TestHeroSessionEndToEnd(t *testing.T) {
 	e := startServer(t, nil)
 	sj := e.create(map[string]any{"hero": "opus", "opener": "/some-skill arg"})
-	if sj.Kind != "hero" || sj.Hero != "opus" || sj.Title != "Opus" || sj.Exited {
+	if sj.Kind != "hero" || sj.Hero != "opus" || sj.Title != "Opus" || sj.Exited || sj.Campaign != e.campaign || sj.Dir != e.dir {
 		t.Fatalf("session: %+v", sj)
 	}
 
@@ -331,7 +340,7 @@ func TestSessionAPIRequiresAuthAndJSON(t *testing.T) {
 			t.Errorf("%s %s without auth: %d", tc.method, tc.path, resp.StatusCode)
 		}
 	}
-	resp, _ := e.req("POST", "/api/sessions", map[string]any{"shell": true, "dir": e.dir}, func(r *http.Request) {
+	resp, _ := e.req("POST", "/api/sessions", map[string]any{"shell": true, "campaign": e.campaign}, func(r *http.Request) {
 		r.Header.Set("Content-Type", "text/plain")
 	})
 	if resp.StatusCode != http.StatusUnsupportedMediaType {
@@ -341,22 +350,20 @@ func TestSessionAPIRequiresAuthAndJSON(t *testing.T) {
 
 func TestCreateValidation(t *testing.T) {
 	e := startServer(t, nil)
-	file := filepath.Join(e.dir, "afile")
-	if err := os.WriteFile(file, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
 	cases := map[string]map[string]any{
-		"unknown hero":    {"hero": "ghost", "dir": e.dir},
-		"relative dir":    {"hero": "opus", "dir": "relative/path"},
-		"empty dir":       {"hero": "opus", "dir": ""},
-		"missing dir":     {"hero": "opus", "dir": filepath.Join(e.dir, "nope")},
-		"file as dir":     {"hero": "opus", "dir": file},
-		"hero and shell":  {"hero": "opus", "shell": true, "dir": e.dir},
-		"neither":         {"dir": e.dir},
-		"unknown field":   {"hero": "opus", "dir": e.dir, "argv": []string{"rm"}},
-		"opener too long": {"hero": "opus", "dir": e.dir, "opener": strings.Repeat("x", maxOpener+1)},
+		"unknown hero":     {"hero": "ghost"},
+		"unknown campaign": {"hero": "opus", "campaign": "cnope"},
+		"empty campaign":   {"hero": "opus", "campaign": ""},
+		"hero and shell":   {"hero": "opus", "shell": true},
+		"neither":          {},
+		"dir not accepted": {"hero": "opus", "dir": "/etc"},
+		"unknown field":    {"hero": "opus", "argv": []string{"rm"}},
+		"opener too long":  {"hero": "opus", "opener": strings.Repeat("x", maxOpener+1)},
 	}
 	for name, body := range cases {
+		if _, ok := body["campaign"]; !ok {
+			body["campaign"] = e.campaign
+		}
 		resp, out := e.req("POST", "/api/sessions", body, nil)
 		if resp.StatusCode != http.StatusBadRequest {
 			t.Errorf("%s: got %d %s, want 400", name, resp.StatusCode, out)
@@ -387,17 +394,202 @@ func TestCreateValidation(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("oversized body: %d", resp.StatusCode)
 	}
-	// None of the rejected requests may have spawned anything.
+	// None of the rejected requests may have spawned or recorded anything.
 	_, out := e.req("GET", "/api/state", nil, nil)
 	if !strings.Contains(string(out), `"sessions":[]`) {
 		t.Fatalf("rejected requests created sessions: %s", out)
 	}
 }
 
+func TestSessionRefusedWhenCampaignDirectoryDisappears(t *testing.T) {
+	e := startServer(t, nil)
+	gone := filepath.Join(t.TempDir(), "gone")
+	if err := os.Mkdir(gone, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	c, err := e.cfg.Campaigns.Add(context.Background(), campaign.Input{Dir: gone})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(gone); err != nil {
+		t.Fatal(err)
+	}
+	resp, out := e.req("POST", "/api/sessions", map[string]any{"shell": true, "campaign": c.ID}, nil)
+	if resp.StatusCode != http.StatusBadRequest || !strings.Contains(string(out), "no longer available") {
+		t.Fatalf("got %d %s", resp.StatusCode, out)
+	}
+}
+
 func TestShellUnavailable(t *testing.T) {
 	e := startServer(t, func(c *Config) { c.Shell = "" })
-	resp, _ := e.req("POST", "/api/sessions", map[string]any{"shell": true, "dir": e.dir}, nil)
+	resp, _ := e.req("POST", "/api/sessions", map[string]any{"shell": true, "campaign": e.campaign}, nil)
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Fatalf("got %d", resp.StatusCode)
+	}
+}
+
+func decodeState(t *testing.T, out []byte) stateJSON {
+	t.Helper()
+	var st stateJSON
+	if err := json.Unmarshal(out, &st); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	return st
+}
+
+func TestCampaignLifecycleOverHTTP(t *testing.T) {
+	e := startServer(t, nil)
+	other := t.TempDir()
+
+	// The pre-registered campaign is listed.
+	_, out := e.req("GET", "/api/state", nil, nil)
+	if st := decodeState(t, out); len(st.Campaigns) != 1 || st.Campaigns[0].ID != e.campaign || st.Campaigns[0].Name != "demo" {
+		t.Fatalf("state: %s", out)
+	}
+
+	// Add.
+	resp, out := e.req("POST", "/api/campaigns", map[string]any{
+		"dir": other, "name": "Second", "labels": []string{"area:web"},
+	}, nil)
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("add: %d %s", resp.StatusCode, out)
+	}
+	var c campaign.Campaign
+	_ = json.Unmarshal(out, &c)
+	if c.Name != "Second" || c.Dir != other || c.Remote != "origin" || len(c.Labels) != 1 {
+		t.Fatalf("added: %+v", c)
+	}
+
+	// Duplicate, invalid and unknown-field requests.
+	for name, tc := range map[string]struct {
+		body map[string]any
+		want int
+	}{
+		"duplicate":     {map[string]any{"dir": other}, http.StatusConflict},
+		"relative":      {map[string]any{"dir": "rel"}, http.StatusBadRequest},
+		"missing":       {map[string]any{"dir": filepath.Join(other, "nope")}, http.StatusBadRequest},
+		"bad remote":    {map[string]any{"dir": t.TempDir(), "remote": "--x"}, http.StatusBadRequest},
+		"unknown field": {map[string]any{"dir": t.TempDir(), "gitRoot": "/"}, http.StatusBadRequest},
+	} {
+		if resp, out := e.req("POST", "/api/campaigns", tc.body, nil); resp.StatusCode != tc.want {
+			t.Errorf("%s: got %d %s, want %d", name, resp.StatusCode, out, tc.want)
+		}
+	}
+
+	// Update.
+	resp, out = e.req("PATCH", "/api/campaigns/"+c.ID, map[string]any{"name": "Renamed", "labels": []string{}}, nil)
+	_ = json.Unmarshal(out, &c)
+	if resp.StatusCode != http.StatusOK || c.Name != "Renamed" || len(c.Labels) != 0 {
+		t.Fatalf("update: %d %s", resp.StatusCode, out)
+	}
+	if resp, _ := e.req("PATCH", "/api/campaigns/cnope", map[string]any{"name": "x"}, nil); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("update unknown: %d", resp.StatusCode)
+	}
+	if resp, _ := e.req("PATCH", "/api/campaigns/"+c.ID, map[string]any{"remote": "--evil"}, nil); resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("update bad remote: %d", resp.StatusCode)
+	}
+
+	// Remove.
+	if resp, _ := e.req("DELETE", "/api/campaigns/"+c.ID, nil, nil); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("remove: %d", resp.StatusCode)
+	}
+	if resp, _ := e.req("DELETE", "/api/campaigns/"+c.ID, nil, nil); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("remove twice: %d", resp.StatusCode)
+	}
+	if _, err := os.Stat(other); err != nil {
+		t.Fatal("removing a campaign must not touch its directory")
+	}
+}
+
+func TestCampaignWithRunningSessionCannotBeRemoved(t *testing.T) {
+	e := startServer(t, nil)
+	sj := e.create(map[string]any{"shell": true})
+
+	resp, out := e.req("DELETE", "/api/campaigns/"+e.campaign, nil, nil)
+	if resp.StatusCode != http.StatusConflict || !strings.Contains(string(out), "running sessions") {
+		t.Fatalf("got %d %s", resp.StatusCode, out)
+	}
+	// Once the session is closed, removal works and its history goes with it.
+	e.req("DELETE", "/api/sessions/"+sj.ID, nil, nil)
+	e.create(map[string]any{"shell": true}) // a fresh one to leave a record behind
+	e.cfg.Sessions.Shutdown()
+	time.Sleep(200 * time.Millisecond)
+	if resp, out := e.req("DELETE", "/api/campaigns/"+e.campaign, nil, nil); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("remove after close: %d %s", resp.StatusCode, out)
+	}
+	_, stOut := e.req("GET", "/api/state", nil, nil)
+	if st := decodeState(t, stOut); len(st.Sessions) != 0 || len(st.Campaigns) != 0 {
+		t.Fatalf("leftovers: %s", stOut)
+	}
+}
+
+func TestFinishedSessionStaysListedUntilClosed(t *testing.T) {
+	e := startServer(t, nil)
+	sj := e.create(map[string]any{"shell": true})
+	c, _, err := e.dial(sj.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.CloseNow()
+	send(t, c, "exit 4\n")
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		_, out := e.req("GET", "/api/state", nil, nil)
+		st := decodeState(t, out)
+		if len(st.Sessions) == 1 && st.Sessions[0].Exited && st.Sessions[0].ExitCode == 4 {
+			if rec, ok := e.cfg.History.Get(sj.ID); !ok || rec.Ended == nil || rec.ExitCode != 4 {
+				t.Fatalf("history not updated: %+v", rec)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("session never reported as exited: %s", out)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if resp, _ := e.req("DELETE", "/api/sessions/"+sj.ID, nil, nil); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("close finished session: %d", resp.StatusCode)
+	}
+	_, out := e.req("GET", "/api/state", nil, nil)
+	if st := decodeState(t, out); len(st.Sessions) != 0 {
+		t.Fatalf("still listed: %s", out)
+	}
+}
+
+func TestSessionsFromAPreviousRunAreLost(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sessions.json")
+	prev, err := history.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var campaignID string
+	// Simulate a previous run that was killed while a session was running.
+	e1 := startServer(t, func(c *Config) { c.History = prev })
+	campaignID = e1.campaign
+	_ = prev.Add(history.Record{ID: "sdeadbeef", Campaign: campaignID, Kind: "hero", Hero: "opus", Title: "Opus", Dir: e1.dir, Created: time.Now().UTC()})
+
+	reopened, err := history.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e2 := startServer(t, func(c *Config) { c.History = reopened })
+	_, out := e2.req("GET", "/api/state", nil, nil)
+	st := decodeState(t, out)
+	if len(st.Sessions) != 1 || !st.Sessions[0].Lost || !st.Sessions[0].Exited || st.Sessions[0].ExitCode != -1 {
+		t.Fatalf("lost session not reported: %s", out)
+	}
+	// Its terminal is gone for good: 410, distinct from "never existed".
+	if resp, _ := e2.req("GET", "/api/sessions/sdeadbeef/term", nil, nil); resp.StatusCode != http.StatusGone {
+		t.Fatalf("terminal of lost session: %d", resp.StatusCode)
+	}
+	if resp, _ := e2.req("GET", "/api/sessions/snever/term", nil, nil); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("terminal of unknown session: %d", resp.StatusCode)
+	}
+	// It can be dismissed.
+	if resp, _ := e2.req("DELETE", "/api/sessions/sdeadbeef", nil, nil); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("dismiss: %d", resp.StatusCode)
+	}
+	if got := reopened.List(); len(got) != 0 {
+		t.Fatalf("history after dismiss: %+v", got)
 	}
 }

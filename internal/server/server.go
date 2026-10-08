@@ -15,6 +15,8 @@ import (
 	"os"
 	"time"
 
+	"dungeon/internal/campaign"
+	"dungeon/internal/history"
 	"dungeon/internal/party"
 	"dungeon/internal/session"
 )
@@ -43,6 +45,11 @@ type Config struct {
 	Sessions *session.Manager
 	// BaseEnv is the environment children inherit. Defaults to os.Environ.
 	BaseEnv func() []string
+	// Campaigns is the registry of working directories. New creates an
+	// in-memory one when nil.
+	Campaigns *campaign.Registry
+	// History records sessions across restarts. In-memory when nil.
+	History *history.Store
 }
 
 // Server wires the handler, the guard and the listener together.
@@ -84,6 +91,12 @@ func withDefaults(cfg Config) Config {
 	}
 	if cfg.BaseEnv == nil {
 		cfg.BaseEnv = os.Environ
+	}
+	if cfg.Campaigns == nil {
+		cfg.Campaigns, _ = campaign.Open(context.Background(), "", nil) // in-memory: cannot fail
+	}
+	if cfg.History == nil {
+		cfg.History, _ = history.Open("") // in-memory: cannot fail
 	}
 	return cfg
 }

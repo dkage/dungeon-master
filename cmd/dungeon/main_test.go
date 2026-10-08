@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"dungeon/internal/campaign"
 	"dungeon/internal/testutil"
 )
 
@@ -88,5 +89,48 @@ func TestBuildConfigInvalidPartyFileIsFatal(t *testing.T) {
 	}
 	if _, err := buildConfig(context.Background(), "127.0.0.1:0", "tok"); err == nil {
 		t.Fatal("invalid party file accepted")
+	}
+}
+
+func TestBuildConfigPersistsCampaignsInConfigDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("DUNGEON_HOME", home)
+	t.Setenv("PATH", "/nonexistent")
+	t.Setenv("SHELL", "")
+	ctx := context.Background()
+
+	cfg, err := buildConfig(ctx, "127.0.0.1:0", "tok")
+	if err != nil {
+		t.Fatal(err)
+	}
+	proj := t.TempDir()
+	if _, err := cfg.Campaigns.Add(ctx, campaign.Input{Dir: proj, Name: "kept"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(home, "campaigns.json")); err != nil {
+		t.Fatalf("campaigns.json not written to the config dir: %v", err)
+	}
+
+	// A second start sees the campaign again.
+	cfg2, err := buildConfig(ctx, "127.0.0.1:0", "tok")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg2.Campaigns.List(); len(got) != 1 || got[0].Name != "kept" || got[0].Dir != proj {
+		t.Fatalf("campaigns after restart: %+v", got)
+	}
+}
+
+func TestBuildConfigRejectsCorruptState(t *testing.T) {
+	for _, name := range []string{"campaigns.json", "sessions.json"} {
+		home := t.TempDir()
+		t.Setenv("DUNGEON_HOME", home)
+		t.Setenv("PATH", "/nonexistent")
+		if err := os.WriteFile(filepath.Join(home, name), []byte("{nope"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := buildConfig(context.Background(), "127.0.0.1:0", "tok"); err == nil {
+			t.Errorf("%s: corrupt state accepted", name)
+		}
 	}
 }

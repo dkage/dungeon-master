@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"dungeon/internal/campaign"
+	"dungeon/internal/history"
 	"dungeon/internal/launcher"
 	"dungeon/internal/party"
 	"dungeon/internal/server"
@@ -23,6 +25,14 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 	if err != nil {
 		return server.Config{}, err
 	}
+	campaigns, err := campaign.Open(ctx, filepath.Join(dir, "campaigns.json"), nil)
+	if err != nil {
+		return server.Config{}, err
+	}
+	hist, err := history.Open(filepath.Join(dir, "sessions.json"))
+	if err != nil {
+		return server.Config{}, err
+	}
 	cfg := server.Config{
 		Addr:    addr,
 		Token:   token,
@@ -30,6 +40,9 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 		Assets:  web.Assets(),
 		Party:   p,
 		Shell:   os.Getenv("SHELL"),
+
+		Campaigns: campaigns,
+		History:   hist,
 	}
 	if path, err := launcher.Resolve(ctx, p.Claude); err != nil {
 		cfg.ClaudeErr = err.Error()
