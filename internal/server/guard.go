@@ -118,5 +118,16 @@ func setSecurityHeaders(w http.ResponseWriter) {
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Referrer-Policy", "no-referrer")
 	h.Set("X-Frame-Options", "DENY")
-	h.Set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'; base-uri 'none'")
+	h.Set("Content-Security-Policy", contentSecurityPolicy)
 }
+
+// contentSecurityPolicy locks scripts and every other resource type to our
+// own origin. Inline styles are allowed because xterm.js builds its font,
+// cell-size, colour and selection rules as <style> elements at runtime;
+// blocking them silently breaks terminal rendering. Style injection cannot
+// run script, and script-src stays at 'self'.
+const contentSecurityPolicy = "default-src 'self'; " +
+	"style-src 'self' 'unsafe-inline'; " +
+	"connect-src 'self' ws://127.0.0.1:* ws://localhost:*; " +
+	"img-src 'self' data:; " +
+	"object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"

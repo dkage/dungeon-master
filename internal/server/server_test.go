@@ -174,3 +174,39 @@ func TestWebsocketUpgradeRequiresOrigin(t *testing.T) {
 		t.Fatalf("legitimate upgrade blocked by guard: %d", rec.Code)
 	}
 }
+
+func TestContentSecurityPolicy(t *testing.T) {
+	csp := do(t, "GET", "/", nil).Header().Get("Content-Security-Policy")
+	directives := map[string]string{}
+	for _, d := range strings.Split(csp, ";") {
+		name, val, _ := strings.Cut(strings.TrimSpace(d), " ")
+		directives[name] = val
+	}
+	// Scripts and everything else default to our own origin only.
+	if directives["default-src"] != "'self'" {
+		t.Errorf("default-src %q", directives["default-src"])
+	}
+	if v, ok := directives["script-src"]; ok && strings.Contains(v, "unsafe") {
+		t.Errorf("script-src must not allow unsafe sources: %q", v)
+	}
+	if strings.Contains(directives["default-src"], "unsafe") {
+		t.Error("default-src must not allow unsafe sources")
+	}
+	// xterm.js injects <style> elements; without this the terminal renders
+	// with the wrong font and no selection highlight.
+	if !strings.Contains(directives["style-src"], "'unsafe-inline'") {
+		t.Errorf("style-src must allow inline styles for the terminal: %q", directives["style-src"])
+	}
+	// The terminal websocket must stay reachable, and only on loopback.
+	// ('self' already covers an IPv6 loopback host; bracketed IPv6 sources are
+	// invalid in CSP and make browsers log a warning, so none is listed.)
+	if !strings.Contains(directives["connect-src"], "ws://127.0.0.1:*") ||
+		strings.Contains(directives["connect-src"], "*.") || strings.Contains(directives["connect-src"], "[") {
+		t.Errorf("connect-src %q", directives["connect-src"])
+	}
+	for _, must := range []string{"frame-ancestors", "base-uri", "object-src", "form-action"} {
+		if directives[must] != "'none'" {
+			t.Errorf("%s = %q, want 'none'", must, directives[must])
+		}
+	}
+}
