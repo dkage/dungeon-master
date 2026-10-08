@@ -98,7 +98,7 @@ func TestAddResolvesGitAndDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Name != "api" || c.Remote != "origin" || c.GitRoot != root || c.Repo != "acme/mono" || c.Labels == nil || len(c.Labels) != 0 {
+	if c.Name != "api" || c.Remote != "origin" || c.GitRoot != root || c.Repo != "acme/mono" || c.Scope != nil {
 		t.Fatalf("campaign: %+v", c)
 	}
 	if !strings.HasPrefix(c.ID, "c") || len(c.ID) != 9 {
@@ -141,10 +141,6 @@ func TestAddValidation(t *testing.T) {
 		"control name":  {Dir: dir, Name: "a\x07b"},
 		"flag remote":   {Dir: dir, Remote: "--upload-pack=x"},
 		"spaced remote": {Dir: dir, Remote: "my remote"},
-		"too many":      {Dir: dir, Labels: []string{"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"}},
-		"long label":    {Dir: dir, Labels: []string{strings.Repeat("l", 51)}},
-		"comma label":   {Dir: dir, Labels: []string{"a,b"}},
-		"control label": {Dir: dir, Labels: []string{"a\nb"}},
 	}
 	for name, in := range cases {
 		_, err := r.Add(context.Background(), in)
@@ -158,14 +154,110 @@ func TestAddValidation(t *testing.T) {
 	}
 }
 
-func TestLabelsAreTrimmedAndDeduped(t *testing.T) {
+func TestNewCampaignsHaveNoScopeYet(t *testing.T) {
 	r := newReg(t, "", &fakeGit{})
-	c, err := r.Add(context.Background(), Input{Dir: t.TempDir(), Labels: []string{" area:api ", "", "Area:API", "bug"}})
-	if err != nil {
+	c, _ := r.Add(context.Background(), Input{Dir: t.TempDir()})
+	if c.Scope != nil {
+		t.Fatalf("a campaign must ask the user before showing anything: %+v", c.Scope)
+	}
+}
+
+func TestValidateScope(t *testing.T) {
+	good := map[string]struct {
+		in   Scope
+		want Scope
+	}{
+		"labels trimmed and de-duplicated": {Scope{Mode: ScopeLabels, Labels: []string{" tracked ", "", "Tracked", "bug"}}, Scope{Mode: ScopeLabels, Labels: []string{"tracked", "bug"}}},
+		"assigned":                         {Scope{Mode: ScopeAssigned}, Scope{Mode: ScopeAssigned, Labels: []string{}}},
+		"all":                              {Scope{Mode: ScopeAll, Labels: []string{}}, Scope{Mode: ScopeAll, Labels: []string{}}},
+		"five labels":                      {Scope{Mode: ScopeLabels, Labels: []string{"a", "b", "c", "d", "e"}}, Scope{Mode: ScopeLabels, Labels: []string{"a", "b", "c", "d", "e"}}},
+	}
+	for name, tc := range good {
+		got, err := ValidateScope(tc.in)
+		if err != nil || got.Mode != tc.want.Mode || strings.Join(got.Labels, "|") != strings.Join(tc.want.Labels, "|") || got.Labels == nil {
+			t.Errorf("%s: %+v %v", name, got, err)
+		}
+	}
+	bad := map[string]Scope{
+		"unknown mode":         {Mode: "everything"},
+		"empty mode":           {},
+		"labels mode, none":    {Mode: ScopeLabels},
+		"labels mode, blanks":  {Mode: ScopeLabels, Labels: []string{" ", ""}},
+		"too many labels":      {Mode: ScopeLabels, Labels: []string{"a", "b", "c", "d", "e", "f"}},
+		"long label":           {Mode: ScopeLabels, Labels: []string{strings.Repeat("l", 51)}},
+		"comma in label":       {Mode: ScopeLabels, Labels: []string{"a,b"}},
+		"control char":         {Mode: ScopeLabels, Labels: []string{"a\nb"}},
+		"labels with assigned": {Mode: ScopeAssigned, Labels: []string{"x"}},
+		"labels with all":      {Mode: ScopeAll, Labels: []string{"x"}},
+	}
+	for name, sc := range bad {
+		var ve ValidationError
+		if _, err := ValidateScope(sc); !errors.As(err, &ve) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestScopeIsSetPersistedAndCopied(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.json")
+	r := newReg(t, path, &fakeGit{})
+	c, _ := r.Add(context.Background(), Input{Dir: t.TempDir()})
+	sc := Scope{Mode: ScopeLabels, Labels: []string{"tracked"}}
+	u, err := r.Update(context.Background(), c.ID, Patch{Scope: &sc})
+	if err != nil || u.Scope == nil || u.Scope.Mode != ScopeLabels || u.Scope.Labels[0] != "tracked" {
+		t.Fatalf("%+v %v", u, err)
+	}
+	if got, _ := newReg(t, path, &fakeGit{}).Get(c.ID); got.Scope == nil || got.Scope.Labels[0] != "tracked" {
+		t.Fatalf("scope not persisted: %+v", got)
+	}
+	// What callers get is a copy: changing it must not change the registry.
+	u.Scope.Labels[0] = "mutated"
+	if again, _ := r.Get(c.ID); again.Scope.Labels[0] != "tracked" {
+		t.Fatal("the registry's scope was mutated through a returned value")
+	}
+	// A bad scope is refused and changes nothing.
+	bad := Scope{Mode: "nope"}
+	if _, err := r.Update(context.Background(), c.ID, Patch{Scope: &bad}); err == nil {
+		t.Fatal("bad scope accepted")
+	}
+	if again, _ := r.Get(c.ID); again.Scope.Mode != ScopeLabels {
+		t.Fatalf("rejected update leaked: %+v", again.Scope)
+	}
+	// Other updates leave it alone.
+	name := "x"
+	if u, _ := r.Update(context.Background(), c.ID, Patch{Name: &name}); u.Scope == nil {
+		t.Fatal("unrelated update cleared the scope")
+	}
+}
+
+func TestOldLabelFiltersBecomeAScope(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(t.TempDir(), "campaigns.json")
+	old := `{"version":1,"campaigns":[
+	  {"id":"c1","name":"api","dir":"` + dir + `","remote":"origin","labels":["area:api","Area:API","bug"]},
+	  {"id":"c2","name":"plain","dir":"` + t.TempDir() + `","remote":"origin","labels":[]},
+	  {"id":"c3","name":"bad","dir":"` + t.TempDir() + `","remote":"origin","labels":["a,b"]}
+	]}`
+	if err := os.WriteFile(path, []byte(old), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(c.Labels, "|") != "area:api|bug" {
-		t.Fatalf("labels %q", c.Labels)
+	r := newReg(t, path, &fakeGit{})
+	c1, _ := r.Get("c1")
+	if c1.Scope == nil || c1.Scope.Mode != ScopeLabels || strings.Join(c1.Scope.Labels, "|") != "area:api|bug" {
+		t.Fatalf("c1: %+v", c1.Scope)
+	}
+	if c2, _ := r.Get("c2"); c2.Scope != nil {
+		t.Fatalf("an empty filter must stay unconfigured: %+v", c2.Scope)
+	}
+	if c3, _ := r.Get("c3"); c3.Scope != nil {
+		t.Fatalf("an invalid old filter must not become a scope: %+v", c3.Scope)
+	}
+	// The next save writes the scope and drops the old field for good.
+	name := "api2"
+	r.Update(context.Background(), "c1", Patch{Name: &name})
+	raw, _ := os.ReadFile(path)
+	if strings.Contains(string(raw), `"labels":["area:api"`) || !strings.Contains(string(raw), `"scope"`) {
+		t.Fatalf("file after migration: %s", raw)
 	}
 }
 
@@ -197,7 +289,7 @@ func TestPersistenceRoundTripAndPermissions(t *testing.T) {
 		remotes: map[string]string{dir + "|upstream": "https://github.com/acme/fork-parent.git"},
 	}
 	r := newReg(t, state, g)
-	c, err := r.Add(context.Background(), Input{Dir: dir, Name: "Main", Remote: "upstream", Labels: []string{"area:web"}})
+	c, err := r.Add(context.Background(), Input{Dir: dir, Name: "Main", Remote: "upstream"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +307,7 @@ func TestPersistenceRoundTripAndPermissions(t *testing.T) {
 
 	again := newReg(t, state, g) // reload: derived fields are re-resolved
 	got, ok := again.Get(c.ID)
-	if !ok || got.Name != "Main" || got.Remote != "upstream" || got.Repo != "acme/fork-parent" || got.Labels[0] != "area:web" {
+	if !ok || got.Name != "Main" || got.Remote != "upstream" || got.Repo != "acme/fork-parent" {
 		t.Fatalf("reloaded: %+v ok=%v", got, ok)
 	}
 }
@@ -242,9 +334,9 @@ func TestUpdate(t *testing.T) {
 	if c.Repo != "me/fork" {
 		t.Fatalf("repo %q", c.Repo)
 	}
-	name, remote, labels := "Renamed", "upstream", []string{"bug"}
-	u, err := r.Update(context.Background(), c.ID, Patch{Name: &name, Remote: &remote, Labels: &labels})
-	if err != nil || u.Name != "Renamed" || u.Repo != "acme/real" || u.Labels[0] != "bug" {
+	name, remote := "Renamed", "upstream"
+	u, err := r.Update(context.Background(), c.ID, Patch{Name: &name, Remote: &remote})
+	if err != nil || u.Name != "Renamed" || u.Repo != "acme/real" {
 		t.Fatalf("update: %+v %v", u, err)
 	}
 	// Only the touched field changes.

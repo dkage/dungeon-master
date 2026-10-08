@@ -3,21 +3,33 @@ package quests
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/dkage/dungeon-master/internal/campaign"
 )
 
-// ErrNoRepo means the campaign has no GitHub repository to read issues from.
-var ErrNoRepo = errors.New("quests: this campaign has no GitHub repository")
+var (
+	// ErrNoRepo means the campaign has no GitHub repository to read issues from.
+	ErrNoRepo = errors.New("quests: this campaign has no GitHub repository")
+	// ErrScopeNeeded means the user has not yet chosen which issues to show.
+	ErrScopeNeeded = errors.New("quests: choose which issues to show")
+)
 
 // Result is a campaign's quests plus where they came from.
 type Result struct {
 	// Source is "github" or "demo".
-	Source string  `json:"source"`
-	Repo   string  `json:"repo,omitempty"`
-	Quests []Quest `json:"quests"`
+	Source string `json:"source"`
+	Repo   string `json:"repo,omitempty"`
+	// Scope is which issues were asked for; nil for demo data.
+	Scope  *campaign.Scope `json:"scope,omitempty"`
+	Quests []Quest         `json:"quests"`
+	// TotalOpen is how many issues are open in the whole repository.
+	TotalOpen int `json:"totalOpen"`
+	// Truncated means more issues matched than were fetched: narrow the scope.
+	Truncated bool `json:"truncated"`
 	// FetchedAt is when the data was read from the source.
 	FetchedAt time.Time `json:"fetchedAt"`
 	// Stale is set when a refresh failed and older data is shown instead;
@@ -31,30 +43,42 @@ type Result struct {
 type Service struct {
 	github, demo Source
 	ttl          time.Duration
+	countsTTL    time.Duration
 	minRefresh   time.Duration
 	now          func() time.Time
 
 	mu       sync.Mutex
 	cache    map[string]entry
 	inflight map[string]*call
+	counts   map[string]countsEntry
 }
 
 type entry struct {
-	quests  []Quest
+	listing Listing
+	fetched time.Time
+}
+
+type countsEntry struct {
+	counts  Counts
 	fetched time.Time
 }
 
 type call struct {
-	done   chan struct{}
-	quests []Quest
-	err    error
+	done    chan struct{}
+	listing Listing
+	err     error
 }
+
+// defaultCountsTTL is how long the numbers behind the scope picker are reused.
+const defaultCountsTTL = 5 * time.Minute
 
 // ServiceOptions configures a Service. Zero values pick sensible defaults.
 type ServiceOptions struct {
 	GitHub, Demo Source
 	// TTL is how long a list is served without asking again. Default 60s.
 	TTL time.Duration
+	// CountsTTL is how long the scope picker's numbers are reused. Default 5 minutes.
+	CountsTTL time.Duration
 	// MinRefresh is the shortest gap honoured for an explicit refresh, so a
 	// button cannot hammer GitHub. Default 5s.
 	MinRefresh time.Duration
@@ -66,6 +90,9 @@ func NewService(o ServiceOptions) *Service {
 	if o.TTL == 0 {
 		o.TTL = 60 * time.Second
 	}
+	if o.CountsTTL == 0 {
+		o.CountsTTL = defaultCountsTTL
+	}
 	if o.MinRefresh == 0 {
 		o.MinRefresh = 5 * time.Second
 	}
@@ -73,102 +100,172 @@ func NewService(o ServiceOptions) *Service {
 		o.Now = time.Now
 	}
 	return &Service{
-		github: o.GitHub, demo: o.Demo, ttl: o.TTL, minRefresh: o.MinRefresh, now: o.Now,
-		cache: map[string]entry{}, inflight: map[string]*call{},
+		github: o.GitHub, demo: o.Demo, ttl: o.TTL, countsTTL: o.CountsTTL, minRefresh: o.MinRefresh, now: o.Now,
+		cache: map[string]entry{}, inflight: map[string]*call{}, counts: map[string]countsEntry{},
 	}
 }
 
-// pick returns the source, cache key and repo for a campaign.
-func (s *Service) pick(c campaign.Campaign) (src Source, name, key string, repo Repo, err error) {
+// target is where a campaign's quests come from.
+type target struct {
+	src    Source
+	name   string // "github" or "demo"
+	key    string // cache key
+	repo   Repo
+	scope  campaign.Scope
+	hasRep bool
+}
+
+// pick returns the source, cache key, repo and scope for a campaign.
+func (s *Service) pick(c campaign.Campaign) (target, error) {
 	if c.Demo {
-		return s.demo, "demo", "demo", Repo{}, nil
+		return target{src: s.demo, name: "demo", key: "demo"}, nil
 	}
 	if c.Repo == "" {
-		return nil, "", "", Repo{}, ErrNoRepo
+		return target{}, ErrNoRepo
 	}
-	repo, err = ParseRepo(c.Repo)
+	repo, err := ParseRepo(c.Repo)
 	if err != nil {
-		return nil, "", "", Repo{}, ErrNoRepo
+		return target{}, ErrNoRepo
 	}
-	return s.github, "github", "github:" + c.Repo, repo, nil
+	if c.Scope == nil {
+		return target{}, ErrScopeNeeded
+	}
+	return target{
+		src: s.github, name: "github", repo: repo, scope: *c.Scope, hasRep: true,
+		key: "github:" + c.Repo + "|" + scopeKey(*c.Scope),
+	}, nil
 }
 
-// List returns the campaign's quests, filtered by its labels and sorted.
-// refresh asks for fresh data (rate-limited by MinRefresh).
+// scopeKey identifies a scope for caching: labels are order-insensitive.
+func scopeKey(sc campaign.Scope) string {
+	labels := make([]string, 0, len(sc.Labels))
+	for _, l := range sc.Labels {
+		labels = append(labels, strings.ToLower(l))
+	}
+	slices.Sort(labels)
+	return sc.Mode + ":" + strings.Join(labels, ",")
+}
+
+// List returns the campaign's quests inside its scope, sorted. refresh asks
+// for fresh data (rate-limited by MinRefresh).
 func (s *Service) List(ctx context.Context, c campaign.Campaign, refresh bool) (Result, error) {
-	src, name, key, repo, err := s.pick(c)
+	t, err := s.pick(c)
 	if err != nil {
 		return Result{}, err
 	}
 	now := s.now()
 	s.mu.Lock()
-	cached, have := s.cache[key]
+	cached, have := s.cache[t.key]
 	age := now.Sub(cached.fetched)
 	if have && ((!refresh && age < s.ttl) || (refresh && age < s.minRefresh)) {
 		s.mu.Unlock()
-		return s.result(name, c, cached, false, ""), nil
+		return s.result(t, c, cached, false, ""), nil
 	}
 	s.mu.Unlock()
 
-	qs, ferr := s.fetch(ctx, key, src, repo)
+	l, ferr := s.fetch(ctx, t)
 	if ferr != nil {
 		if have {
-			return s.result(name, c, cached, true, ferr.Error()), nil
+			return s.result(t, c, cached, true, ferr.Error()), nil
 		}
 		return Result{}, ferr
 	}
-	e := entry{quests: qs, fetched: s.now()}
+	e := entry{listing: l, fetched: s.now()}
 	s.mu.Lock()
-	s.cache[key] = e
+	s.cache[t.key] = e
 	s.mu.Unlock()
-	return s.result(name, c, e, false, ""), nil
+	return s.result(t, c, e, false, ""), nil
 }
 
 // fetch runs one source call per key at a time; concurrent callers share it.
-func (s *Service) fetch(ctx context.Context, key string, src Source, repo Repo) ([]Quest, error) {
+func (s *Service) fetch(ctx context.Context, t target) (Listing, error) {
 	s.mu.Lock()
-	if cl, ok := s.inflight[key]; ok {
+	if cl, ok := s.inflight[t.key]; ok {
 		s.mu.Unlock()
 		select {
 		case <-cl.done:
-			return cl.quests, cl.err
+			return cl.listing, cl.err
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return Listing{}, ctx.Err()
 		}
 	}
 	cl := &call{done: make(chan struct{})}
-	s.inflight[key] = cl
+	s.inflight[t.key] = cl
 	s.mu.Unlock()
 
 	// The shared fetch must not die with one caller's request, so it gets its
 	// own bounded context.
 	fctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer cancel()
-	cl.quests, cl.err = src.List(fctx, repo)
+	cl.listing, cl.err = t.src.List(fctx, t.repo, t.scope)
 
 	s.mu.Lock()
-	delete(s.inflight, key)
+	delete(s.inflight, t.key)
 	s.mu.Unlock()
 	close(cl.done)
-	return cl.quests, cl.err
+	return cl.listing, cl.err
 }
 
-func (s *Service) result(source string, c campaign.Campaign, e entry, stale bool, warning string) Result {
-	qs := FilterLabels(append([]Quest(nil), e.quests...), c.Labels)
+func (s *Service) result(t target, c campaign.Campaign, e entry, stale bool, warning string) Result {
+	qs := append([]Quest(nil), e.listing.Quests...)
 	Sort(qs)
-	repo := c.Repo
-	if source == "demo" {
-		repo = ""
+	r := Result{
+		Source: t.name, Quests: qs, TotalOpen: e.listing.TotalOpen, Truncated: e.listing.Truncated,
+		FetchedAt: e.fetched, Stale: stale, Warning: warning,
 	}
-	return Result{Source: source, Repo: repo, Quests: qs, FetchedAt: e.fetched, Stale: stale, Warning: warning}
+	if t.name == "github" {
+		r.Repo = c.Repo
+		sc := t.scope
+		r.Scope = &sc
+	}
+	return r
+}
+
+// Counts returns what each scope choice would show, for the first-connection
+// question. It does not need a scope, and is reused for a few minutes.
+func (s *Service) Counts(ctx context.Context, c campaign.Campaign) (Counts, error) {
+	src, repo, key := Source(s.demo), Repo{}, "demo"
+	if !c.Demo {
+		if c.Repo == "" {
+			return Counts{}, ErrNoRepo
+		}
+		r, err := ParseRepo(c.Repo)
+		if err != nil {
+			return Counts{}, ErrNoRepo
+		}
+		src, repo, key = s.github, r, "github:"+c.Repo
+	}
+	now := s.now()
+	s.mu.Lock()
+	if e, ok := s.counts[key]; ok && now.Sub(e.fetched) < s.countsTTL {
+		s.mu.Unlock()
+		return e.counts, nil
+	}
+	s.mu.Unlock()
+	counts, err := src.Counts(ctx, repo)
+	if err != nil {
+		return Counts{}, err
+	}
+	s.mu.Lock()
+	s.counts[key] = countsEntry{counts: counts, fetched: s.now()}
+	s.mu.Unlock()
+	return counts, nil
 }
 
 // Detail returns one quest in full. It is not cached: opening an issue is a
 // deliberate act and costs a single request.
 func (s *Service) Detail(ctx context.Context, c campaign.Campaign, number int) (Detail, error) {
-	src, _, _, repo, err := s.pick(c)
-	if err != nil {
+	t, err := s.pick(c)
+	if err != nil && !errors.Is(err, ErrScopeNeeded) {
 		return Detail{}, err
 	}
-	return src.Get(ctx, repo, number)
+	if t.src == nil {
+		// Opening one issue needs no scope: the repository is enough.
+		repo, perr := ParseRepo(c.Repo)
+		if perr != nil {
+			return Detail{}, ErrNoRepo
+		}
+		return s.github.Get(ctx, repo, number)
+	}
+	return t.src.Get(ctx, t.repo, number)
 }

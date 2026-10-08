@@ -36,11 +36,13 @@ func (e ValidationError) Error() string { return string(e) }
 
 // Campaign is a registered directory plus what was learned from git.
 type Campaign struct {
-	ID     string   `json:"id"`
-	Name   string   `json:"name"`
-	Dir    string   `json:"dir"`
-	Remote string   `json:"remote"`
-	Labels []string `json:"labels"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Dir    string `json:"dir"`
+	Remote string `json:"remote"`
+	// Scope says which of the repository's issues the panel shows. Nil until
+	// the user has chosen one (the first-connection question).
+	Scope *Scope `json:"scope"`
 	// Demo shows built-in sample quests instead of GitHub issues.
 	Demo bool `json:"demo"`
 	// Derived from git on registration and update; empty when the directory
@@ -49,28 +51,49 @@ type Campaign struct {
 	Repo    string `json:"repo,omitempty"` // "owner/repo"
 }
 
+// Scope modes.
+const (
+	// ScopeLabels shows issues carrying any of the chosen labels.
+	ScopeLabels = "labels"
+	// ScopeAssigned shows open issues assigned to the signed-in GitHub user.
+	ScopeAssigned = "assigned"
+	// ScopeAll shows every issue, paged and capped.
+	ScopeAll = "all"
+)
+
+// MaxScopeLabels bounds the labels of a scope: each one is a separate query.
+const MaxScopeLabels = 5
+
+// Scope is which issues a campaign shows.
+type Scope struct {
+	Mode   string   `json:"mode"`
+	Labels []string `json:"labels"`
+}
+
 // Input registers a campaign.
 type Input struct {
 	Dir    string
 	Name   string
 	Remote string
-	Labels []string
 }
 
 // Patch changes a campaign; nil fields are left alone.
 type Patch struct {
 	Name   *string
 	Remote *string
-	Labels *[]string
+	Scope  *Scope
 	Demo   *bool
 }
 
 type record struct {
-	ID     string    `json:"id"`
-	Name   string    `json:"name"`
-	Dir    string    `json:"dir"`
-	Remote string    `json:"remote"`
-	Labels []string  `json:"labels"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Dir    string `json:"dir"`
+	Remote string `json:"remote"`
+	// Labels is the old campaign-level label filter, read once and turned into
+	// a scope on load; never written again.
+	Labels []string  `json:"labels,omitempty"`
+	Scope  *Scope    `json:"scope,omitempty"`
 	Demo   bool      `json:"demo,omitempty"`
 	Added  time.Time `json:"added"`
 }
@@ -114,10 +137,22 @@ func Open(ctx context.Context, path string, git Git) (*Registry, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	r.records = f.Campaigns
-	for _, rec := range r.records {
-		r.derived[rec.ID] = r.resolve(ctx, rec)
+	for i := range r.records {
+		migrate(&r.records[i])
+		r.derived[r.records[i].ID] = r.resolve(ctx, r.records[i])
 	}
 	return r, nil
+}
+
+// migrate turns the old campaign-level label filter into a scope. Nothing is
+// written until the next change, and then only the scope.
+func migrate(rec *record) {
+	if rec.Scope == nil && len(rec.Labels) > 0 {
+		if sc, err := ValidateScope(Scope{Mode: ScopeLabels, Labels: rec.Labels}); err == nil {
+			rec.Scope = &sc
+		}
+	}
+	rec.Labels = nil
 }
 
 // List returns campaigns in registration order.
@@ -160,15 +195,11 @@ func (r *Registry) Add(ctx context.Context, in Input) (Campaign, error) {
 	if err != nil {
 		return Campaign{}, err
 	}
-	labels, err := checkLabels(in.Labels)
-	if err != nil {
-		return Campaign{}, err
-	}
 	id, err := newID()
 	if err != nil {
 		return Campaign{}, err
 	}
-	rec := record{ID: id, Name: name, Dir: dir, Remote: remote, Labels: labels, Added: time.Now().UTC()}
+	rec := record{ID: id, Name: name, Dir: dir, Remote: remote, Added: time.Now().UTC()}
 	d := r.resolve(ctx, rec)
 
 	r.mu.Lock()
@@ -188,7 +219,7 @@ func (r *Registry) Add(ctx context.Context, in Input) (Campaign, error) {
 	return r.view(rec), nil
 }
 
-// Update changes name, remote, labels or the demo flag, re-reading git when the remote
+// Update changes name, remote, scope or the demo flag, re-reading git when the remote
 // changes.
 func (r *Registry) Update(ctx context.Context, id string, p Patch) (Campaign, error) {
 	r.mu.Lock()
@@ -222,12 +253,12 @@ func (r *Registry) Update(ctx context.Context, id string, p Patch) (Campaign, er
 		}
 		rec.Remote = rm
 	}
-	if p.Labels != nil {
-		ls, err := checkLabels(*p.Labels)
+	if p.Scope != nil {
+		sc, err := ValidateScope(*p.Scope)
 		if err != nil {
 			return Campaign{}, err
 		}
-		rec.Labels = ls
+		rec.Scope = &sc
 	}
 	if p.Demo != nil {
 		rec.Demo = *p.Demo
@@ -272,12 +303,14 @@ func (r *Registry) Remove(id string) (bool, error) {
 
 func (r *Registry) view(rec record) Campaign {
 	d := r.derived[rec.ID]
-	labels := rec.Labels
-	if labels == nil {
-		labels = []string{}
+	var scope *Scope
+	if rec.Scope != nil {
+		sc := *rec.Scope
+		sc.Labels = append([]string{}, sc.Labels...)
+		scope = &sc
 	}
 	return Campaign{
-		ID: rec.ID, Name: rec.Name, Dir: rec.Dir, Remote: rec.Remote, Labels: labels, Demo: rec.Demo,
+		ID: rec.ID, Name: rec.Name, Dir: rec.Dir, Remote: rec.Remote, Scope: scope, Demo: rec.Demo,
 		GitRoot: d.gitRoot, Repo: d.repo,
 	}
 }
@@ -356,6 +389,31 @@ func checkRemote(n string) (string, error) {
 		return "", ValidationError("remote must be a plain remote name such as origin")
 	}
 	return n, nil
+}
+
+// ValidateScope checks a scope and returns it cleaned: labels trimmed and
+// de-duplicated, and present only in labels mode.
+func ValidateScope(sc Scope) (Scope, error) {
+	switch sc.Mode {
+	case ScopeLabels:
+		labels, err := checkLabels(sc.Labels)
+		if err != nil {
+			return Scope{}, err
+		}
+		if len(labels) == 0 {
+			return Scope{}, ValidationError("choose at least one label")
+		}
+		if len(labels) > MaxScopeLabels {
+			return Scope{}, ValidationError(fmt.Sprintf("at most %d labels", MaxScopeLabels))
+		}
+		return Scope{Mode: ScopeLabels, Labels: labels}, nil
+	case ScopeAssigned, ScopeAll:
+		if len(sc.Labels) > 0 {
+			return Scope{}, ValidationError("labels only apply when showing issues by label")
+		}
+		return Scope{Mode: sc.Mode, Labels: []string{}}, nil
+	}
+	return Scope{}, ValidationError("scope mode must be labels, assigned or all")
 }
 
 func checkLabels(in []string) ([]string, error) {

@@ -14,8 +14,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/quartermaster"
 	"github.com/dkage/dungeon-master/internal/quests"
 )
@@ -25,10 +27,12 @@ const (
 	DefaultEndpoint = "https://api.github.com/graphql"
 
 	pageSize      = 100
-	maxOpenPages  = 3 // at most 300 open issues
-	closedRecent  = 50
+	maxOpenPages  = 3  // at most 300 open issues per query
+	closedAll     = 50 // recently closed issues shown when everything is in scope
+	closedScoped  = 20 // ... and when a label or assignee narrows it
 	maxResponse   = 8 << 20
 	tokenLifetime = 5 * time.Minute
+	loginLifetime = 10 * time.Minute
 )
 
 // Options configures a Client.
@@ -49,6 +53,10 @@ type Client struct {
 	token    *cached
 	now      func() time.Time
 	onLimit  func(reset time.Time)
+
+	loginMu    sync.Mutex
+	loginName  string
+	loginUntil time.Time
 }
 
 var _ quests.Source = (*Client)(nil)
@@ -76,10 +84,14 @@ func New(o Options) *Client {
 	}
 }
 
+// listQuery reads one page of issues. The scope is part of the query: $labels
+// and $filter narrow it on GitHub's side, so nothing is cut before filtering.
+// `total` is the number of open issues in the whole repository.
 const listQuery = `
-query($owner:String!,$name:String!,$states:[IssueState!],$first:Int!,$after:String){
+query($owner:String!,$name:String!,$states:[IssueState!],$first:Int!,$after:String,$labels:[String!],$filter:IssueFilters){
   repository(owner:$owner,name:$name){
-    issues(first:$first, after:$after, states:$states, orderBy:{field:UPDATED_AT,direction:DESC}){
+    total: issues(states:OPEN, first:1){totalCount}
+    issues(first:$first, after:$after, states:$states, labels:$labels, filterBy:$filter, orderBy:{field:UPDATED_AT,direction:DESC}){
       pageInfo{hasNextPage endCursor}
       nodes{
         number title state stateReason url updatedAt
@@ -95,6 +107,22 @@ query($owner:String!,$name:String!,$states:[IssueState!],$first:Int!,$after:Stri
     }
   }
 }`
+
+// countsQuery reads what each scope choice would show. The marker label is
+// asked for by name so it is found even in a repository with over 100 labels.
+const countsQuery = `
+query($owner:String!,$name:String!,$login:String!,$marker:String!){
+  repository(owner:$owner,name:$name){
+    total: issues(states:OPEN, first:1){totalCount}
+    assigned: issues(states:OPEN, first:1, filterBy:{assignee:$login}){totalCount}
+    marker: label(name:$marker){name color issues(states:OPEN, first:1){totalCount}}
+    labels(first:100, orderBy:{field:NAME,direction:ASC}){
+      nodes{name color issues(states:OPEN, first:1){totalCount}}
+    }
+  }
+}`
+
+const viewerQuery = `query{viewer{login}}`
 
 const detailQuery = `
 query($owner:String!,$name:String!,$number:Int!){
@@ -166,6 +194,9 @@ type issueNode struct {
 
 type listData struct {
 	Repository *struct {
+		Total struct {
+			TotalCount int `json:"totalCount"`
+		} `json:"total"`
 		Issues struct {
 			PageInfo struct {
 				HasNextPage bool   `json:"hasNextPage"`
@@ -182,40 +213,88 @@ type detailData struct {
 	} `json:"repository"`
 }
 
-// List returns open issues (up to 300) and the most recently updated closed
-// ones, already finished (state derived).
-func (c *Client) List(ctx context.Context, repo quests.Repo) ([]quests.Quest, error) {
-	var out []quests.Quest
+// List returns the issues inside the scope: open ones (up to 300 per query)
+// plus the most recently closed. Labels are queried one at a time and merged,
+// because GitHub ANDs a list of labels.
+func (c *Client) List(ctx context.Context, repo quests.Repo, scope campaign.Scope) (quests.Listing, error) {
+	switch scope.Mode {
+	case campaign.ScopeLabels:
+		if len(scope.Labels) == 0 {
+			return quests.Listing{}, errors.New("quests: no labels in the scope")
+		}
+		var out quests.Listing
+		seen := map[int]bool{}
+		for _, label := range scope.Labels {
+			part, err := c.collect(ctx, repo, []string{label}, "", closedScoped)
+			if err != nil {
+				return quests.Listing{}, err
+			}
+			out.TotalOpen = part.TotalOpen
+			out.Truncated = out.Truncated || part.Truncated
+			for _, q := range part.Quests {
+				if !seen[q.Number] {
+					seen[q.Number] = true
+					out.Quests = append(out.Quests, q)
+				}
+			}
+		}
+		return out, nil
+	case campaign.ScopeAssigned:
+		login, err := c.login(ctx)
+		if err != nil {
+			return quests.Listing{}, err
+		}
+		return c.collect(ctx, repo, nil, login, closedScoped)
+	case campaign.ScopeAll:
+		return c.collect(ctx, repo, nil, "", closedAll)
+	}
+	return quests.Listing{}, fmt.Errorf("quests: unknown scope %q", scope.Mode)
+}
+
+// collect reads one query's worth: open pages, then recently closed.
+func (c *Client) collect(ctx context.Context, repo quests.Repo, labels []string, assignee string, closed int) (quests.Listing, error) {
+	var out quests.Listing
 	var after string
 	for page := 0; page < maxOpenPages; page++ {
-		got, next, err := c.listPage(ctx, repo, []string{"OPEN"}, pageSize, after)
+		got, total, next, err := c.listPage(ctx, repo, []string{"OPEN"}, pageSize, after, labels, assignee)
 		if err != nil {
-			return nil, err
+			return quests.Listing{}, err
 		}
-		out = append(out, got...)
+		out.Quests = append(out.Quests, got...)
+		out.TotalOpen = total
 		if next == "" {
 			break
 		}
+		if page == maxOpenPages-1 {
+			out.Truncated = true // more matched than we are willing to fetch
+		}
 		after = next
 	}
-	closed, _, err := c.listPage(ctx, repo, []string{"CLOSED"}, closedRecent, "")
+	recent, _, _, err := c.listPage(ctx, repo, []string{"CLOSED"}, closed, "", labels, assignee)
 	if err != nil {
-		return nil, err
+		return quests.Listing{}, err
 	}
-	return append(out, closed...), nil
+	out.Quests = append(out.Quests, recent...)
+	return out, nil
 }
 
-func (c *Client) listPage(ctx context.Context, repo quests.Repo, states []string, first int, after string) ([]quests.Quest, string, error) {
+func (c *Client) listPage(ctx context.Context, repo quests.Repo, states []string, first int, after string, labels []string, assignee string) ([]quests.Quest, int, string, error) {
 	vars := map[string]any{"owner": repo.Owner, "name": repo.Name, "states": states, "first": first}
 	if after != "" {
 		vars["after"] = after
 	}
+	if len(labels) > 0 {
+		vars["labels"] = labels
+	}
+	if assignee != "" {
+		vars["filter"] = map[string]any{"assignee": assignee}
+	}
 	var data listData
 	if err := c.do(ctx, listQuery, vars, &data); err != nil {
-		return nil, "", err
+		return nil, 0, "", err
 	}
 	if data.Repository == nil {
-		return nil, "", quests.ErrNotFound
+		return nil, 0, "", quests.ErrNotFound
 	}
 	conn := data.Repository.Issues
 	qs := make([]quests.Quest, 0, len(conn.Nodes))
@@ -226,7 +305,84 @@ func (c *Client) listPage(ctx context.Context, repo quests.Repo, states []string
 	if conn.PageInfo.HasNextPage {
 		next = conn.PageInfo.EndCursor
 	}
-	return qs, next, nil
+	return qs, data.Repository.Total.TotalCount, next, nil
+}
+
+// login returns the GitHub user the token belongs to, remembered for a while.
+func (c *Client) login(ctx context.Context) (string, error) {
+	c.loginMu.Lock()
+	defer c.loginMu.Unlock()
+	if c.loginName != "" && c.now().Before(c.loginUntil) {
+		return c.loginName, nil
+	}
+	var data struct {
+		Viewer struct {
+			Login string `json:"login"`
+		} `json:"viewer"`
+	}
+	if err := c.do(ctx, viewerQuery, nil, &data); err != nil {
+		return "", err
+	}
+	if data.Viewer.Login == "" {
+		return "", quests.ErrUnauthorized
+	}
+	c.loginName, c.loginUntil = data.Viewer.Login, c.now().Add(loginLifetime)
+	return c.loginName, nil
+}
+
+// Counts returns how many open issues each scope choice would show.
+func (c *Client) Counts(ctx context.Context, repo quests.Repo) (quests.Counts, error) {
+	login, err := c.login(ctx)
+	if err != nil {
+		return quests.Counts{}, err
+	}
+	var data struct {
+		Repository *struct {
+			Total    struct{ TotalCount int } `json:"total"`
+			Assigned struct{ TotalCount int } `json:"assigned"`
+			Marker   *labelNode               `json:"marker"`
+			Labels   struct {
+				Nodes []labelNode `json:"nodes"`
+			} `json:"labels"`
+		} `json:"repository"`
+	}
+	vars := map[string]any{"owner": repo.Owner, "name": repo.Name, "login": login, "marker": quests.MarkerLabel}
+	if err := c.do(ctx, countsQuery, vars, &data); err != nil {
+		return quests.Counts{}, err
+	}
+	if data.Repository == nil {
+		return quests.Counts{}, quests.ErrNotFound
+	}
+	out := quests.Counts{
+		OpenTotal: data.Repository.Total.TotalCount, Assigned: data.Repository.Assigned.TotalCount,
+		Login: login, Labels: []quests.LabelCount{},
+	}
+	seen := map[string]bool{}
+	add := func(l labelNode) {
+		if !seen[l.Name] {
+			seen[l.Name] = true
+			out.Labels = append(out.Labels, quests.LabelCount{Name: l.Name, Color: l.Color, Open: l.Issues.TotalCount})
+		}
+	}
+	// The marker is always offered, even with nothing in it yet or beyond the first 100 labels.
+	if m := data.Repository.Marker; m != nil {
+		add(*m)
+	} else {
+		seen[quests.MarkerLabel] = true
+		out.Labels = append(out.Labels, quests.LabelCount{Name: quests.MarkerLabel, Open: 0})
+	}
+	for _, l := range data.Repository.Labels.Nodes {
+		add(l)
+	}
+	return out, nil
+}
+
+type labelNode struct {
+	Name   string `json:"name"`
+	Color  string `json:"color"`
+	Issues struct {
+		TotalCount int `json:"totalCount"`
+	} `json:"issues"`
 }
 
 // Get returns one issue with its body, comments and relations.

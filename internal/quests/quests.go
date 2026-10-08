@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/dkage/dungeon-master/internal/campaign"
 )
 
 // State is a quest's derived state. It is computed from the issue, never
@@ -101,10 +103,44 @@ type Detail struct {
 	CommentList []Comment `json:"commentList"`
 }
 
+// MarkerLabel is the default label that marks an issue as part of the work
+// done here. It is a plain, neutral GitHub label; the scope picker suggests it.
+const MarkerLabel = "tracked"
+
+// Listing is what a source returns for a scope.
+type Listing struct {
+	Quests []Quest
+	// TotalOpen is how many issues are open in the whole repository, whatever
+	// the scope, so the panel can say "14 of 312 open".
+	TotalOpen int
+	// Truncated means more issues matched than were fetched.
+	Truncated bool
+}
+
+// LabelCount is a label with how many open issues carry it.
+type LabelCount struct {
+	Name  string `json:"name"`
+	Color string `json:"color,omitempty"`
+	Open  int    `json:"open"`
+}
+
+// Counts are the numbers behind the first-connection question: how many
+// issues each choice would show.
+type Counts struct {
+	OpenTotal int          `json:"openTotal"`
+	Assigned  int          `json:"assigned"`
+	Login     string       `json:"login,omitempty"`
+	Labels    []LabelCount `json:"labels"`
+}
+
 // Source supplies quests for a repository.
 type Source interface {
-	List(ctx context.Context, repo Repo) ([]Quest, error)
+	// List returns the quests inside the scope. The scope is part of the
+	// query, never applied to a truncated list afterwards.
+	List(ctx context.Context, repo Repo, scope campaign.Scope) (Listing, error)
 	Get(ctx context.Context, repo Repo, number int) (Detail, error)
+	// Counts returns what each scope choice would show.
+	Counts(ctx context.Context, repo Repo) (Counts, error)
 }
 
 var (
@@ -175,28 +211,6 @@ func Finish(q Quest) Quest {
 	}
 	q.State = Derive(q)
 	return q
-}
-
-// FilterLabels keeps quests that carry at least one of the labels
-// (case-insensitive). No labels means no filtering.
-func FilterLabels(qs []Quest, labels []string) []Quest {
-	if len(labels) == 0 {
-		return qs
-	}
-	want := map[string]bool{}
-	for _, l := range labels {
-		want[strings.ToLower(l)] = true
-	}
-	out := make([]Quest, 0, len(qs))
-	for _, q := range qs {
-		for _, l := range q.Labels {
-			if want[strings.ToLower(l.Name)] {
-				out = append(out, q)
-				break
-			}
-		}
-	}
-	return out
 }
 
 // Sort orders quests for display: open work first (frontier, then claimed,

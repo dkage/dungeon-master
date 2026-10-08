@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/quartermaster"
 	"github.com/dkage/dungeon-master/internal/quests"
 )
@@ -30,6 +31,39 @@ func (s *Server) handleQuests(w http.ResponseWriter, r *http.Request) {
 		res.Quests = []quests.Quest{}
 	}
 	writeJSON(w, http.StatusOK, res)
+}
+
+// handleScopeSet stores which issues a campaign shows.
+func (s *Server) handleScopeSet(w http.ResponseWriter, r *http.Request) {
+	var sc campaign.Scope
+	if !decode(w, r, &sc) {
+		return
+	}
+	c, err := s.cfg.Campaigns.Update(r.Context(), r.PathValue("id"), campaign.Patch{Scope: &sc})
+	if err != nil {
+		campaignErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
+}
+
+// handleScopeOptions returns what each choice of scope would show, for the
+// question asked when a campaign first connects to a repository.
+func (s *Server) handleScopeOptions(w http.ResponseWriter, r *http.Request) {
+	c, ok := s.cfg.Campaigns.Get(r.PathValue("id"))
+	if !ok {
+		httpErr(w, http.StatusNotFound, "no such campaign")
+		return
+	}
+	counts, err := s.cfg.Quests.Counts(r.Context(), c)
+	if err != nil {
+		questsErr(w, err, c.Repo)
+		return
+	}
+	if counts.Labels == nil {
+		counts.Labels = []quests.LabelCount{}
+	}
+	writeJSON(w, http.StatusOK, counts)
 }
 
 func (s *Server) handleQuest(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +98,8 @@ func questsErr(w http.ResponseWriter, err error, repo string) {
 	case errors.Is(err, quests.ErrNoRepo):
 		httpErrCode(w, http.StatusConflict, "no_repo",
 			"This campaign has no GitHub repository. Give the project a remote named origin that points at github.com, or load the demo quests.")
+	case errors.Is(err, quests.ErrScopeNeeded):
+		httpErrCode(w, http.StatusConflict, "scope_needed", "Choose which of this repository's issues to show.")
 	case errors.Is(err, quests.ErrNoToken):
 		httpErrCode(w, http.StatusServiceUnavailable, "no_token",
 			"No GitHub credentials found. Run `gh auth login` (or set GH_TOKEN), then refresh.")

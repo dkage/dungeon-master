@@ -29,6 +29,8 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/campaigns", s.handleCampaignAdd)
 	mux.HandleFunc("PATCH /api/campaigns/{id}", s.handleCampaignUpdate)
 	mux.HandleFunc("DELETE /api/campaigns/{id}", s.handleCampaignRemove)
+	mux.HandleFunc("PUT /api/campaigns/{id}/scope", s.handleScopeSet)
+	mux.HandleFunc("GET /api/campaigns/{id}/scope/options", s.handleScopeOptions)
 	mux.HandleFunc("GET /api/campaigns/{id}/quests", s.handleQuests)
 	mux.HandleFunc("GET /api/campaigns/{id}/quests/{number}", s.handleQuest)
 
@@ -109,10 +111,9 @@ func (s *Server) handleState(w http.ResponseWriter, _ *http.Request) {
 // --- campaigns ---
 
 type campaignReq struct {
-	Dir    string   `json:"dir"`
-	Name   string   `json:"name"`
-	Remote string   `json:"remote"`
-	Labels []string `json:"labels"`
+	Dir    string `json:"dir"`
+	Name   string `json:"name"`
+	Remote string `json:"remote"`
 }
 
 func (s *Server) handleCampaignAdd(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +122,7 @@ func (s *Server) handleCampaignAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, err := s.cfg.Campaigns.Add(r.Context(), campaign.Input{
-		Dir: req.Dir, Name: req.Name, Remote: req.Remote, Labels: req.Labels,
+		Dir: req.Dir, Name: req.Name, Remote: req.Remote,
 	})
 	if err != nil {
 		campaignErr(w, err)
@@ -132,16 +133,16 @@ func (s *Server) handleCampaignAdd(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCampaignUpdate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name   *string   `json:"name"`
-		Remote *string   `json:"remote"`
-		Labels *[]string `json:"labels"`
-		Demo   *bool     `json:"demo"`
+		Name   *string         `json:"name"`
+		Remote *string         `json:"remote"`
+		Scope  *campaign.Scope `json:"scope"`
+		Demo   *bool           `json:"demo"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
 	c, err := s.cfg.Campaigns.Update(r.Context(), r.PathValue("id"), campaign.Patch{
-		Name: req.Name, Remote: req.Remote, Labels: req.Labels, Demo: req.Demo,
+		Name: req.Name, Remote: req.Remote, Scope: req.Scope, Demo: req.Demo,
 	})
 	if err != nil {
 		campaignErr(w, err)

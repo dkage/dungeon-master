@@ -237,8 +237,12 @@ func isLoopbackHost(h string) bool {
 // noGitHub is the GitHub source of a server started without one.
 type noGitHub struct{}
 
-func (noGitHub) List(context.Context, quests.Repo) ([]quests.Quest, error) {
-	return nil, quests.ErrNoToken
+func (noGitHub) List(context.Context, quests.Repo, campaign.Scope) (quests.Listing, error) {
+	return quests.Listing{}, quests.ErrNoToken
+}
+
+func (noGitHub) Counts(context.Context, quests.Repo) (quests.Counts, error) {
+	return quests.Counts{}, quests.ErrNoToken
 }
 
 func (noGitHub) Get(context.Context, quests.Repo, int) (quests.Detail, error) {

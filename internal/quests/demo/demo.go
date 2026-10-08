@@ -4,9 +4,11 @@ package demo
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"time"
 
+	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/quests"
 )
 
@@ -128,9 +130,41 @@ var colors = map[string]string{
 	"question": "d876e3", "docs": "0075ca", "research": "fbca04", "chore": "ededed",
 }
 
-// List returns every sample quest, regardless of repo.
-func (s *Source) List(_ context.Context, _ quests.Repo) ([]quests.Quest, error) {
-	return s.quests(), nil
+// List returns every sample quest, regardless of repo and scope.
+func (s *Source) List(_ context.Context, _ quests.Repo, _ campaign.Scope) (quests.Listing, error) {
+	qs := s.quests()
+	open := 0
+	for _, q := range qs {
+		if !q.Closed {
+			open++
+		}
+	}
+	return quests.Listing{Quests: qs, TotalOpen: open}, nil
+}
+
+// Counts describes the sample data.
+func (s *Source) Counts(_ context.Context, _ quests.Repo) (quests.Counts, error) {
+	c := quests.Counts{Login: "alice", Labels: []quests.LabelCount{}}
+	byLabel := map[string]int{}
+	for _, it := range items {
+		if it.closed {
+			continue
+		}
+		c.OpenTotal++
+		for _, a := range it.assignees {
+			if a == "alice" {
+				c.Assigned++
+			}
+		}
+		for _, l := range it.labels {
+			byLabel[l]++
+		}
+	}
+	for name, n := range byLabel {
+		c.Labels = append(c.Labels, quests.LabelCount{Name: name, Color: colors[name], Open: n})
+	}
+	sort.Slice(c.Labels, func(i, j int) bool { return c.Labels[i].Name < c.Labels[j].Name })
+	return c, nil
 }
 
 // Get returns one sample quest with its body, comments and relations.

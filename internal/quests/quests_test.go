@@ -48,26 +48,6 @@ func TestFinishSetsStateAndNonNilSlices(t *testing.T) {
 	}
 }
 
-func TestFilterLabels(t *testing.T) {
-	qs := []Quest{
-		{Number: 1, Labels: []Label{{Name: "area:api"}}},
-		{Number: 2, Labels: []Label{{Name: "Area:Web"}, {Name: "bug"}}},
-		{Number: 3},
-	}
-	if got := FilterLabels(qs, nil); len(got) != 3 {
-		t.Fatalf("no filter: %d", len(got))
-	}
-	if got := FilterLabels(qs, []string{"area:api"}); len(got) != 1 || got[0].Number != 1 {
-		t.Fatalf("one label: %+v", got)
-	}
-	if got := FilterLabels(qs, []string{"AREA:WEB", "area:api"}); len(got) != 2 {
-		t.Fatalf("any-of, case-insensitive: %+v", got)
-	}
-	if got := FilterLabels(qs, []string{"nope"}); len(got) != 0 {
-		t.Fatalf("no match: %+v", got)
-	}
-}
-
 func TestSortOrder(t *testing.T) {
 	now := time.Now()
 	qs := []Quest{

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/quests"
 )
 
@@ -13,12 +14,12 @@ var fixed = func() time.Time { return time.Date(2026, 10, 8, 12, 0, 0, 0, time.U
 
 func list(t *testing.T) map[int]quests.Quest {
 	t.Helper()
-	qs, err := (&Source{Now: fixed}).List(context.Background(), quests.Repo{})
+	l, err := (&Source{Now: fixed}).List(context.Background(), quests.Repo{}, campaign.Scope{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := map[int]quests.Quest{}
-	for _, q := range qs {
+	for _, q := range l.Quests {
 		m[q.Number] = q
 	}
 	return m
@@ -101,10 +102,38 @@ func TestDemoDetail(t *testing.T) {
 func TestDemoTimesFollowTheClock(t *testing.T) {
 	a := list(t)
 	later := &Source{Now: func() time.Time { return fixed().Add(48 * time.Hour) }}
-	qs, _ := later.List(context.Background(), quests.Repo{})
-	for _, q := range qs {
+	l2, _ := later.List(context.Background(), quests.Repo{}, campaign.Scope{})
+	for _, q := range l2.Quests {
 		if q.Number == 6 && !q.Updated.After(a[6].Updated) {
 			t.Fatal("updated time did not move with the clock")
+		}
+	}
+}
+
+func TestDemoTotalsAndCounts(t *testing.T) {
+	s := &Source{Now: fixed}
+	l, _ := s.List(context.Background(), quests.Repo{}, campaign.Scope{Mode: campaign.ScopeAssigned})
+	open := 0
+	for _, q := range l.Quests {
+		if !q.Closed {
+			open++
+		}
+	}
+	if l.TotalOpen != open || l.TotalOpen == 0 || l.Truncated {
+		t.Fatalf("totals: %+v", l)
+	}
+	c, err := s.Counts(context.Background(), quests.Repo{})
+	if err != nil || c.OpenTotal != l.TotalOpen || c.Assigned != 1 || c.Login != "alice" || len(c.Labels) < 4 {
+		t.Fatalf("counts: %+v %v", c, err)
+	}
+	for i := 1; i < len(c.Labels); i++ {
+		if c.Labels[i-1].Name >= c.Labels[i].Name {
+			t.Fatalf("labels not sorted: %v", c.Labels)
+		}
+	}
+	for _, lc := range c.Labels {
+		if lc.Open <= 0 {
+			t.Fatalf("label with nothing open: %+v", lc)
 		}
 	}
 }

@@ -35,13 +35,18 @@ func (fakeGit) RemoteURL(context.Context, string, string) (string, error) {
 
 // fakeQuests is the GitHub source: settable data and errors.
 type fakeQuests struct {
-	class  quartermaster.Class
-	mu     sync.Mutex
-	list   []quests.Quest
-	err    error
-	detail quests.Detail
-	repo   quests.Repo
-	number int
+	class     quartermaster.Class
+	mu        sync.Mutex
+	list      []quests.Quest
+	total     int
+	truncated bool
+	err       error
+	detail    quests.Detail
+	counts    quests.Counts
+	countsErr error
+	repo      quests.Repo
+	scope     campaign.Scope
+	number    int
 }
 
 func (f *fakeQuests) set(list []quests.Quest, err error) {
@@ -50,12 +55,26 @@ func (f *fakeQuests) set(list []quests.Quest, err error) {
 	f.list, f.err = list, err
 }
 
-func (f *fakeQuests) List(ctx context.Context, repo quests.Repo) ([]quests.Quest, error) {
+func (f *fakeQuests) List(ctx context.Context, repo quests.Repo, scope campaign.Scope) (quests.Listing, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.repo, f.scope = repo, scope
+	f.class = quartermaster.ClassOf(ctx)
+	if f.err != nil {
+		return quests.Listing{}, f.err
+	}
+	total := f.total
+	if total == 0 {
+		total = len(f.list)
+	}
+	return quests.Listing{Quests: append([]quests.Quest(nil), f.list...), TotalOpen: total, Truncated: f.truncated}, nil
+}
+
+func (f *fakeQuests) Counts(_ context.Context, repo quests.Repo) (quests.Counts, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.repo = repo
-	f.class = quartermaster.ClassOf(ctx)
-	return append([]quests.Quest(nil), f.list...), f.err
+	return f.counts, f.countsErr
 }
 
 func (f *fakeQuests) Get(_ context.Context, repo quests.Repo, n int) (quests.Detail, error) {
@@ -111,18 +130,137 @@ func TestQuestsFromGitHub(t *testing.T) {
 	}
 }
 
-func TestQuestsAreFilteredByCampaignLabels(t *testing.T) {
+func TestTheCampaignsScopeGoesToGitHubAndIsReported(t *testing.T) {
 	e := startServer(t, nil)
-	e.gh.set([]quests.Quest{q(1, "area:api"), q(2, "area:web"), q(3)}, nil)
-	e.req("PATCH", "/api/campaigns/"+e.campaign, map[string]any{"labels": []string{"area:api"}}, nil)
+	e.gh.set([]quests.Quest{q(1, "tracked"), q(2, "tracked")}, nil)
+	e.gh.total = 312
+
+	// The default test campaign shows the tracked label.
 	_, out := e.quests("")
-	if r := decodeResult(t, out); len(r.Quests) != 1 || r.Quests[0].Number != 1 {
-		t.Fatalf("filtered: %s", out)
+	r := decodeResult(t, out)
+	if e.gh.scope.Mode != campaign.ScopeLabels || len(e.gh.scope.Labels) != 1 || e.gh.scope.Labels[0] != "tracked" {
+		t.Fatalf("the source was asked for %+v", e.gh.scope)
 	}
-	e.req("PATCH", "/api/campaigns/"+e.campaign, map[string]any{"labels": []string{}}, nil)
+	if r.Scope == nil || r.Scope.Mode != campaign.ScopeLabels || r.TotalOpen != 312 || r.Truncated || len(r.Quests) != 2 {
+		t.Fatalf("result: %s", out)
+	}
+
+	// Changing the scope changes the query, not a filter on what came back.
+	resp, out := e.req("PUT", "/api/campaigns/"+e.campaign+"/scope", map[string]any{"mode": "assigned", "labels": []string{}}, nil)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(out), `"mode":"assigned"`) {
+		t.Fatalf("%d %s", resp.StatusCode, out)
+	}
+	e.gh.truncated = true
 	_, out = e.quests("")
-	if r := decodeResult(t, out); len(r.Quests) != 3 {
-		t.Fatalf("unfiltered: %s", out)
+	r = decodeResult(t, out)
+	if e.gh.scope.Mode != campaign.ScopeAssigned || r.Scope.Mode != campaign.ScopeAssigned || !r.Truncated {
+		t.Fatalf("assigned: %+v / %s", e.gh.scope, out)
+	}
+}
+
+func TestChoosingAScopeIsValidated(t *testing.T) {
+	e := startServer(t, nil)
+	put := func(body any) (*http.Response, []byte) {
+		return e.req("PUT", "/api/campaigns/"+e.campaign+"/scope", body, nil)
+	}
+	for name, body := range map[string]any{
+		"unknown mode":    map[string]any{"mode": "whatever"},
+		"empty":           map[string]any{},
+		"labels but none": map[string]any{"mode": "labels", "labels": []string{}},
+		"too many labels": map[string]any{"mode": "labels", "labels": []string{"a", "b", "c", "d", "e", "f"}},
+		"comma label":     map[string]any{"mode": "labels", "labels": []string{"a,b"}},
+		"labels on all":   map[string]any{"mode": "all", "labels": []string{"x"}},
+		"unknown field":   map[string]any{"mode": "all", "extra": 1},
+	} {
+		if resp, out := put(body); resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s: %d %s", name, resp.StatusCode, out)
+		}
+	}
+	// Nothing invalid was stored.
+	if c, _ := e.cfg.Campaigns.Get(e.campaign); c.Scope == nil || c.Scope.Mode != campaign.ScopeLabels {
+		t.Fatalf("a rejected scope changed the campaign: %+v", c.Scope)
+	}
+	if resp, _ := e.req("PUT", "/api/campaigns/cnope/scope", map[string]any{"mode": "all"}, nil); resp.StatusCode != http.StatusNotFound {
+		t.Errorf("unknown campaign: %d", resp.StatusCode)
+	}
+	if resp, _ := e.req("PUT", "/api/campaigns/"+e.campaign+"/scope", map[string]any{"mode": "all"}, func(r *http.Request) { r.Header.Del("Authorization") }); resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("without auth: %d", resp.StatusCode)
+	}
+	if resp, _ := put(map[string]any{"mode": "labels", "labels": []string{" Tracked ", "bug"}}); resp.StatusCode != http.StatusOK {
+		t.Errorf("a valid scope was refused: %d", resp.StatusCode)
+	}
+}
+
+func TestACampaignWithoutAScopeAsksTheQuestion(t *testing.T) {
+	e := startServer(t, nil)
+	other := t.TempDir()
+	c, err := e.cfg.Campaigns.Add(context.Background(), campaign.Input{Dir: other})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.gh.set([]quests.Quest{q(1)}, nil)
+	before := e.gh.repo
+	resp, out := e.req("GET", "/api/campaigns/"+c.ID+"/quests", nil, nil)
+	if resp.StatusCode != http.StatusConflict || !strings.Contains(string(out), `"code":"scope_needed"`) {
+		t.Fatalf("%d %s", resp.StatusCode, out)
+	}
+	if e.gh.repo != before {
+		t.Fatal("GitHub was asked for issues before a scope was chosen")
+	}
+	// Opening a single issue needs no scope.
+	if resp, out := e.req("GET", "/api/campaigns/"+c.ID+"/quests/7", nil, nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("detail without scope: %d %s", resp.StatusCode, out)
+	}
+	// Choosing one unlocks the list.
+	e.req("PUT", "/api/campaigns/"+c.ID+"/scope", map[string]any{"mode": "all"}, nil)
+	if resp, out := e.req("GET", "/api/campaigns/"+c.ID+"/quests", nil, nil); resp.StatusCode != http.StatusOK {
+		t.Fatalf("%d %s", resp.StatusCode, out)
+	}
+}
+
+func TestScopeOptionsReportTheCounts(t *testing.T) {
+	e := startServer(t, nil)
+	e.gh.counts = quests.Counts{OpenTotal: 312, Assigned: 3, Login: "me", Labels: []quests.LabelCount{
+		{Name: "tracked", Open: 14, Color: "123456"}, {Name: "bug", Open: 40},
+	}}
+	resp, out := e.req("GET", "/api/campaigns/"+e.campaign+"/scope/options", nil, nil)
+	var got quests.Counts
+	if err := json.Unmarshal(out, &got); err != nil || resp.StatusCode != http.StatusOK {
+		t.Fatalf("%v %d %s", err, resp.StatusCode, out)
+	}
+	if got.OpenTotal != 312 || got.Assigned != 3 || got.Login != "me" || len(got.Labels) != 2 || got.Labels[0].Open != 14 {
+		t.Fatalf("%s", out)
+	}
+	// Empty labels encode as [], never null.
+	e.gh.counts = quests.Counts{}
+	if _, out := e.req("GET", "/api/campaigns/"+e.campaign+"/scope/options", nil, nil); !strings.Contains(string(out), `"labels":[]`) {
+		t.Fatalf("%s", out)
+	}
+	// Errors use the same actionable mapping as the quest list.
+	e.gh.countsErr = quests.ErrNoToken
+	if resp, out := e.req("GET", "/api/campaigns/"+e.campaign+"/scope/options", nil, nil); resp.StatusCode != http.StatusServiceUnavailable || !strings.Contains(string(out), "no_token") {
+		t.Fatalf("%d %s", resp.StatusCode, out)
+	}
+	if resp, _ := e.req("GET", "/api/campaigns/cnope/scope/options", nil, nil); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown campaign: %d", resp.StatusCode)
+	}
+	if resp, _ := e.req("GET", "/api/campaigns/"+e.campaign+"/scope/options", nil, func(r *http.Request) { r.Header.Del("Authorization") }); resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("without auth: %d", resp.StatusCode)
+	}
+}
+
+func TestScopeOptionsForCampaignsWithoutARepoOrOnDemoData(t *testing.T) {
+	e := startServer(t, nil)
+	plain := filepath.Join(t.TempDir(), "plain")
+	os.Mkdir(plain, 0o755)
+	c, _ := e.cfg.Campaigns.Add(context.Background(), campaign.Input{Dir: plain})
+	if resp, out := e.req("GET", "/api/campaigns/"+c.ID+"/scope/options", nil, nil); resp.StatusCode != http.StatusConflict || !strings.Contains(string(out), "no_repo") {
+		t.Fatalf("%d %s", resp.StatusCode, out)
+	}
+	e.req("PATCH", "/api/campaigns/"+c.ID, map[string]any{"demo": true}, nil)
+	resp, out := e.req("GET", "/api/campaigns/"+c.ID+"/scope/options", nil, nil)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(out), `"openTotal":11`) {
+		t.Fatalf("demo: %d %s", resp.StatusCode, out)
 	}
 }
 

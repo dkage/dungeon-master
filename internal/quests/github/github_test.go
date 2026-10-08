@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/quartermaster"
 	"github.com/dkage/dungeon-master/internal/quests"
 )
@@ -48,78 +49,233 @@ func fakeGitHub(t *testing.T, token TokenFunc, handler func(w http.ResponseWrite
 
 var demoRepo = quests.Repo{Owner: "dkage", Name: "dungeon-master"}
 
+var everything = campaign.Scope{Mode: campaign.ScopeAll, Labels: []string{}}
+
+// replay serves recorded responses, chosen by what the request asks for.
+func replay(t *testing.T, calls *[]gqlReq) func(w http.ResponseWriter, r *http.Request, q gqlReq) {
+	return func(w http.ResponseWriter, r *http.Request, q gqlReq) {
+		if calls != nil {
+			*calls = append(*calls, q)
+		}
+		switch {
+		case strings.Contains(q.Query, "viewer{login}"):
+			w.Write(fixture(t, "viewer.json"))
+		case strings.Contains(q.Query, "assigned: issues"):
+			w.Write(fixture(t, "counts.json"))
+		default:
+			states, _ := q.Variables["states"].([]any)
+			closed := len(states) == 1 && states[0] == "CLOSED"
+			kind := "all"
+			if _, ok := q.Variables["labels"]; ok {
+				kind = "labels"
+			} else if _, ok := q.Variables["filter"]; ok {
+				kind = "assigned"
+			}
+			which := "open"
+			if closed {
+				which = "closed"
+			}
+			w.Write(fixture(t, "list_"+kind+"_"+which+".json"))
+		}
+	}
+}
+
 func TestListMapsARealResponse(t *testing.T) {
-	list := fixture(t, "list.json")
-	empty := []byte(`{"data":{"repository":{"issues":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}`)
 	var sawAuth, sawUA string
+	var calls []gqlReq
+	inner := replay(t, &calls)
 	c := fakeGitHub(t, nil, func(w http.ResponseWriter, r *http.Request, q gqlReq) {
 		sawAuth, sawUA = r.Header.Get("Authorization"), r.Header.Get("User-Agent")
 		if q.Variables["owner"] != "dkage" || q.Variables["name"] != "dungeon-master" {
 			t.Errorf("variables: %v", q.Variables)
 		}
-		if states, _ := q.Variables["states"].([]any); len(states) == 1 && states[0] == "CLOSED" {
-			w.Write(empty)
-			return
-		}
-		w.Write(list)
+		inner(w, r, q)
 	})
-	got, err := c.List(context.Background(), demoRepo)
+	listing, err := c.List(context.Background(), demoRepo, campaign.Scope{Mode: campaign.ScopeLabels, Labels: []string{"enhancement"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if sawAuth != "Bearer tok-123" || sawUA != "dungeon-master" {
 		t.Errorf("auth %q ua %q", sawAuth, sawUA)
 	}
+	// The scope is part of the query: the label goes to GitHub, not applied afterwards.
+	if len(calls) != 2 {
+		t.Fatalf("%d requests (one open page, one closed)", len(calls))
+	}
+	for _, q := range calls {
+		labels, _ := q.Variables["labels"].([]any)
+		if len(labels) != 1 || labels[0] != "enhancement" {
+			t.Errorf("labels variable: %v", q.Variables["labels"])
+		}
+		if _, has := q.Variables["filter"]; has {
+			t.Error("a label scope must not send an assignee filter")
+		}
+	}
+	if first, _ := calls[1].Variables["first"].(float64); first != 20 {
+		t.Errorf("recently closed in a narrowed scope: first=%v, want 20", first)
+	}
+	if listing.TotalOpen != 5 || listing.Truncated {
+		t.Fatalf("listing: total %d truncated %v", listing.TotalOpen, listing.Truncated)
+	}
 	by := map[int]quests.Quest{}
-	for _, q := range got {
+	for _, q := range listing.Quests {
 		by[q.Number] = q
 	}
-	if len(by) != 5 {
-		t.Fatalf("got %d quests", len(by))
+	if len(by) != 3 {
+		t.Fatalf("got %d quests: %v", len(by), by)
 	}
-	// #3: sub-issue of #1, blocked by the open #2 → locked.
+	// #3: sub-issue of #1, blocked by the open #2, so locked.
 	q3 := by[3]
 	if q3.Parent != 1 || len(q3.BlockedBy) != 1 || q3.BlockedBy[0].Number != 2 || q3.BlockedBy[0].Closed ||
 		q3.State != quests.StateLocked || q3.Comments != 1 {
 		t.Errorf("#3: %+v", q3)
 	}
-	// #1: parent of two.
 	if q := by[1]; q.SubTotal != 2 || q.SubDone != 0 || q.State != quests.StateOpen {
 		t.Errorf("#1: %+v", q)
 	}
-	// #5: assigned bug → claimed, label kept with its colour.
-	q5 := by[5]
-	if q5.State != quests.StateClaimed || len(q5.Assignees) != 1 || q5.Assignees[0] != "dkage" ||
-		len(q5.Labels) != 1 || q5.Labels[0].Name != "bug" || q5.Labels[0].Color == "" {
-		t.Errorf("#5: %+v", q5)
-	}
-	if q := by[4]; q.State != quests.StateOpen || q.URL == "" || q.Updated.IsZero() {
-		t.Errorf("#4: %+v", q)
-	}
-	for _, q := range got {
+	for _, q := range listing.Quests {
 		if q.Labels == nil || q.Assignees == nil || q.BlockedBy == nil || q.PRs == nil {
 			t.Errorf("#%d has nil slices", q.Number)
 		}
 	}
 }
 
+func TestEveryLabelIsQueriedAndMergedWithoutDuplicates(t *testing.T) {
+	var calls []gqlReq
+	inner := replay(t, &calls)
+	c := fakeGitHub(t, nil, inner)
+	// Both labels return the same recorded issues: they must be merged, not doubled.
+	listing, err := c.List(context.Background(), demoRepo, campaign.Scope{Mode: campaign.ScopeLabels, Labels: []string{"enhancement", "tracked"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 4 {
+		t.Fatalf("%d requests, want open+closed per label", len(calls))
+	}
+	if got := calls[0].Variables["labels"].([]any)[0]; got != "enhancement" {
+		t.Errorf("first query label %v", got)
+	}
+	if got := calls[2].Variables["labels"].([]any)[0]; got != "tracked" {
+		t.Errorf("second query label %v", got)
+	}
+	seen := map[int]bool{}
+	for _, q := range listing.Quests {
+		if seen[q.Number] {
+			t.Errorf("#%d returned twice", q.Number)
+		}
+		seen[q.Number] = true
+	}
+	if len(listing.Quests) != 3 {
+		t.Fatalf("%d quests", len(listing.Quests))
+	}
+}
+
+func TestAssignedScopeAsksWhoYouAreOnceAndFiltersOnGitHub(t *testing.T) {
+	var calls []gqlReq
+	c := fakeGitHub(t, nil, replay(t, &calls))
+	scope := campaign.Scope{Mode: campaign.ScopeAssigned, Labels: []string{}}
+	listing, err := c.List(context.Background(), demoRepo, scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listing.Quests) != 1 || listing.Quests[0].Number != 5 || listing.Quests[0].Assignees[0] != "dkage" {
+		t.Fatalf("%+v", listing.Quests)
+	}
+	// viewer, open page, closed page.
+	if len(calls) != 3 || !strings.Contains(calls[0].Query, "viewer{login}") {
+		t.Fatalf("%d requests: the first must ask who the user is", len(calls))
+	}
+	filter, _ := calls[1].Variables["filter"].(map[string]any)
+	if filter["assignee"] != "dkage" {
+		t.Fatalf("assignee filter %v", calls[1].Variables["filter"])
+	}
+	if _, has := calls[1].Variables["labels"]; has {
+		t.Error("an assigned scope sends no label filter")
+	}
+	// The login is remembered: the second listing does not ask again.
+	calls = nil
+	if _, err := c.List(context.Background(), demoRepo, scope); err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 2 {
+		t.Fatalf("%d requests on the second listing, want 2 (no viewer query)", len(calls))
+	}
+}
+
+func TestAssignedScopeNeedsAKnownUser(t *testing.T) {
+	c := fakeGitHub(t, nil, func(w http.ResponseWriter, r *http.Request, q gqlReq) {
+		w.Write([]byte(`{"data":{"viewer":{"login":""}}}`))
+	})
+	_, err := c.List(context.Background(), demoRepo, campaign.Scope{Mode: campaign.ScopeAssigned})
+	if !errors.Is(err, quests.ErrUnauthorized) {
+		t.Fatalf("%v", err)
+	}
+}
+
+func TestEverythingScopeSendsNoFilterAndShowsMoreClosedIssues(t *testing.T) {
+	var calls []gqlReq
+	c := fakeGitHub(t, nil, replay(t, &calls))
+	listing, err := c.List(context.Background(), demoRepo, everything)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(calls) != 2 {
+		t.Fatalf("%d requests", len(calls))
+	}
+	for _, q := range calls {
+		if _, has := q.Variables["labels"]; has {
+			t.Error("labels sent for the everything scope")
+		}
+		if _, has := q.Variables["filter"]; has {
+			t.Error("filter sent for the everything scope")
+		}
+	}
+	if first, _ := calls[1].Variables["first"].(float64); first != 50 {
+		t.Errorf("closed page size %v, want 50", first)
+	}
+	if len(listing.Quests) != 6 { // 5 open plus the closed probe issue
+		t.Fatalf("%d quests", len(listing.Quests))
+	}
+}
+
+func TestUnknownOrEmptyScopesAreRefusedWithoutAskingGitHub(t *testing.T) {
+	var hits int
+	c := fakeGitHub(t, nil, func(w http.ResponseWriter, r *http.Request, q gqlReq) { hits++ })
+	for name, sc := range map[string]campaign.Scope{
+		"empty mode":      {},
+		"unknown mode":    {Mode: "everything"},
+		"labels, no list": {Mode: campaign.ScopeLabels},
+	} {
+		if _, err := c.List(context.Background(), demoRepo, sc); err == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+	if hits != 0 {
+		t.Fatalf("%d requests for refused scopes", hits)
+	}
+}
+
 func TestListPagesThroughOpenIssuesAndAddsClosed(t *testing.T) {
 	var openCalls, closedCalls atomic.Int32
 	page := func(num int, next bool, cursor string) []byte {
-		b, _ := json.Marshal(map[string]any{"data": map[string]any{"repository": map[string]any{"issues": map[string]any{
-			"pageInfo": map[string]any{"hasNextPage": next, "endCursor": cursor},
-			"nodes":    []map[string]any{{"number": num, "title": "t", "state": "OPEN"}},
-		}}}})
+		b, _ := json.Marshal(map[string]any{"data": map[string]any{"repository": map[string]any{
+			"total": map[string]any{"totalCount": 312},
+			"issues": map[string]any{
+				"pageInfo": map[string]any{"hasNextPage": next, "endCursor": cursor},
+				"nodes":    []map[string]any{{"number": num, "title": "t", "state": "OPEN"}},
+			}}}})
 		return b
 	}
 	c := fakeGitHub(t, nil, func(w http.ResponseWriter, r *http.Request, q gqlReq) {
 		states, _ := q.Variables["states"].([]any)
 		if states[0] == "CLOSED" {
 			closedCalls.Add(1)
-			b, _ := json.Marshal(map[string]any{"data": map[string]any{"repository": map[string]any{"issues": map[string]any{
-				"pageInfo": map[string]any{"hasNextPage": false},
-				"nodes":    []map[string]any{{"number": 99, "title": "old", "state": "CLOSED", "stateReason": "COMPLETED"}},
-			}}}})
+			b, _ := json.Marshal(map[string]any{"data": map[string]any{"repository": map[string]any{
+				"total": map[string]any{"totalCount": 312},
+				"issues": map[string]any{
+					"pageInfo": map[string]any{"hasNextPage": false},
+					"nodes":    []map[string]any{{"number": 99, "title": "old", "state": "CLOSED", "stateReason": "COMPLETED"}},
+				}}}})
 			w.Write(b)
 			return
 		}
@@ -136,19 +292,23 @@ func TestListPagesThroughOpenIssuesAndAddsClosed(t *testing.T) {
 			w.Write(page(2, false, ""))
 		}
 	})
-	got, err := c.List(context.Background(), demoRepo)
+	got, err := c.List(context.Background(), demoRepo, everything)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 3 || got[0].Number != 1 || got[1].Number != 2 || got[2].Number != 99 || !got[2].Closed || got[2].Reason != "completed" || got[2].State != quests.StateCleared {
-		t.Fatalf("%+v", got)
+	qs := got.Quests
+	if len(qs) != 3 || qs[0].Number != 1 || qs[1].Number != 2 || qs[2].Number != 99 || !qs[2].Closed || qs[2].Reason != "completed" || qs[2].State != quests.StateCleared {
+		t.Fatalf("%+v", qs)
+	}
+	if got.TotalOpen != 312 || got.Truncated {
+		t.Fatalf("total %d truncated %v", got.TotalOpen, got.Truncated)
 	}
 	if openCalls.Load() != 2 || closedCalls.Load() != 1 {
 		t.Fatalf("open pages %d, closed pages %d", openCalls.Load(), closedCalls.Load())
 	}
 }
 
-func TestListStopsAtThePageCap(t *testing.T) {
+func TestListStopsAtThePageCapAndSaysItWasCut(t *testing.T) {
 	var openCalls atomic.Int32
 	c := fakeGitHub(t, nil, func(w http.ResponseWriter, r *http.Request, q gqlReq) {
 		states, _ := q.Variables["states"].([]any)
@@ -158,16 +318,109 @@ func TestListStopsAtThePageCap(t *testing.T) {
 		} else {
 			openCalls.Add(1)
 		}
-		b, _ := json.Marshal(map[string]any{"data": map[string]any{"repository": map[string]any{"issues": map[string]any{
-			"pageInfo": map[string]any{"hasNextPage": more, "endCursor": "again"}, "nodes": []any{},
-		}}}})
+		b, _ := json.Marshal(map[string]any{"data": map[string]any{"repository": map[string]any{
+			"total": map[string]any{"totalCount": 900},
+			"issues": map[string]any{
+				"pageInfo": map[string]any{"hasNextPage": more, "endCursor": "again"}, "nodes": []any{},
+			}}}})
 		w.Write(b)
 	})
-	if _, err := c.List(context.Background(), demoRepo); err != nil {
+	got, err := c.List(context.Background(), demoRepo, everything)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if openCalls.Load() != maxOpenPages {
 		t.Fatalf("fetched %d open pages, cap is %d", openCalls.Load(), maxOpenPages)
+	}
+	if !got.Truncated || got.TotalOpen != 900 {
+		t.Fatalf("a cut list must say so: %+v", got)
+	}
+	// Exactly filling the cap with nothing more is not a cut.
+	openCalls.Store(0)
+	c2 := fakeGitHub(t, nil, func(w http.ResponseWriter, r *http.Request, q gqlReq) {
+		states, _ := q.Variables["states"].([]any)
+		n := openCalls.Add(1)
+		more := states[0] != "CLOSED" && n < int32(maxOpenPages)
+		b, _ := json.Marshal(map[string]any{"data": map[string]any{"repository": map[string]any{
+			"total":  map[string]any{"totalCount": 300},
+			"issues": map[string]any{"pageInfo": map[string]any{"hasNextPage": more, "endCursor": "x"}, "nodes": []any{}}}}})
+		w.Write(b)
+	})
+	if got, _ := c2.List(context.Background(), demoRepo, everything); got.Truncated {
+		t.Fatal("a list that ended exactly at the cap was reported as cut")
+	}
+}
+
+func TestCountsFromARealResponse(t *testing.T) {
+	var calls []gqlReq
+	c := fakeGitHub(t, nil, replay(t, &calls))
+	got, err := c.Counts(context.Background(), demoRepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.OpenTotal != 5 || got.Assigned != 1 || got.Login != "dkage" {
+		t.Fatalf("%+v", got)
+	}
+	by := map[string]quests.LabelCount{}
+	for _, l := range got.Labels {
+		by[l.Name] = l
+	}
+	if by["enhancement"].Open != 3 || by["bug"].Open != 1 || by["question"].Open != 1 || by["enhancement"].Color == "" {
+		t.Fatalf("%+v", got.Labels)
+	}
+	// The marker label does not exist in this repository, but is still offered, with nothing in it.
+	if m, ok := by[quests.MarkerLabel]; !ok || m.Open != 0 || got.Labels[0].Name != quests.MarkerLabel {
+		t.Fatalf("marker: %+v (labels %+v)", m, got.Labels)
+	}
+	// It asks who the user is, then for the counts, naming the marker.
+	if len(calls) != 2 || calls[1].Variables["login"] != "dkage" || calls[1].Variables["marker"] != quests.MarkerLabel {
+		t.Fatalf("%d requests: %+v", len(calls), calls)
+	}
+}
+
+func TestMarkerLabelIsFoundEvenWhenItIsNotAmongTheFirstHundred(t *testing.T) {
+	c := fakeGitHub(t, nil, func(w http.ResponseWriter, r *http.Request, q gqlReq) {
+		if strings.Contains(q.Query, "viewer{login}") {
+			w.Write([]byte(`{"data":{"viewer":{"login":"me"}}}`))
+			return
+		}
+		w.Write([]byte(`{"data":{"repository":{
+		  "total":{"totalCount":400},"assigned":{"totalCount":0},
+		  "marker":{"name":"tracked","color":"123456","issues":{"totalCount":14}},
+		  "labels":{"nodes":[{"name":"a","color":"fff","issues":{"totalCount":2}},{"name":"tracked","color":"123456","issues":{"totalCount":14}}]}}}}`))
+	})
+	got, err := c.Counts(context.Background(), demoRepo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, l := range got.Labels {
+		if l.Name == "tracked" {
+			n++
+			if l.Open != 14 || l.Color != "123456" {
+				t.Fatalf("%+v", l)
+			}
+		}
+	}
+	if n != 1 || got.Labels[0].Name != "tracked" {
+		t.Fatalf("the marker must appear once, first: %+v", got.Labels)
+	}
+}
+
+func TestCountsFailures(t *testing.T) {
+	c := fakeGitHub(t, nil, func(w http.ResponseWriter, r *http.Request, q gqlReq) {
+		if strings.Contains(q.Query, "viewer{login}") {
+			w.Write([]byte(`{"data":{"viewer":{"login":"me"}}}`))
+			return
+		}
+		w.Write([]byte(`{"data":{"repository":null}}`))
+	})
+	if _, err := c.Counts(context.Background(), demoRepo); !errors.Is(err, quests.ErrNotFound) {
+		t.Fatalf("%v", err)
+	}
+	c2 := fakeGitHub(t, nil, func(w http.ResponseWriter, r *http.Request, q gqlReq) { w.WriteHeader(http.StatusUnauthorized) })
+	if _, err := c2.Counts(context.Background(), demoRepo); !errors.Is(err, quests.ErrUnauthorized) {
+		t.Fatalf("%v", err)
 	}
 }
 
@@ -206,7 +459,7 @@ func TestGetUnknownIssueIsNotFound(t *testing.T) {
 		if _, err := c.Get(context.Background(), demoRepo, 1); !errors.Is(err, quests.ErrNotFound) {
 			t.Errorf("%s: %v", name, err)
 		}
-		if _, err := c.List(context.Background(), demoRepo); !errors.Is(err, quests.ErrNotFound) && name != "null issue" {
+		if _, err := c.List(context.Background(), demoRepo, everything); !errors.Is(err, quests.ErrNotFound) && name != "null issue" {
 			t.Errorf("%s (list): %v", name, err)
 		}
 	}
@@ -215,7 +468,7 @@ func TestGetUnknownIssueIsNotFound(t *testing.T) {
 func TestMissingCredentials(t *testing.T) {
 	var hits atomic.Int32
 	c := fakeGitHub(t, func(context.Context) (string, error) { return "", quests.ErrNoToken }, func(w http.ResponseWriter, r *http.Request, q gqlReq) { hits.Add(1) })
-	if _, err := c.List(context.Background(), demoRepo); !errors.Is(err, quests.ErrNoToken) {
+	if _, err := c.List(context.Background(), demoRepo, everything); !errors.Is(err, quests.ErrNoToken) {
 		t.Fatalf("err %v", err)
 	}
 	if hits.Load() != 0 {
@@ -393,7 +646,7 @@ func TestQuartermasterRefusalsBecomePausedRateLimits(t *testing.T) {
 		if !errors.As(gotErr, &rl) || !rl.Paused || !rl.Reset.Equal(until) {
 			t.Errorf("%s: %v", name, gotErr)
 		}
-		if _, listErr := c.List(context.Background(), demoRepo); !errors.As(listErr, &rl) || !rl.Paused {
+		if _, listErr := c.List(context.Background(), demoRepo, everything); !errors.As(listErr, &rl) || !rl.Paused {
 			t.Errorf("%s (list): %v", name, listErr)
 		}
 	}

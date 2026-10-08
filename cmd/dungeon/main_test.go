@@ -186,7 +186,7 @@ func TestBuildConfigQuestsUseTheGitHubCLIToken(t *testing.T) {
 	t.Setenv("GITHUB_TOKEN", "")
 	t.Setenv("SHELL", "")
 	ctx := context.Background()
-	camp := campaign.Campaign{ID: "c", Repo: "dkage/dungeon-master"}
+	camp := campaign.Campaign{ID: "c", Repo: "dkage/dungeon-master", Scope: &campaign.Scope{Mode: campaign.ScopeAll, Labels: []string{}}}
 
 	// Without gh or an env token: a clear "no credentials", and no request.
 	t.Setenv("PATH", "/nonexistent")
@@ -301,7 +301,7 @@ func TestQuartermasterIsWiredAndItsPauseSurvivesARestart(t *testing.T) {
 	t.Setenv("PATH", "/nonexistent")
 	t.Setenv("SHELL", "")
 	ctx := context.Background()
-	camp := campaign.Campaign{ID: "c", Repo: "acme/widgets"}
+	camp := campaign.Campaign{ID: "c", Repo: "acme/widgets", Scope: &campaign.Scope{Mode: campaign.ScopeAll, Labels: []string{}}}
 
 	cfg, err := buildConfig(ctx, "127.0.0.1:0", "tok")
 	if err != nil || cfg.Quartermaster == nil {

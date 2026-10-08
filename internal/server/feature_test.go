@@ -63,7 +63,7 @@ func startServer(t *testing.T, mutate func(*Config)) *env {
 	cfg.Campaigns, _ = campaign.Open(context.Background(), "", fakeGit{})
 	gh := &fakeQuests{}
 	cfg.Quests = quests.NewService(quests.ServiceOptions{
-		GitHub: gh, Demo: demo.New(), TTL: time.Nanosecond, MinRefresh: time.Nanosecond,
+		GitHub: gh, Demo: demo.New(), TTL: time.Nanosecond, CountsTTL: time.Nanosecond, MinRefresh: time.Nanosecond,
 	})
 	if mutate != nil {
 		mutate(&cfg)
@@ -71,6 +71,12 @@ func startServer(t *testing.T, mutate func(*Config)) *env {
 	cfg = withDefaults(cfg)
 	camp, err := cfg.Campaigns.Add(context.Background(), campaign.Input{Dir: dir, Name: "demo"})
 	if err != nil {
+		t.Fatal(err)
+	}
+	// Most tests are about something other than the first-connection question,
+	// so the test campaign has already chosen the tracked label.
+	scope := campaign.Scope{Mode: campaign.ScopeLabels, Labels: []string{"tracked"}}
+	if _, err := cfg.Campaigns.Update(context.Background(), camp.ID, campaign.Patch{Scope: &scope}); err != nil {
 		t.Fatal(err)
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -459,14 +465,14 @@ func TestCampaignLifecycleOverHTTP(t *testing.T) {
 
 	// Add.
 	resp, out := e.req("POST", "/api/campaigns", map[string]any{
-		"dir": other, "name": "Second", "labels": []string{"area:web"},
+		"dir": other, "name": "Second",
 	}, nil)
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("add: %d %s", resp.StatusCode, out)
 	}
 	var c campaign.Campaign
 	_ = json.Unmarshal(out, &c)
-	if c.Name != "Second" || c.Dir != other || c.Remote != "origin" || len(c.Labels) != 1 {
+	if c.Name != "Second" || c.Dir != other || c.Remote != "origin" || c.Scope != nil {
 		t.Fatalf("added: %+v", c)
 	}
 
@@ -487,9 +493,9 @@ func TestCampaignLifecycleOverHTTP(t *testing.T) {
 	}
 
 	// Update.
-	resp, out = e.req("PATCH", "/api/campaigns/"+c.ID, map[string]any{"name": "Renamed", "labels": []string{}}, nil)
+	resp, out = e.req("PATCH", "/api/campaigns/"+c.ID, map[string]any{"name": "Renamed"}, nil)
 	_ = json.Unmarshal(out, &c)
-	if resp.StatusCode != http.StatusOK || c.Name != "Renamed" || len(c.Labels) != 0 {
+	if resp.StatusCode != http.StatusOK || c.Name != "Renamed" {
 		t.Fatalf("update: %d %s", resp.StatusCode, out)
 	}
 	if resp, _ := e.req("PATCH", "/api/campaigns/cnope", map[string]any{"name": "x"}, nil); resp.StatusCode != http.StatusNotFound {
