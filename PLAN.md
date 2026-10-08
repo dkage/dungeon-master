@@ -224,27 +224,13 @@ No memory carried between expeditions; GitHub is the memory. Issue text is untru
 
 ## 10. Release & distribution (macOS binary etc.)
 
-Our release approach:
+Detailed plan: `release/PLAN_RELEASE.md` (index: `release/README.md`). Summary:
 
-1. **Portable binary** (`dungeon serve`): pure Go, `CGO_ENABLED=0`, cross-compiled for darwin/linux/windows × amd64/arm64 by **GoReleaser** in one CI job. The SPA is built first (`npm run build`) and embedded with `go:embed`, so each binary is self-contained. Output: tar.gz/zip + `checksums.txt` on a GitHub Release.
-2. **Native desktop app**: needs cgo (`webview_go` → WKWebView on macOS, WebKitGTK on Linux, WebView2 on Windows), so it **cannot** be cross-compiled by GoReleaser. Build it on a native runner per OS in GitHub Actions.
-3. **macOS .app + .dmg** (what you asked about), assembled by a script on a `macos-15` (arm64) runner:
-   - build the shell binary with `-tags webview`;
-   - create `Dungeon.app/Contents/{MacOS,Resources,Info.plist}`; `MacOS/dungeon` is the binary;
-   - icon: render PNGs at the required sizes with `sips`, bundle with `iconutil -c icns`;
-   - `Info.plist`: bundle id (e.g. `app.dungeon.desktop`), version, min macOS (`otool -l` → `minos`), `NSHighResolutionCapable`;
-   - ad-hoc sign: `codesign --force --sign - Dungeon.app`;
-   - DMG: stage `Dungeon.app` + a symlink to `/Applications` + a README, then `hdiutil create -srcfolder … -format UDZO`; write a `.sha256`.
-   - Unsigned/un-notarized means Gatekeeper blocks first launch (right-click → Open, or System Settings → Privacy & Security → Open Anyway). That is acceptable for an alpha.
-   - **Upgrade path**: an Apple Developer account ($99/yr) gives Developer ID signing + `notarytool` notarization, which removes the warning. In CI that is: import cert from secrets → `codesign --options runtime --timestamp` → `xcrun notarytool submit --wait` → `xcrun stapler staple`. Defer until the app is worth it.
-   - Intel Macs: either add an `macos-13` job or a universal build via `lipo` of two arm64/amd64 builds (cgo per arch, so two jobs). Start arm64-only.
-4. **Linux**: AppImage (bundles WebKitGTK; needs a smoke test on a bare host), plus `.deb`/`.rpm` via **nfpm** that depend on the distro's WebKitGTK. Start with the plain binary + AppImage; add deb/rpm later.
-5. **Windows**: ship the cgo-free binary first (browser mode); WebView2 shell later. ConPTY needs a Windows smoke test in CI.
-6. **Release workflow**: tag `vX.Y.Z` → create a **draft** release → parallel jobs (goreleaser binaries, macOS dmg, linux appimage/packages) upload artifacts → final job publishes the draft only if all required jobs passed. Version/commit/date injected with `-ldflags -X`.
-7. **Distribution**: GitHub Releases only at first. Later: Homebrew cask via GoReleaser's `homebrew_casks` into a personal tap (the cleanest macOS install story: `brew install --cask`).
-8. **CI** (`ci.yml`): `go vet`, `go test ./...`, web `npm test` + type-check, `govulncheck`, and a build matrix smoke on macOS/Linux.
-
-Makefile/`Taskfile` targets: `web`, `build`, `dev-backend`, `dev-web` (Vite proxy to Go), `test`, `webview`, `bundle`, `dmg`, `appimage`, `snapshot` (goreleaser `--snapshot`), `release`.
+- **Portable binary** (`dungeon serve`): pure Go, cross-compiled by GoReleaser; the built SPA is embedded with `go:embed`.
+- **Native app** (cgo webview shell): built per OS on native runners, because cgo cannot be cross-compiled. macOS first: `.app` in a `.dmg`, ad-hoc signed at first, Developer ID + notarization later. Linux AppImage next; deb/rpm and Windows shell on demand.
+- **Pipeline**: tag → draft release → parallel build jobs upload → one final job verifies the asset set and publishes.
+- **Trust and distribution**: checksums and attestations, pinned actions, Homebrew cask tap, notify-only update check.
+- **Dry runs first**: snapshot builds, a manual dry-run workflow and an `rc` tag before the first real release.
 
 ---
 

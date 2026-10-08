@@ -2,7 +2,7 @@
 
 A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents against GitHub issues. One button starts an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native webview shell.
 
-Status: M0 (skeleton) in progress. Plans: `PLAN.md` (v1), `PLAN_SKILLS.md` (skills), `PLAN_V2.md` (parking lot, not in v1). Read the relevant plan before building a milestone.
+Status: M0 (skeleton) in progress. Plans: `PLAN.md` (v1), `PLAN_SKILLS.md` (skills), `release/PLAN_RELEASE.md` (releases), `PLAN_V2.md` (parking lot, not in v1). Read the relevant plan before building a milestone.
 
 ## Scope and principles
 
@@ -24,7 +24,8 @@ cmd/dungeon/        CLI entry (serve, version)
 internal/server/    HTTP, guard (token, Host, Origin, content-type), static assets
 web/                embedded frontend (web/dist is generated, only .gitkeep is tracked)
 web/placeholder/    stand-in page until the Svelte app lands
-.github/workflows/  CI
+.github/workflows/  CI and release workflows (thin; call scripts in release/)
+release/            everything about shipping: plan, scripts, packaging (index: release/README.md)
 ```
 
 Planned packages (see `PLAN.md` §4): `party`, `adapter`/`launcher`, `pty`, `session`, `github`, `quests`, `spells`, `briefing`, `config`.
@@ -70,6 +71,7 @@ design so the work can start from a shared reference.
 - One logical change per commit. Commit only when asked.
 - **No attribution of any kind**: no `Co-Authored-By`, no `Claude-Session:` trailer, no "Generated with" line, in commits or PR bodies.
 - Do not amend or rewrite commits that have been pushed.
+- Releases are automated from these messages (release-please, see `release/PLAN_RELEASE.md` §3): the type decides the version bump and the changelog entry. PRs are squash-merged with a Conventional Commit PR title. Never hand-edit `CHANGELOG.md`, the release manifest or version numbers.
 
 ## Milestones
 
