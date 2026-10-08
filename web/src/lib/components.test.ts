@@ -577,7 +577,18 @@ describe('ScopePicker', () => {
     const o = options({ labels: [{ name: 'tracked', open: 0 }, { name: 'bug', open: 40 }] })
     render(ScopePicker, { store: picker(o) })
     expect(screen.getByRole('radio', { name: /Assigned to me/ })).toBeChecked()
-    expect(screen.getByText(/None yet. Add the label to an issue on GitHub/)).toBeInTheDocument()
+    expect(screen.getByText(/None yet. This app never adds the label/)).toBeInTheDocument()
+  })
+
+  it('leads with the tracked label only when it has issues; an empty one goes last', () => {
+    const order = () => screen.getAllByRole('radio').map((r) => r.closest('label')?.textContent ?? '')
+    const { unmount } = render(ScopePicker, { store: picker(options()) })
+    expect(order()[0]).toMatch(/Issues labeled tracked/)
+    unmount()
+    render(ScopePicker, { store: picker(options({ labels: [{ name: 'tracked', open: 0 }, { name: 'bug', open: 4 }] })) })
+    const o = order()
+    expect(o[0]).toMatch(/Assigned to me/)
+    expect(o[o.length - 1]).toMatch(/Issues labeled tracked/)
   })
 
   it('preselects nothing, and cannot submit, when there is nothing to suggest', async () => {

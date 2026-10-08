@@ -17,6 +17,9 @@
   const opts = $derived(store.scopeOptions)
   const marker = $derived(opts?.labels.find((l) => l.name === MARKER))
   const pickable = $derived(opts ? opts.labels.filter((l) => l.open > 0 || l.name === MARKER) : [])
+  // The marker label leads only when it already has issues (or is the current
+  // choice); an empty one is an opt-in at the bottom, not the first suggestion.
+  const trackedFirst = $derived((marker?.open ?? 0) > 0 || choice === 'tracked')
   const editing = $derived(store.campaign?.scope != null)
 
   onMount(() => {
@@ -74,6 +77,18 @@
   }
 </script>
 
+{#snippet trackedOpt()}
+      <label class="opt">
+        <input type="radio" name="scope" checked={choice === 'tracked'} onchange={() => pick('tracked')} />
+        <span class="optbody">
+          <span>Issues labeled <code>{MARKER}</code> <span class="count">({marker?.open ?? 0})</span></span>
+          <span class="help">
+            {#if (marker?.open ?? 0) === 0}None yet. This app never adds the label: add it to an issue on GitHub yourself to use this option.{:else}The work driven from here, so a busy repository stays readable.{/if}
+          </span>
+        </span>
+      </label>
+{/snippet}
+
 <form class="scope-picker" onsubmit={save}>
   {#if store.scopeOptionsLoading && !opts}
     <p class="hint pad" role="status">Counting issues…</p>
@@ -88,15 +103,7 @@
         {#if editing}Show which issues?{:else}This repository has {opts.openTotal.toLocaleString()} open issues. Show:{/if}
       </legend>
 
-      <label class="opt">
-        <input type="radio" name="scope" checked={choice === 'tracked'} onchange={() => pick('tracked')} />
-        <span class="optbody">
-          <span>Issues labeled <code>{MARKER}</code> <span class="count">({marker?.open ?? 0})</span></span>
-          <span class="help">
-            {#if (marker?.open ?? 0) === 0}None yet. Add the label to an issue on GitHub to track it here.{:else}The work driven from here, so a busy repository stays readable.{/if}
-          </span>
-        </span>
-      </label>
+      {#if trackedFirst}{@render trackedOpt()}{/if}
 
       <label class="opt">
         <input type="radio" name="scope" checked={choice === 'assigned'} onchange={() => pick('assigned')} />
@@ -138,6 +145,8 @@
           <span class="help">Large repositories show the newest 300 open issues.</span>
         </span>
       </label>
+
+      {#if !trackedFirst}{@render trackedOpt()}{/if}
     </fieldset>
 
     <div class="actions">

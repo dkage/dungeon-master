@@ -403,8 +403,11 @@ test('a new campaign asks which issues to show, with real counts, and remembers 
   // The question, with the numbers from the (recorded) repository.
   await expect(panel.getByText('This repository has 312 open issues. Show:')).toBeVisible()
   await expect(panel.getByRole('radio', { name: /Issues labeled tracked \(0\)/ })).not.toBeChecked()
-  await expect(panel.getByText('None yet. Add the label to an issue on GitHub')).toBeVisible()
+  await expect(panel.getByText('None yet. This app never adds the label')).toBeVisible()
   await expect(panel.getByRole('radio', { name: /Assigned to me \(@dkage\) \(1\)/ })).toBeChecked() // the suggestion
+  // An empty marker label is an opt-in at the bottom, not the first choice.
+  await expect(panel.getByRole('radio').first()).toHaveAccessibleName(/Assigned to me/)
+  await expect(panel.getByRole('radio').last()).toHaveAccessibleName(/Issues labeled tracked/)
   await expect(panel.getByRole('radio', { name: /Everything \(312\)/ })).toBeVisible()
   // Nothing is listed, and it is not an error.
   await expect(panel.getByLabel('Filter quests')).toHaveCount(0)
