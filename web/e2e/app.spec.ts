@@ -394,6 +394,11 @@ test('a campaign without a GitHub repository can open the separate sample projec
   await expect(detail.getByRole('heading', { name: /#3 Build the signup form/ })).toBeVisible()
   await expect(detail.getByRole('button', { name: /#2 Design the welcome screen/ })).toBeVisible()
   await expect(detail.getByRole('link', { name: 'Open on GitHub' })).toHaveCount(0)
+  await detail.getByRole('button', { name: 'Brief' }).click()
+  const briefing = page.getByRole('dialog', { name: 'Task briefing' })
+  await expect(briefing.locator('pre')).toContainText('Build the signup form')
+  await expect(briefing.locator('pre')).toContainText('untrusted task data')
+  await briefing.getByRole('button', { name: 'Close briefing' }).click()
   // Titles and headings inside an issue are content: they must not inherit the
   // small uppercase style used for section labels.
   const title = detail.getByRole('heading', { name: /#3 Build the signup form/ })

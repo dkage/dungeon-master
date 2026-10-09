@@ -435,6 +435,7 @@ describe('QuestDetail', () => {
     blocking: [{ number: 4, title: 'Validate', closed: false }], subIssues: [{ number: 8, title: 'Sub', closed: true }],
     parentTitle: 'The epic',
     commentList: [{ author: 'carol', body: 'looks **good**', created: new Date().toISOString() }],
+    briefing: { content: '# Task briefing\n\nContext stays plain text.', truncated: false, commentsShown: 1, commentsTotal: 1 },
     ...over,
   })
 
@@ -471,6 +472,16 @@ describe('QuestDetail', () => {
     const { container } = render(QuestDetail, { store: open(detail()) })
     expect(container.querySelector('script')).toBeNull()
     expect((window as unknown as { pwned?: number }).pwned).toBeUndefined()
+  })
+
+  it('opens and closes the plain-text task briefing preview', async () => {
+    render(QuestDetail, { store: open(detail({ briefing: { content: '<script>untrusted</script>', truncated: true, commentsShown: 5, commentsTotal: 12 } })) })
+    await fireEvent.click(screen.getByRole('button', { name: 'Brief' }))
+    expect(screen.getByRole('dialog', { name: 'Task briefing' })).toBeInTheDocument()
+    expect(screen.getByText('<script>untrusted</script>')).toBeInTheDocument()
+    expect(screen.getByText(/5 of 12 comments · some context was shortened/)).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Close briefing' }))
+    expect(screen.queryByRole('dialog', { name: 'Task briefing' })).not.toBeInTheDocument()
   })
 
   it('navigates to related quests and back to the list', async () => {

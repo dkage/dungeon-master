@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/dkage/dungeon-master/internal/briefing"
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/quartermaster"
 	"github.com/dkage/dungeon-master/internal/quests"
@@ -86,7 +87,10 @@ func (s *Server) handleQuest(w http.ResponseWriter, r *http.Request) {
 		questsErr(w, err, c.Repo)
 		return
 	}
-	writeJSON(w, http.StatusOK, d)
+	writeJSON(w, http.StatusOK, struct {
+		quests.Detail
+		Briefing briefing.Result `json:"briefing"`
+	}{Detail: d, Briefing: briefing.Build(c.Repo, d)})
 }
 
 // questsErr turns a source failure into a status, a code the UI can act on

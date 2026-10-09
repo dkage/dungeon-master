@@ -160,6 +160,15 @@ export interface QuestDetail extends Quest {
   subIssues: QuestRef[]
   parentTitle?: string
   commentList: QuestComment[]
+  /** Fresh context assembled from this issue when its detail is loaded. */
+  briefing?: BriefingResult
+}
+
+export interface BriefingResult {
+  content: string
+  truncated: boolean
+  commentsShown: number
+  commentsTotal: number
 }
 
 export interface Ration {
