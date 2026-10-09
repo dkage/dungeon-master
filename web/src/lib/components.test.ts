@@ -30,6 +30,7 @@ function store(setup: (s: AppStore) => void = () => {}) {
       systemPrompt: 'Keep to the issue.', command: ['claude', '--model', 'm1'],
     })), getGithub: vi.fn(), setScope: vi.fn(), getScopeOptions: vi.fn(),
     getProjectSuggestions: vi.fn(async () => []), createSampleCampaign: vi.fn(async () => camp('sample', { sample: true, demo: true })),
+    pickFolder: vi.fn(async () => ({ cancelled: true })), openCampaignFolder: vi.fn(async () => undefined),
     adoptStarterHeroes: vi.fn(async () => ({ saved: true })),
     getHeroesConfig: vi.fn(async () => ({ defaultHero: 'opus', heroes: [{ id: 'opus', label: 'Opus', args: ['--model', 'm1'], env: ['API_KEY='] }] })),
     saveHeroesConfig: vi.fn(async () => ({ saved: true })),
@@ -234,6 +235,23 @@ describe('Sidebar', () => {
     expect(screen.getByPlaceholderText('/absolute/path/to/project')).toHaveValue('') // success: cleared
   })
 
+  it('offers per-campaign free sessions, folder actions, rename and explained removal', async () => {
+    const s = store()
+    const launch = vi.spyOn(s, 'launchInCampaign').mockResolvedValue()
+    const openFolder = vi.spyOn(s, 'openCampaignFolder').mockResolvedValue()
+    render(Sidebar, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: 'Campaign actions for Camp c1' }))
+    const menu = screen.getByRole('group', { name: 'Actions for Camp c1' })
+    await fireEvent.click(within(menu).getByRole('button', { name: 'Opus: free session' }))
+    expect(launch).toHaveBeenCalledWith('c1', { hero: 'opus' })
+    await fireEvent.click(screen.getByRole('button', { name: 'Campaign actions for Camp c1' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Open folder' }))
+    expect(openFolder).toHaveBeenCalledWith('c1')
+    await fireEvent.click(screen.getByRole('button', { name: 'Campaign actions for Camp c1' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove project' }))
+    expect(screen.getByRole('group', { name: 'Confirm removal of Camp c1' })).toHaveTextContent('Project files are not deleted')
+  })
+
   it('omits an empty name', async () => {
     const s = store()
     const add = vi.spyOn(s, 'addCampaign').mockResolvedValue(true)
@@ -248,12 +266,14 @@ describe('Sidebar', () => {
     const s = store()
     const remove = vi.spyOn(s, 'removeCampaign').mockResolvedValue()
     render(Sidebar, { store: s })
-    await fireEvent.click(screen.getByRole('button', { name: 'Remove campaign Camp c1' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Campaign actions for Camp c1' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove project' }))
     expect(remove).not.toHaveBeenCalled()
-    await fireEvent.click(screen.getByRole('button', { name: 'Cancel removal' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(remove).not.toHaveBeenCalled()
-    await fireEvent.click(screen.getByRole('button', { name: 'Remove campaign Camp c1' }))
-    await fireEvent.click(screen.getByRole('button', { name: 'Remove?' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Campaign actions for Camp c1' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove project' }))
+    await fireEvent.click(within(screen.getByRole('group', { name: 'Confirm removal of Camp c1' })).getByRole('button', { name: 'Remove project' }))
     expect(remove).toHaveBeenCalledWith('c1')
   })
 })
@@ -545,6 +565,8 @@ describe('QuestDetail', () => {
     expect(screen.queryByLabelText('Comments')).not.toBeInTheDocument()
     expect(screen.getByText('Cleared · not planned')).toBeInTheDocument()
     expect(screen.queryByText('Blocked by')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review launch' })).toBeDisabled()
+    expect(screen.getByText('Closed issues cannot be started.')).toBeInTheDocument()
   })
 
   it('shows loading and error states, with retry', async () => {

@@ -11,6 +11,9 @@
   let search = $state('')
   let adding = $state(false)
   let confirming = $state<string | null>(null)
+  let menuFor = $state<string | null>(null)
+  let renameFor = $state<string | null>(null)
+  let renameName = $state('')
   const visibleCampaigns = $derived(store.campaigns.filter((campaign) => {
     const query = search.trim().toLowerCase()
     if (!query) return true
@@ -26,6 +29,21 @@
       name = ''
       adding = false
     }
+  }
+
+  function addFromPicker() {
+    adding = true
+    void store.pickFolder().then((path) => {
+      if (!path) return
+      dir = path
+      if (!name.trim()) name = path.split(/[\\/]/).filter(Boolean).at(-1) ?? ''
+    })
+  }
+
+  async function rename(e: SubmitEvent, id: string) {
+    e.preventDefault()
+    if (!renameName.trim()) return
+    if (await store.updateCampaign(id, { name: renameName.trim() })) renameFor = null
   }
 
   function status(s: SessionInfo): { label: string; kind: string } {
@@ -48,7 +66,7 @@
     <input type="search" bind:value={search} placeholder="Search projects and sessions…" />
   </label>
   <nav aria-label={wordLabel('campaign', store.appearance.wordMode, true)}>
-    <h2 class="sidebar-heading"><Term word="campaign" mode={store.appearance.wordMode} /><span class="section-rule" aria-hidden="true"></span><button type="button" class="heading-add" aria-label="Add project" onclick={() => (adding = true)}>＋</button></h2>
+    <h2 class="sidebar-heading"><Term word="campaign" mode={store.appearance.wordMode} /><span class="section-rule" aria-hidden="true"></span><button type="button" class="heading-add" aria-label="Add project" onclick={addFromPicker}>＋</button></h2>
     {#if store.campaigns.length === 0}
       <p class="hint">A campaign is a project directory. Add one to start.</p>
     {/if}
@@ -69,18 +87,40 @@
               {#if c.sample}<span class="campaign-badge">Sample</span>{/if}
             </button>
             {#if c.sample}
-              <button type="button" class="ghost" aria-label="Remove sample project" onclick={() => store.removeCampaign(c.id)}>×</button>
-            {:else if confirming === c.id}
-              <button type="button" class="danger" onclick={() => { confirming = null; store.removeCampaign(c.id) }}>
-                Remove?
-              </button>
-              <button type="button" class="ghost" aria-label="Cancel removal" onclick={() => (confirming = null)}>×</button>
+              <button type="button" class="ghost" aria-label="Remove sample project" onclick={() => (confirming = c.id)}>×</button>
             {:else}
-              <button type="button" class="ghost" aria-label={`Remove campaign ${c.name}`} onclick={() => (confirming = c.id)}>
-                ⋯
-              </button>
+              <button type="button" class="ghost" aria-label={`Campaign actions for ${c.name}`} aria-expanded={menuFor === c.id} onclick={() => (menuFor = menuFor === c.id ? null : c.id)}>⋯</button>
             {/if}
           </div>
+
+          {#if menuFor === c.id}
+            <div class="campaign-menu" role="group" aria-label={`Actions for ${c.name}`}>
+              <strong>Free session</strong>
+              {#each store.heroes as h (h.id)}<button type="button" disabled={store.busy || !store.claude.found} onclick={() => { menuFor = null; void store.launchInCampaign(c.id, { hero: h.id }) }}>{h.label}: free session</button>{/each}
+              <button type="button" disabled={store.busy} onclick={() => { menuFor = null; void store.launchInCampaign(c.id, { shell: true }) }}>Shell</button>
+              <hr />
+              <button type="button" onclick={() => { menuFor = null; void store.openCampaignFolder(c.id) }}>Open folder</button>
+              <button type="button" onclick={() => { menuFor = null; store.changeCampaignScope(c.id) }}>Change which issues to show</button>
+              <button type="button" onclick={() => { menuFor = null; renameFor = c.id; renameName = c.name }}>Rename</button>
+              <button type="button" class="danger" onclick={() => { menuFor = null; confirming = c.id }}>Remove project</button>
+            </div>
+          {/if}
+
+          {#if renameFor === c.id}
+            <form class="campaign-inline-form" onsubmit={(e) => rename(e, c.id)}>
+              <label><span>Project name</span><input aria-label={`New name for ${c.name}`} bind:value={renameName} /></label>
+              <button type="submit" disabled={!renameName.trim()}>Save name</button>
+              <button type="button" class="secondary" onclick={() => (renameFor = null)}>Cancel</button>
+            </form>
+          {/if}
+
+          {#if confirming === c.id}
+            <div class="remove-confirm" role="group" aria-label={`Confirm removal of ${c.name}`}>
+              <p>{c.sample ? 'Remove the sample project? Its generated workspace will be deleted.' : `Remove ${c.name} from this app? Project files are not deleted.`}</p>
+              <button type="button" class="danger" onclick={() => { confirming = null; void store.removeCampaign(c.id) }}>{c.sample ? 'Remove sample' : 'Remove project'}</button>
+              <button type="button" class="secondary" onclick={() => (confirming = null)}>Cancel</button>
+            </div>
+          {/if}
 
           {#if store.sessionsOf(c.id).length > 0}
             <ul class="sessions" aria-label={`${store.appearance.wordMode === 'plain' ? 'Sessions' : 'Expeditions'} in ${c.name}`}>
@@ -117,7 +157,9 @@
       <div class="add-heading"><h2>Add {store.appearance.wordMode === 'plain' ? 'project' : 'campaign'}</h2><button type="button" class="ghost" aria-label="Cancel adding project" onclick={() => (adding = false)}>×</button></div>
       <label>
         <span>Directory</span>
+        <button type="button" class="secondary" disabled={store.busy} onclick={() => void store.pickFolder().then((path) => { if (path) { dir = path; if (!name.trim()) name = path.split(/[\\/]/).filter(Boolean).at(-1) ?? '' } })}>Choose folder…</button>
         <input type="text" bind:value={dir} placeholder="/absolute/path/to/project" spellcheck="false" autocomplete="off" />
+        <small class="hint">Type a path if the native folder picker is unavailable.</small>
       </label>
       <label>
         <span>Name (optional)</span>

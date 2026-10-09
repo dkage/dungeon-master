@@ -29,6 +29,8 @@ function fakeClient(over: Partial<Client> = {}, state: Partial<AppState> = {}): 
     getQuests: vi.fn(async () => result([quest(1)])),
     getQuest: vi.fn(async (_c, n) => detailOf(n)),
     previewQuestLaunch: vi.fn(async () => ({ content: 'brief', canStart: true, truncated: false, commentsShown: 0, commentsTotal: 0 })),
+    pickFolder: vi.fn(async () => ({ cancelled: true })),
+    openCampaignFolder: vi.fn(async () => undefined),
     getGithub: vi.fn(async () => githubOk),
     setScope: vi.fn(async (id, scope) => camp(id, { scope })),
     getScopeOptions: vi.fn(async () => scopeOptions),

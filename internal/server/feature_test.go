@@ -711,7 +711,6 @@ func TestCampaignLifecycleOverHTTP(t *testing.T) {
 		body map[string]any
 		want int
 	}{
-		"duplicate":     {map[string]any{"dir": other}, http.StatusConflict},
 		"relative":      {map[string]any{"dir": "rel"}, http.StatusBadRequest},
 		"missing":       {map[string]any{"dir": filepath.Join(other, "nope")}, http.StatusBadRequest},
 		"bad remote":    {map[string]any{"dir": t.TempDir(), "remote": "--x"}, http.StatusBadRequest},
@@ -720,6 +719,12 @@ func TestCampaignLifecycleOverHTTP(t *testing.T) {
 		if resp, out := e.req("POST", "/api/campaigns", tc.body, nil); resp.StatusCode != tc.want {
 			t.Errorf("%s: got %d %s, want %d", name, resp.StatusCode, out, tc.want)
 		}
+	}
+	resp, out = e.req("POST", "/api/campaigns", map[string]any{"dir": other}, nil)
+	var reused campaign.Campaign
+	_ = json.Unmarshal(out, &reused)
+	if resp.StatusCode != http.StatusOK || reused.ID != c.ID || len(e.cfg.Campaigns.List()) != 2 {
+		t.Fatalf("duplicate should return the existing campaign: %d %s", resp.StatusCode, out)
 	}
 
 	// Update.

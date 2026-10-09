@@ -254,6 +254,7 @@ export const getProjectSuggestions = () =>
   call<ProjectSuggestion[]>('GET', '/api/onboarding/suggestions') as Promise<ProjectSuggestion[]>
 export const createSampleCampaign = () =>
   call<Campaign>('POST', '/api/onboarding/sample', {}) as Promise<Campaign>
+export const pickFolder = () => call<{ path?: string; cancelled?: boolean }>('POST', '/api/pick-folder', {}) as Promise<{ path?: string; cancelled?: boolean }>
 export const adoptStarterHeroes = () =>
   call<{ saved: boolean }>('POST', '/api/heroes/adopt-starters', {}) as Promise<{ saved: boolean }>
 export const getHeroesConfig = () => call<HeroesConfig>('GET', '/api/heroes/config') as Promise<HeroesConfig>
@@ -265,6 +266,8 @@ export const updateCampaign = (id: string, patch: CampaignPatch) =>
   call<Campaign>('PATCH', `/api/campaigns/${encodeURIComponent(id)}`, patch) as Promise<Campaign>
 export const removeCampaign = (id: string) =>
   call<void>('DELETE', `/api/campaigns/${encodeURIComponent(id)}`) as Promise<void>
+export const openCampaignFolder = (id: string) =>
+  call<void>('POST', `/api/campaigns/${encodeURIComponent(id)}/open-folder`, {}) as Promise<void>
 export const getQuests = (campaignId: string, refresh = false, background = false) => {
   const q = [refresh && 'refresh=1', background && 'background=1'].filter(Boolean).join('&')
   return call<QuestResult>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/quests${q ? `?${q}` : ''}`) as Promise<QuestResult>

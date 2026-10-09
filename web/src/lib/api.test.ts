@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ApiError, addCampaign, createSession, deleteSession, getGithub, getQuest, getQuests, getScopeOptions, getState, removeCampaign,
   setScope, termUrl, updateCampaign, getProjectSuggestions, createSampleCampaign, adoptStarterHeroes, getHeroesConfig, saveHeroesConfig, previewQuestLaunch,
+  pickFolder, openCampaignFolder,
 } from './api'
 
 function mockFetch(status: number, body?: unknown) {
@@ -120,6 +121,18 @@ describe('api', () => {
     expect(init.method).toBe('POST')
     expect(JSON.parse(init.body as string)).toEqual({ hero: 'opus' })
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+  })
+
+  it('uses guarded endpoints for picking and opening campaign folders', async () => {
+    const f = mockFetch(200, { path: '/work/project' })
+    await expect(pickFolder()).resolves.toEqual({ path: '/work/project' })
+    await openCampaignFolder('c/1')
+    const calls = f.mock.calls as unknown as [string, RequestInit][]
+    expect(calls.map(([u, i]) => `${i.method} ${u}`)).toEqual([
+      'POST /api/pick-folder', 'POST /api/campaigns/c%2F1/open-folder',
+    ])
+    expect(JSON.parse(calls[0][1].body as string)).toEqual({})
+    expect(calls[1][1].body).toBe('{}')
   })
 
   it('marks background polling and reads the GitHub budget', async () => {

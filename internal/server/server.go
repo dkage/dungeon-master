@@ -49,6 +49,10 @@ type Config struct {
 	PartyError string
 	// StateDir is the private per-user directory for generated briefing files.
 	StateDir string
+	// PickFolder and OpenFolder are local desktop actions; tests can supply
+	// deterministic implementations. Nil uses the current platform helper.
+	PickFolder func(context.Context) (string, error)
+	OpenFolder func(context.Context, string) error
 	// Claude is the resolved claude binary; empty when it was not found, in
 	// which case ClaudeErr says why and hero launches are refused.
 	Claude    string
@@ -97,6 +101,7 @@ type Server struct {
 	url           string // where this server can be reached, set once it listens
 	partyMu       sync.RWMutex
 	questLaunchMu sync.Mutex
+	pickerMu      sync.Mutex
 	partyStop     context.CancelFunc
 	partyWG       sync.WaitGroup
 

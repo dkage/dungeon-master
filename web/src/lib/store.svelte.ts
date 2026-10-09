@@ -8,7 +8,7 @@ export type Client = Pick<
   typeof realApi,
   | 'getState' | 'createSession' | 'deleteSession' | 'addCampaign' | 'updateCampaign' | 'removeCampaign'
   | 'getQuests' | 'getQuest' | 'previewQuestLaunch' | 'getGithub' | 'setScope' | 'getScopeOptions' | 'getProjectSuggestions' | 'createSampleCampaign'
-  | 'adoptStarterHeroes' | 'getHeroesConfig' | 'saveHeroesConfig'
+  | 'adoptStarterHeroes' | 'getHeroesConfig' | 'saveHeroesConfig' | 'pickFolder' | 'openCampaignFolder'
 >
 
 const CAMPAIGN_KEY = 'dungeon.campaign'
@@ -219,6 +219,33 @@ export class AppStore {
     } finally {
       this.busy = false
     }
+  }
+
+  async pickFolder(): Promise<string | null> {
+    try {
+      const result = await this.client.pickFolder()
+      return result.path ?? null
+    } catch (e) {
+      this.error = this.fail(e)
+      return null
+    }
+  }
+
+  async openCampaignFolder(id: string) {
+    try {
+      await this.client.openCampaignFolder(id)
+      this.error = null
+    } catch (e) {
+      this.error = this.fail(e)
+    }
+  }
+
+  changeCampaignScope(id: string) {
+    if (!this.campaigns.some((c) => c.id === id)) return
+    this.selectCampaign(id)
+    this.questsOpen = true
+    this.pickingScope = true
+    void this.loadScopeOptions()
   }
 
   async adoptStarterHeroes(): Promise<boolean> {
@@ -442,7 +469,7 @@ export class AppStore {
     this.busy = true
     try {
       const c = await this.client.addCampaign(input)
-      this.campaigns = [...this.campaigns, c]
+      if (!this.campaigns.some((x) => x.id === c.id)) this.campaigns = [...this.campaigns, c]
       this.selectCampaign(c.id)
       this.error = null
       return true
@@ -484,7 +511,11 @@ export class AppStore {
   }
 
   async launch(target: Target) {
-    const campaign = this.campaign
+    await this.launchInCampaign(this.campaignId, target)
+  }
+
+  async launchInCampaign(campaignId: string | null, target: Target) {
+    const campaign = this.campaigns.find((c) => c.id === campaignId)
     if (!campaign) {
       this.error = 'Add or select a campaign first.'
       return
@@ -493,6 +524,7 @@ export class AppStore {
     try {
       const sess = await this.client.createSession({ ...target, campaign: campaign.id })
       this.sessions = [...this.sessions, sess]
+      this.selectCampaign(campaign.id)
       this.activeId = sess.id
       this.error = null
     } catch (e) {

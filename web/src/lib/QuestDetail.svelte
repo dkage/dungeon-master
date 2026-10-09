@@ -162,7 +162,7 @@
         {#if store.heroes.length === 0}<option value="">No heroes configured</option>{/if}
         {#each store.heroes as h (h.id)}<option value={h.id}>{h.label}</option>{/each}
       </select>
-      <button type="button" class="launch-button" onclick={openBrief} disabled={!d || !selectedHero || previewBusy || store.busy || !!existingQuestSession}>
+      <button type="button" class="launch-button" onclick={openBrief} disabled={!d || d.state === 'cleared' || !selectedHero || previewBusy || store.busy || !!existingQuestSession}>
         {previewBusy ? 'Preparing…' : 'Review launch'}
       </button>
       {#if existingQuestSession}

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -36,10 +37,12 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/github", s.handleGitHub)
 	mux.HandleFunc("GET /api/onboarding/suggestions", s.handleSuggestions)
 	mux.HandleFunc("POST /api/onboarding/sample", s.handleSampleCampaign)
+	mux.HandleFunc("POST /api/pick-folder", s.handlePickFolder)
 
 	mux.HandleFunc("POST /api/campaigns", s.handleCampaignAdd)
 	mux.HandleFunc("PATCH /api/campaigns/{id}", s.handleCampaignUpdate)
 	mux.HandleFunc("DELETE /api/campaigns/{id}", s.handleCampaignRemove)
+	mux.HandleFunc("POST /api/campaigns/{id}/open-folder", s.handleOpenFolder)
 	mux.HandleFunc("PUT /api/campaigns/{id}/scope", s.handleScopeSet)
 	mux.HandleFunc("GET /api/campaigns/{id}/scope/options", s.handleScopeOptions)
 	mux.HandleFunc("GET /api/campaigns/{id}/quests", s.handleQuests)
@@ -264,10 +267,92 @@ func (s *Server) handleCampaignAdd(w http.ResponseWriter, r *http.Request) {
 		Dir: req.Dir, Name: req.Name, Remote: req.Remote,
 	})
 	if err != nil {
+		if errors.Is(err, campaign.ErrDuplicate) {
+			if wanted, statErr := os.Stat(req.Dir); statErr == nil {
+				for _, existing := range s.cfg.Campaigns.List() {
+					if current, currentErr := os.Stat(existing.Dir); currentErr == nil && os.SameFile(wanted, current) {
+						writeJSON(w, http.StatusOK, existing)
+						return
+					}
+				}
+			}
+		}
 		campaignErr(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, c)
+}
+
+func (s *Server) handlePickFolder(w http.ResponseWriter, r *http.Request) {
+	var req struct{}
+	if !decode(w, r, &req) {
+		return
+	}
+	if !s.pickerMu.TryLock() {
+		httpErrCode(w, http.StatusConflict, "picker_busy", "A folder picker is already open.")
+		return
+	}
+	defer s.pickerMu.Unlock()
+	pick := s.cfg.PickFolder
+	if pick == nil {
+		pick = pickFolder
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	path, err := pick(ctx)
+	if errors.Is(err, errPickerCancelled) {
+		writeJSON(w, http.StatusOK, map[string]bool{"cancelled": true})
+		return
+	}
+	if errors.Is(err, errPickerUnavailable) {
+		httpErrCode(w, http.StatusNotImplemented, "picker_unavailable", "The native folder picker is unavailable. Type a project path instead.")
+		return
+	}
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			httpErrCode(w, http.StatusGatewayTimeout, "picker_timeout", "The folder picker timed out.")
+		} else {
+			httpErr(w, http.StatusInternalServerError, "could not open the folder picker")
+		}
+		return
+	}
+	path, err = filepath.Abs(path)
+	if err != nil {
+		httpErr(w, http.StatusBadRequest, "the folder picker returned an invalid path")
+		return
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.IsDir() {
+		httpErr(w, http.StatusBadRequest, "the selected path is not an existing directory")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"path": path})
+}
+
+func (s *Server) handleOpenFolder(w http.ResponseWriter, r *http.Request) {
+	var req struct{}
+	if !decode(w, r, &req) {
+		return
+	}
+	c, ok := s.cfg.Campaigns.Get(r.PathValue("id"))
+	if !ok {
+		httpErr(w, http.StatusNotFound, "no such campaign")
+		return
+	}
+	info, err := os.Stat(c.Dir)
+	if err != nil || !info.IsDir() {
+		httpErr(w, http.StatusBadRequest, "campaign folder is no longer available")
+		return
+	}
+	open := s.cfg.OpenFolder
+	if open == nil {
+		open = openFolder
+	}
+	if err := open(r.Context(), c.Dir); err != nil {
+		httpErr(w, http.StatusServiceUnavailable, "could not open this folder in the file manager")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleCampaignUpdate(w http.ResponseWriter, r *http.Request) {
