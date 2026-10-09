@@ -24,8 +24,8 @@ generators. It mirrors the demo source's titles and relationships; its
 ## Visual rule
 
 - The room, number, title, and dependency edges carry the task information.
-- A creature suggests **effort** only. Rat = trivial, goblin = moderate,
-  original many-eyed creature = large, empty diamond = unknown.
+- A creature suggests **effort** only. The 15-creature roster provides several
+  silhouettes per tier; unknown effort uses an empty diamond.
 - A separate marker and border carry **state**: `!` ready, `▣` blocked,
   `@` assigned, `✓` cleared. A door marks a blocking edge.
 - Quest detail and launch controls stay below the map. The List toggle is the
@@ -34,19 +34,18 @@ generators. It mirrors the demo source's titles and relationships; its
 
 ## Assets
 
-| File                              | Purpose                                                 |
-|-----------------------------------|---------------------------------------------------------|
-| `assets/rat-idle-strip.png`       | Four transparent rat poses                              |
-| `assets/goblin-idle-strip.png`    | Four transparent goblin poses                           |
-| `assets/many-eyed-idle-strip.png` | Four transparent poses of an original floating creature |
-| `assets/stone-floor.png`          | Dark stone texture under a heavy CSS shade              |
+The 15-creature tier map, stable issue assignment guidance, and sprite contract
+are in [CREATURE_ROSTER.md](./CREATURE_ROSTER.md). All 15 sheets are in
+`assets/`: rat, slime, bat, kobold, beetle, spider, goblin, skeleton, ghoul,
+orc, troll, warlock, many-eyed stone watcher, lich, and dragon. The original
+rat, goblin, and watcher sheets remain the style anchors for the 12 additions.
+Open [roster.html](./roster.html) to compare all strips together by effort tier.
 
-The three strips are 2172 × 724 RGBA, with four 543 px wide cells. The mockup
-displays each cell inside a 58 × 70 px window. The first frame of every creature
-is recognizable at that size in `preview-panel.png`. These are **prototype
-sprites**, not final animation masters: the generated frames need consistent
-baseline and edge cleanup before shipping. The stone texture has not been
-verified as mathematically seamless, so the mockup avoids a visible repeat.
+Each strip is 2172 × 724 RGBA, with four 543 px wide cells. The mockup displays
+each cell inside a 58 × 70 px window. These are **prototype sprites**, not final
+animation masters: inspect the frame edges and baseline at native size before
+shipping. The stone texture has not been verified as mathematically seamless,
+so the mockup avoids a visible repeat.
 
 `preview-panel.png` is the actual-width map and detail. `preview.png` shows the
 whole cockpit. `preview-list.png` shows the list alternative after selecting a
@@ -64,12 +63,14 @@ The images were made with the built-in imagegen tool. The concept sheet used:
 > pixel-art influence; cool blue ambient light and warm amber accents; no UI
 > text, logos, gore, or franchise character likeness.
 
-Each strip then used its corresponding concept-sheet row as reference and asked
-for four equally spaced poses of the **same** character on a transparent
-background: rat (crouch, sniff, rise, crouch), goblin (crouch, breathing shift,
-glance, crouch), and many-eyed creature (hover, tilt, narrowed eye, hover).
-The texture prompt asked for a quiet top-down blue-black stone floor, uniform
-lighting and no focal objects or text.
+Each original strip used its corresponding concept-sheet row as reference and
+asked for four equally spaced poses of the **same** character on transparent
+background. The 12 new sheets used the rat, goblin, and watcher as style
+references and followed the shared strip contract in `CREATURE_ROSTER.md`.
+Every prompt asked for restrained idle movement, no scenery or UI, consistent
+cool blue rim light, and restrained amber accents. The texture prompt asked
+for a quiet top-down blue-black stone floor, uniform lighting and no focal
+objects or text.
 
 ## What the study suggests
 
