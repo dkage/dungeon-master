@@ -24,14 +24,16 @@ These block or shape the work below. Each has a recommendation; none has an answ
 
 The content of each is in `PLAN_EXPERIENCE.md` §4; this is only what is not started.
 
-- **M3.6 First run and words** (`PLAN_EXPERIENCE.md` §5): Start-here panel, sample campaign, repo suggestions,
-  `words.ts` with `Term` popovers, starter heroes as an action, empty states, design tokens, `make run-fresh`, a
-  first-run browser test from an empty config directory.
+- **M3.6 Stitch shell, first run and words** (`PLAN_EXPERIENCE.md` §4–6): implement the Stitch v4 cockpit structure
+  and visual foundation first, including the right-panel map/detail split; then fit onboarding, sample campaign, repo
+  suggestions, `words.ts` with `Term` popovers, starter heroes as an action, empty states, appearance settings,
+  `make run-fresh`, and a first-run browser test into that shell. The graph remains M5a.
 - **M4 Launch from a quest**: briefing file, primary "Start with" button, session titles from quests, quest chip,
   one-session-per-tree gate. GitHub write-back stays opt-in and off.
 - **M4.5 Attention**: "needs you" from PTY output recency, tab title and favicon badge, optional OS notification.
-- **M5a Map v1** (`PLAN_MAP.md`, `PLAN_UI.md`): read-only layered graph, blocked-by and parent edges, click selects,
-  double-click starts. It must not hide blockers outside the scope (`PLAN_M3_7.md` 2.6).
+- **M5a Map v1** (`PLAN_MAP.md`, `PLAN_UI.md`): implement the read-only layered graph inside the map region reserved
+  in M3.6; blocked-by and parent edges, click selects, double-click starts. It must not hide blockers outside the scope
+  (`PLAN_M3_7.md` 2.6).
 - **M5b Spells** (`PLAN_SKILLS.md`), **M6 Map v2**, **M7 Hooks status**, **M8 Packaging**.
 
 ## 3. Left over from M3.5

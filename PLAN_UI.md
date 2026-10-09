@@ -244,9 +244,9 @@ The same pattern as the starter-heroes action in `PLAN_EXPERIENCE.md` §5.3, app
 
 | Section            | Contents                                                                  | Milestone |
 |--------------------|---------------------------------------------------------------------------|-----------|
-| Appearance & words | theme pack and palette (§6.5), hints, reduced motion                      | M3.6      |
+| Appearance & words | theme pack and palette (§6.5), selectable panel fonts and sizes, hints, reduced motion | M3.6 |
 | GitHub             | account and token source, budget in plain words, write-back toggles (off) | M3.5      |
-| Terminal           | font size, scrollback length (colours follow the palette)                 | M4        |
+| Terminal           | scrollback length (colours follow the palette); independent font size is in Appearance & words | M3.6/M4 |
 | Notifications      | when to notify (needs you, finished, failed), system notifications        | M4.5      |
 | Session titles     | automatic titles for free sessions                                        | later     |
 
@@ -281,6 +281,15 @@ themed word shows its plain name, and the hover popover always gives the plain m
 **Palette and pack**: each pack ships its palettes; inside a pack the user can pick among them or follow the system
 (light or dark). So the Settings section has two combos: **Theme** (the pack) and **Palette** (within the pack, default
 "System").
+
+**Dungeon typography choice (settled 2026-10-09):** Appearance & words offers **Almendra**, **EB Garamond**, and
+**Alegreya** as the selectable serif family for the left campaign panel and right quest panel. Almendra is the preferred
+default. Each of the three visible panels has its own font-size control: campaigns/sidebar, terminal, and quests. The
+terminal size changes xterm's size only; its monospaced Nerd Font stack remains fixed so terminal glyphs keep working.
+The selected serif never changes the terminal font. Keep Cinzel for display headings and Fira Code for code samples as
+shown in the visual baseline. Bundle the selectable font files with their matching SIL Open Font License texts; the
+font study in `design/font-study/` documents the candidates and Portuguese coverage (`ç`, `ã`, `á`, and other accented
+letters).
 
 ### What v1 builds now (cheap seams)
 
@@ -323,9 +332,11 @@ is mostly data, not a rewrite:
   framed dark-red panels, a parchment terminal, Cinzel and Fira Code). Its colours, fonts and textures become the
   pack's tokens and assets; its generated HTML is a reference, never copied into `web/`.
 
-Milestones: M3.6 ships the seams (words table with keys and the Neutral pack, icons by meaning, tokens), the Theme and
-Palette combos, the Dungeon and Neutral packs, and the completeness and contrast tests. The map skin choice per pack
-lands with the map (M5a). New packs, such as a starship pack, are a later initiative in `PLAN_V2.md`.
+Milestones: M3.6 applies the Stitch v4 visual foundation to the Svelte cockpit shell and ships the seams (words table
+with keys and the Neutral pack, icons by meaning, tokens), Theme and Palette controls, the Dungeon and Neutral packs,
+and completeness and contrast tests. The right-panel split and its visual treatment are established in M3.6; M5a fills
+the reserved map area with the interactive graph. New packs, such as a starship pack, are a later initiative in
+`PLAN_V2.md`.
 
 ## 7. Keyboard and platform conventions
 
@@ -388,40 +399,30 @@ bindings; the R1 smoke test opens Settings with ⌘, and pastes into a text fiel
 
 ## 8. Milestone summary
 
-- **M3.6**: in-page shortcuts (§7.2), campaign `+` with the folder picker, campaign card menus, scratch shell, the
-  Settings page with Heroes, Local files and Appearance & words, including the theme and
-  palette pickers (§6.5).
+- **M3.6**: Stitch v4 cockpit shell and right-panel map/detail split; in-page shortcuts (§7.2), campaign `+` with the
+  folder picker, campaign card menus, scratch shell, onboarding, and the Settings page with Heroes, Local files and
+  Appearance & words, including the theme and palette pickers (§6.5).
 - **M4**: detail footer with hero combo, None skill choice and Start, Brief preview, quest chip in the centre header,
   Terminal settings.
 - **M4.5**: "needs you" state dots, Dock or taskbar badge, Notifications settings.
-- **M5a**: the right-panel map, Map / List, expand, drilling into halls (`PLAN_MAP.md`).
+- **M5a**: the graph in the map area established in M3.6, Map / List behavior, expand, and drilling into halls
+  (`PLAN_MAP.md`).
 - **M5b**: Spells settings (sources, recommendation rules, skill presets) and the populated skill combo.
 - **R1** (release): native menus with Settings on ⌘, and the standard Edit menu (§7.1), window state.
 - **Later**: session titles, art for hero crests.
 
 ## 9. Decisions and open questions
 
-Decided (2026-10-08):
+Decided (2026-10-08; updated 2026-10-09):
 
 1. Settings is a **modal** over the whole window (§6).
 2. The app **owns the heroes file**; users edit heroes in Settings and never need the file (§6.1).
 3. The **scratch shell** stays, as `>_` next to the campaigns header (§2.2).
 4. Skill presets are **global** for now. Per-campaign presets are a later idea (`PLAN_V2.md`).
 5. A locked quest **cannot be started**: no "start anyway" override (`PLAN_MAP.md` §3).
+6. The terminal stays in the centre while the right panel holds the map/list and quest detail; no centre stage tabs
+   (`PLAN_EXPERIENCE.md` §3, `PLAN_MAP.md` §2).
 
 Still open:
 
-1. No tabs in the centre (the left panel is the session list): agreed?
-2. Rename `party.toml` to a plain name such as `agents.toml`?
-3. **Dungeon pack fonts.** The v4 prototype (`design/stitch-prototype/`) cannot ship its fonts as they are. Every font
-   must ship in the binary with its licence text (§6.5), and the export has the font files but no licences. Settling
-   this is the first step of the UI work (`PLAN_EXPERIENCE.md` §7.2):
-    - **Cinzel** (headings, labels) and **Fira Code** (code): SIL OFL 1.1, no Reserved Font Name. Keep them; add their
-      `OFL.txt` files. Cinzel has only capitals and small capitals, Latin only, so it suits titles, never body text.
-    - **MedievalSharp**: loaded by the pages but never used. Drop it. It is OFL 1.1 with the Reserved Font Name
-      "MedievalSharp", so a subset we make ourselves would have to be renamed.
-    - **Georgia**, the parchment terminal's body text, is a system font that we cannot ship and that is missing on most
-      Linux machines. Pick an OFL serif in its place (candidates: EB Garamond, Crimson Pro, Cormorant) and compare it
-      against the screenshots.
-    - The terminal itself keeps a monospaced Nerd Font stack (§6.5), so only the panel around it gets the parchment
-      serif. Is the prototype's serif-in-terminal look dropped, or moved to a quest briefing view?
+1. Rename `party.toml` to a plain name such as `agents.toml`?

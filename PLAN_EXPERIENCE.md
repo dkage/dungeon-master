@@ -69,24 +69,25 @@ Three columns, one centre of gravity:
 
 ```
 ┌──────────────┬──────────────────────────────────┬───────────────────────┐
-│ CAMPAIGNS    │ [ Map ] [ Expedition: #42 ]  ... │ QUESTS  (list)        │
+│ CAMPAIGNS    │                                  │ MAP / LIST            │
 │  repo A      │                                  │  filter, state tally  │
-│   ● #42 ...  │  terminal or map (the stage)     │                       │
-│   ○ #17 ...  │                                  │ ───────────────────── │
+│   ● #42 ...  │  selected terminal               │  quest graph or list  │
+│   ○ #17 ...  │                                  │ ───── resize ──────── │
 │  repo B      │                                  │ QUEST DETAIL          │
-│              │                                  │  [ Start with Opus ▾ ]│
-│ + Add        │                                  │                       │
+│              │                                  │  issue content        │
+│ + Add        │                                  │  launch controls M4   │
 └──────────────┴──────────────────────────────────┴───────────────────────┘
 ```
 
 Changes from today:
 
-- **The stage (centre) has tabs: Map and one tab per expedition.** The map needs room, so it is not squeezed into the
-  400 px quest drawer. The quest list stays on the right as the precise, searchable view of the same data.
+- **The app keeps the Stitch cockpit layout:** campaigns and sessions on the left, the selected terminal in the centre,
+  and the quest workspace on the right. The right panel is split vertically: map/list above, selected quest detail
+  below. The quest list remains the precise, searchable alternative to the map.
 - **The hero buttons move into the quest detail** as one primary button, "Start with <default hero>", with a menu for
   another hero and an optional spell. The toolbar keeps only "Shell" (free session) and the campaign identity. This
   removes the "which of these buttons do I press?" problem: you start a quest, not a model.
-- **A session knows its quest.** Tabs and sidebar entries read "#42 Validate email addresses", not "claude".
+- **A session knows its quest.** Sidebar entries read "#42 Validate email addresses", not "claude".
 - **The help layer is built in** (§5), not a separate document.
 
 ## 4. Milestones (revised order)
@@ -96,10 +97,10 @@ M0 to M3 are done. New or moved work is marked.
 | Milestone                                   | Content                                                                                                                                                                      | Exit test (a person does this on a fresh config directory)                                                                                                                                     |
 |---------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **M3** (done)                               | Quests list and detail, GitHub source, demo source, sanitised markdown                                                                                                       | Met. Follow-ups carried into M3.6 (the scope part of the truncation fix is Phase B of `PLAN_M3_5.md`): say when the list is truncated, and stop offering sample quests inside a real campaign. |
-| **M3.6 First run and words** (new)          | Start-here panel, sample campaign, repo suggestions, glossary and `Term`, starter heroes as an action, empty states, design tokens, `make run-fresh`, first-run browser test | From an empty config directory to a running agent session on the sample campaign in under two minutes, with no document open and no unexplained word on screen.                                |
-| **M4 Launch from a quest**                  | Briefing, primary "Start with" button, session titles from quests, quest chip, one-session-per-tree gate, neutral GitHub write-back stays opt-in and off                     | Pick an issue, press one button, the agent has the issue's context and says what it is working on.                                                                                             |
+| **M3.6 Stitch shell, first run and words**  | Implement the Stitch v4 cockpit structure and visual foundation in Svelte; fit onboarding, sample campaign, repo suggestions, glossary and `Term`, starter heroes action, empty states, appearance settings, `make run-fresh`, and the first-run browser test into that shell. Reserve the right-panel map/detail split with existing list/detail behavior; do not build the graph yet. | From an empty config directory, the user can learn the app and start a sample session inside the Stitch-based shell; the layout has a clear place for the future map and quest launch controls. |
+| **M4 Launch from a quest**                  | Briefing, pinned detail-footer hero/model and skill controls, primary "Start with" button, session titles from quests, quest chip, one-session-per-tree gate; neutral GitHub write-back stays opt-in and off | Pick an issue, press one button, the agent has the issue's context and says what it is working on.                                                        |
 | **M4.5 Attention** (pulled forward from M7) | "Needs you" signal from PTY output recency (hooks replace it in M7), tab title and favicon badge, optional OS notification                                                   | Start two sessions, switch away, and know which one stopped to ask something without looking.                                                                                                  |
-| **M5a Map v1** (pulled forward from M6)     | Read-only layered graph in the stage: rooms are quests, edges are blocked-by and parent links, state styling, click selects, double-click starts                             | The dependency picture of a real repo is readable at a glance and is faster to read than the list.                                                                                             |
+| **M5a Map v1** (pulled forward from M6)     | Fill the right-panel map region established in M3.6 with a read-only layered graph: rooms are quests, edges are blocked-by and parent links, state styling, click selects, double-click starts | The dependency picture of a real repo is readable at a glance and is faster to read than the list.                                                        |
 | **M5b Spells**                              | Discovery, suggested spell per quest, spell menu in the Start button                                                                                                         | A bug-labelled quest offers the bug skill as the default and one click runs it.                                                                                                                |
 | **M6 Map v2**                               | Fog for unspecified work, glyphs by label, milestone floors, live occupancy                                                                                                  | Polish only; M5a already carries the value.                                                                                                                                                    |
 | **M7 Hooks status**                         | Hook-driven working, idle, needs-input replaces the output heuristic                                                                                                         | Same exit as M4.5 with exact states.                                                                                                                                                           |
@@ -200,13 +201,12 @@ levels), one accent, four state colours (open, claimed, locked, cleared) with a 
 type scale, and one monospace stack shared with the terminal theme. Dark is the default look; light follows the system.
 Tokens live in one file; components reference tokens only.
 
-**First step of the UI work: settle the fonts.** Before any token or component, close the font question in `PLAN_UI.md`
-§9 (open question 3), because the type scale and the font tokens depend on it:
-
-1. Render the v4 prototype's parchment panel (`design/stitch-prototype/v4/`) with each OFL serif candidate in place of
-   Georgia: EB Garamond, Crimson Pro and Cormorant.
-2. Compare them side by side with the Stitch screenshot, at the app's real sizes, on macOS and Linux.
-3. Record the choice in `PLAN_UI.md`, and bundle the chosen font, Cinzel and Fira Code with their `OFL.txt` files.
+**First step of the UI work: implement the settled font choice.** The comparison is in
+`design/font-study/`; `PLAN_UI.md` §6.5 records the decision. Appearance & words offers Almendra (default), EB Garamond,
+and Alegreya for the campaign and quest panels, plus an independent size control for each panel including the terminal.
+The terminal keeps its monospaced Nerd Font stack. Keep Cinzel for display headings and Fira Code for code samples.
+Bundle the font files used by the app with their matching SIL Open Font License texts, and retain Portuguese accents in
+the typography specimen and UI checks.
 
 ### 7.3 State language
 
@@ -253,7 +253,7 @@ One set of markers used everywhere (list, map, tabs, sidebar):
 
 Written as rules; each is cheap to check in review.
 
-- **Surface cap.** Three columns, a stage with tabs, a settings sheet, a help page. A new top-level surface needs a
+- **Surface cap.** Three columns with the right-panel map/detail workspace, a settings sheet, and a help page. A new top-level surface needs a
   written case against putting it in an existing one.
 - **Scope fences.** Not in v1 and not to be built "just in case": a task store of our own, a database server, a workflow
   or pipeline engine, registries or versioned bundles of hero setups, containers or sandboxes, a memory or knowledge
@@ -286,13 +286,12 @@ Written as rules; each is cheap to check in review.
 ## 10. Decisions to confirm
 
 1. **Map before spells** (this plan) or spells first (the old order)?
-2. **Stage tabs** (map and sessions share the centre) versus map in the right column?
-3. **Repo suggestions**: is a bounded, read-only scan of common development folders acceptable, or should it be
+2. **Repo suggestions**: is a bounded, read-only scan of common development folders acceptable, or should it be
    launch-directory only plus manual paths?
-4. **Sample campaign working directory**: a scratch directory under the state directory, with a real agent session
+3. **Sample campaign working directory**: a scratch directory under the state directory, with a real agent session
    allowed, or sessions disabled for the sample?
-5. **Windows in v1?** It decides the PTY approach and the release matrix before M8.
-6. **Does an unattended mode** (non-interactive `claude -p` for research tickets) belong in v1, v2, or never? It is the
+4. **Windows in v1?** It decides the PTY approach and the release matrix before M8.
+5. **Does an unattended mode** (non-interactive `claude -p` for research tickets) belong in v1, v2, or never? It is the
    one feature that conflicts with "the terminal is the product", so it stays in `PLAN_V2.md` until decided.
 
 ## 11. Definition of done for the experience

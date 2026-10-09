@@ -5,8 +5,9 @@ an agent CLI in a PTY with its model, flags and context already set. Go server w
 webview shell.
 
 Status: M0-M3 done. M3.5 (GitHub budget, scope and the `gh` shim, `PLAN_M3_5.md`) is done except the deferred SQLite
-copy and write queue (phases C and D). M3.6 (first run and words, `PLAN_EXPERIENCE.md`) is in parallel; M4 (start a hero
-from a quest) is next. Themed words: `GLOSSARY.md`.
+copy and write queue (phases C and D). M3.6 (Stitch v4 cockpit shell, first run and words; `PLAN_EXPERIENCE.md`) is in
+progress: implement the shell and right-panel map/detail split before polishing onboarding. M4 adds quest launch and
+its pinned detail controls; M5a fills the reserved map area with the graph. Themed words: `GLOSSARY.md`.
 
 ## Scope and principles
 
@@ -143,9 +144,10 @@ design so the work can start from a shared reference.
 
 ## Milestones
 
-M0 skeleton, M1 heroes and terminal, M2 campaigns, M3 GitHub quests, M4 briefing and launch from a quest, M5 spells, M6
-dungeon map, M7 hooks status and notifications, M8 packaging and release. Details in `PLAN.md` §11 and `PLAN_SKILLS.md`
-§7.
+M0 skeleton, M1 heroes and terminal, M2 campaigns, M3 GitHub quests, M3.5 GitHub scope and write guard, M3.6 Stitch
+cockpit shell and first run, M4 briefing and launch from a quest, M4.5 attention, M5a dungeon map, M5b spells, M6 map
+polish, M7 hooks status and notifications, M8 packaging and release. Details in `PLAN_EXPERIENCE.md` §4,
+`PLAN_SKILLS.md` §7 and `release/PLAN_RELEASE.md`.
 
 ## Verifications
 

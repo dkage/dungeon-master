@@ -1,10 +1,10 @@
-# Map and right panel: brainstorm
+# Map and right panel: design
 
-Brainstorm for the map (M5a and M6 in `PLAN_EXPERIENCE.md` §4) and for the right-hand panel around it. Nothing here
-is decided yet. It ends with a recommended MVP and the questions to settle before building.
+Design for the map (M5a and M6 in `PLAN_EXPERIENCE.md` §4) and the right-hand panel around it. The right-column
+composition is decided and its shell belongs in M3.6; M5a implements the graph inside the reserved map region.
 
-It does not edit the plans in motion. Where it changes them (the layout in `PLAN_EXPERIENCE.md` §3 and §7.4), the
-change is listed in §9 so it can go into the M3.7 reconciliation pass.
+The Stitch v4 prototype is the visual reference for the shell. This document specifies map behavior; `PLAN_UI.md`
+specifies the surrounding controls. Where the generated prototype differs from those behavior plans, the plans win.
 
 ## 1. What we want
 
@@ -48,8 +48,8 @@ Constraints:
 The controls around the map (header, detail, footer, settings, shortcuts) are specified in `PLAN_UI.md`; this section
 keeps only the layout decision.
 
-This is better than the stage tabs proposed in `PLAN_EXPERIENCE.md` §3, where the map and the terminals took turns in
-the centre. With the map on the right you watch the agents and the map together, which is the point of a cockpit.
+This keeps the selected terminal visible while the user reads the map and quest detail, matching the Stitch cockpit
+and keeping the three regions in stable roles.
 
 - **Right column**: map on top, quest detail below, a draggable splitter between them. Both sizes are remembered per
   window. The column itself is resizable (about half the window on a wide desktop, minimum 360 px, while keeping the
@@ -244,10 +244,10 @@ The sample quests (`internal/quests/demo`) should be shaped to show the map well
 a blocked chain of three, two loose quests (outskirts), one closed, one assigned elsewhere. The first-run experience
 then shows a meaningful map within seconds, before any GitHub setup.
 
-## 9. Changes to plans in motion (for the M3.7 pass)
+## 9. Plan alignment
 
-- `PLAN_EXPERIENCE.md` §3: replace "stage tabs: map and one tab per expedition" with the right-column layout in §2 of
-  this file; the terminal keeps the full centre.
+- `PLAN_EXPERIENCE.md` §3 and §4: implement the Stitch cockpit shell in M3.6 and reserve the right-column map/detail
+  split there; M5a implements the graph. The terminal remains in the full-height centre.
 - `PLAN_EXPERIENCE.md` §3 and §7.5: launch controls move into the detail footer with a hero/model combo, a skill combo
   defaulted to the recommendation or None, and Start. None gives a plain quest session without a skill.
 - `PLAN_EXPERIENCE.md` §7.4: point to this file for the map design.
@@ -255,12 +255,11 @@ then shows a meaningful map within seconds, before any GitHub setup.
 - `GLOSSARY.md`: "hall" and "outskirts" are drawing terms, not new vocabulary; if shown at all, they appear as plain
   "group" and "unlinked" in the popover.
 
-## 10. Questions to settle
+## 10. Remaining design questions
 
-1. Right-column layout (this file) instead of stage tabs: agreed?
-2. MVP skin: torchlight (B) with markers (C), or start with plain (A) only and add the skin in M6?
-3. Should cleared quests show by default (faint) or be hidden until toggled?
-4. Hero tokens: generated geometric faces, or user-chosen class glyphs?
-5. Do halls (parents as regions) read better than parent links drawn as lines? Worth a quick prototype of both on the
+1. MVP skin: torchlight (B) with markers (C), or start with plain (A) only and add the skin in M6?
+2. Should cleared quests show by default (faint) or be hidden until toggled?
+3. Hero tokens: generated geometric faces, or user-chosen class glyphs?
+4. Do halls (parents as regions) read better than parent links drawn as lines? Worth a quick prototype of both on the
    sample data.
-6. Is a later art direction (E) a goal for v1, or a v2 item for `PLAN_V2.md`?
+5. Is a later art direction (E) a goal for v1, or a v2 item for `PLAN_V2.md`?
