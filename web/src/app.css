@@ -434,9 +434,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .state.open { background: #6bba86; box-shadow: 0 0 7px #4bbf7180; }
 .state.claimed { background: #6ab4d8; box-shadow: 0 0 7px #57b8e880; }
 .state.locked { border-color: #b18146; }
-.detail, .detail-empty { min-height: 0; overflow-y: auto; background: linear-gradient(180deg, #160609, #100507); }
+.detail, .detail-empty { min-height: 0; overflow: hidden; background: linear-gradient(180deg, #160609, #100507); }
 .detail .qhead { position: sticky; top: 0; }
-.detail article { padding: 12px 14px 20px; }
+.detail article { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 14px 20px; }
 .dtitle { color: #f2e1c1; font-family: 'Cinzel', var(--reading-font, serif); font-size: 17px; }
 .dmeta, .detail .meta, .detail .rel { color: #bea98e; }
 .pill, .chip { background: #21090c; border-color: #633027; color: #d9c7aa; }

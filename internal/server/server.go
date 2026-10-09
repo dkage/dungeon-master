@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -46,6 +47,8 @@ type Config struct {
 	Party      party.Party
 	PartyPath  string
 	PartyError string
+	// StateDir is the private per-user directory for generated briefing files.
+	StateDir string
 	// Claude is the resolved claude binary; empty when it was not found, in
 	// which case ClaudeErr says why and hero launches are refused.
 	Claude    string
@@ -169,6 +172,9 @@ func New(cfg Config) (*Server, error) {
 }
 
 func withDefaults(cfg Config) Config {
+	if cfg.StateDir == "" && cfg.PartyPath != "" {
+		cfg.StateDir = filepath.Dir(cfg.PartyPath)
+	}
 	if cfg.Sessions == nil {
 		cfg.Sessions = session.NewManager()
 	}

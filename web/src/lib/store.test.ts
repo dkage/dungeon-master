@@ -28,6 +28,7 @@ function fakeClient(over: Partial<Client> = {}, state: Partial<AppState> = {}): 
     removeCampaign: vi.fn(async () => undefined),
     getQuests: vi.fn(async () => result([quest(1)])),
     getQuest: vi.fn(async (_c, n) => detailOf(n)),
+    previewQuestLaunch: vi.fn(async () => ({ content: 'brief', canStart: true, truncated: false, commentsShown: 0, commentsTotal: 0 })),
     getGithub: vi.fn(async () => githubOk),
     setScope: vi.fn(async (id, scope) => camp(id, { scope })),
     getScopeOptions: vi.fn(async () => scopeOptions),
@@ -275,6 +276,20 @@ describe('sessions', () => {
     expect(s.busy).toBe(false)
     await s.launch({ shell: true })
     expect(c.createSession).toHaveBeenLastCalledWith({ shell: true, campaign: 'c2' })
+  })
+
+  it('previews and launches a selected quest with the inspected briefing id', async () => {
+    const c = fakeClient({
+      previewQuestLaunch: vi.fn(async () => ({ content: 'brief', canStart: true, briefingId: 'preview-1', truncated: false, commentsShown: 0, commentsTotal: 0 })),
+    })
+    const s = new AppStore(c)
+    await s.refresh()
+    const preview = await s.previewQuestLaunch(9, 'opus')
+    expect(preview?.briefingId).toBe('preview-1')
+    expect(c.previewQuestLaunch).toHaveBeenCalledWith('c1', 9, 'opus')
+    expect(await s.launchQuest(9, 'opus', preview?.briefingId)).toBe(true)
+    expect(c.createSession).toHaveBeenCalledWith({ campaign: 'c1', hero: 'opus', quest: 9, briefingId: 'preview-1' })
+    expect(s.activeId).toBe('s1')
   })
 
   it('launch shows the server error and clears busy', async () => {

@@ -39,11 +39,16 @@ type env struct {
 }
 
 func startServer(t *testing.T, mutate func(*Config)) *env {
+	return startServerWithQuestTTL(t, mutate, time.Nanosecond)
+}
+
+func startServerWithQuestTTL(t *testing.T, mutate func(*Config), ttl time.Duration) *env {
 	t.Helper()
 	dir := t.TempDir()
 	cfg := Config{
-		Token:   testToken,
-		Version: "test",
+		Token:    testToken,
+		Version:  "test",
+		StateDir: filepath.Join(t.TempDir(), "state"),
 		Party: party.Party{
 			Claude: "claude",
 			Heroes: []party.Hero{{
@@ -64,7 +69,7 @@ func startServer(t *testing.T, mutate func(*Config)) *env {
 	cfg.Campaigns, _ = campaign.Open(context.Background(), "", fakeGit{})
 	gh := &fakeQuests{}
 	cfg.Quests = quests.NewService(quests.ServiceOptions{
-		GitHub: gh, Demo: demo.New(), TTL: time.Nanosecond, CountsTTL: time.Nanosecond, MinRefresh: time.Nanosecond,
+		GitHub: gh, Demo: demo.New(), TTL: ttl, CountsTTL: time.Nanosecond, MinRefresh: time.Nanosecond,
 	})
 	if mutate != nil {
 		mutate(&cfg)
@@ -380,6 +385,92 @@ func TestHeroSessionEndToEnd(t *testing.T) {
 	}
 	if resp, _ := e.req("GET", "/api/sessions/"+sj.ID+"/term", nil, nil); resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("terminal of a removed session: %d", resp.StatusCode)
+	}
+}
+
+func TestQuestPreviewAndStartUseTheSamePrivateBriefing(t *testing.T) {
+	e := startServerWithQuestTTL(t, nil, time.Minute)
+	e.gh.mu.Lock()
+	e.gh.detail = quests.Detail{
+		Quest: quests.Quest{
+			Number: 42, Title: "Fix signup validation", State: quests.StateOpen,
+			URL: "https://github.com/acme/widgets/issues/42", Labels: []quests.Label{{Name: "bug"}}, Comments: 1,
+		},
+		Body:        "Validate the address before saving.",
+		CommentList: []quests.Comment{{Author: "alice", Body: "Keep the error readable."}},
+	}
+	e.gh.mu.Unlock()
+
+	resp, out := e.req(http.MethodPost, "/api/campaigns/"+e.campaign+"/quests/42/launch-preview", map[string]any{"hero": "opus"}, nil)
+	var preview struct {
+		Content      string   `json:"content"`
+		CanStart     bool     `json:"canStart"`
+		HeroLabel    string   `json:"heroLabel"`
+		Directory    string   `json:"directory"`
+		BriefingID   string   `json:"briefingId"`
+		BriefingFile string   `json:"briefingFile"`
+		Opener       string   `json:"opener"`
+		SystemPrompt string   `json:"systemPrompt"`
+		Command      []string `json:"command"`
+	}
+	if err := json.Unmarshal(out, &preview); err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK || !preview.CanStart || preview.HeroLabel != "Opus" || preview.Directory != e.dir {
+		t.Fatalf("preview: %d %s", resp.StatusCode, out)
+	}
+	if !strings.Contains(preview.Content, "Fix signup validation") || !strings.Contains(preview.Content, "Keep the error readable.") || !strings.Contains(preview.SystemPrompt, "untrusted task data") {
+		t.Fatalf("incomplete preview: %+v", preview)
+	}
+	if !strings.Contains(preview.Opener, preview.BriefingFile) || len(preview.Command) < 8 {
+		t.Fatalf("incomplete launch plan: %+v", preview)
+	}
+	file, err := os.ReadFile(preview.BriefingFile)
+	if err != nil || string(file) != preview.Content {
+		t.Fatalf("briefing file mismatch: %v", err)
+	}
+	info, err := os.Stat(preview.BriefingFile)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("briefing permissions: %v %v", info, err)
+	}
+
+	sj := e.create(map[string]any{
+		"hero": "opus", "quest": 42, "briefingId": preview.BriefingID,
+	})
+	if sj.Title != "#42 Fix signup validation" || sj.Dir != e.dir {
+		t.Fatalf("quest session metadata: %+v", sj)
+	}
+	c, _, err := e.dial(sj.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.CloseNow()
+	output := readUntil(t, c, "cwd=")
+	for _, want := range []string{
+		"arg=[--model]", "arg=[m1]", "arg=[--append-system-prompt]",
+		"untrusted task data", "arg=[--add-dir]", filepath.Dir(preview.BriefingFile),
+		"arg=[--]", preview.BriefingFile,
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("session output missing %q:\n%s", want, output)
+		}
+	}
+	e.gh.mu.Lock()
+	getCalls := e.gh.getCalls
+	e.gh.mu.Unlock()
+	if getCalls != 1 {
+		t.Fatalf("preview and start used %d issue-detail requests, want one", getCalls)
+	}
+}
+
+func TestClosedQuestCannotStart(t *testing.T) {
+	e := startServer(t, nil)
+	e.gh.mu.Lock()
+	e.gh.detail = quests.Detail{Quest: quests.Quest{Title: "Already done", State: quests.StateCleared, Closed: true}}
+	e.gh.mu.Unlock()
+	resp, out := e.req(http.MethodPost, "/api/sessions", map[string]any{"campaign": e.campaign, "hero": "opus", "quest": 7}, nil)
+	if resp.StatusCode != http.StatusConflict || !strings.Contains(string(out), "closed") {
+		t.Fatalf("closed quest launch: %d %s", resp.StatusCode, out)
 	}
 }
 

@@ -123,6 +123,7 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 		Token:      token,
 		Version:    version,
 		Assets:     web.Assets(),
+		StateDir:   dir,
 		SampleDir:  filepath.Join(dir, "sample-workspace"),
 		Party:      p,
 		PartyPath:  partyPath,

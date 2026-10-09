@@ -15,6 +15,7 @@ type fakeSource struct {
 	name      string
 	calls     atomic.Int32
 	countsN   atomic.Int32
+	getCalls  atomic.Int32
 	list      []Quest
 	total     int
 	truncated bool
@@ -40,6 +41,7 @@ func (f *fakeSource) List(ctx context.Context, repo Repo, scope campaign.Scope) 
 }
 
 func (f *fakeSource) Get(_ context.Context, repo Repo, n int) (Detail, error) {
+	f.getCalls.Add(1)
 	f.gotRepo, f.getN = repo, n
 	return Detail{Quest: Quest{Number: n, Title: f.name}}, f.err
 }
@@ -153,6 +155,26 @@ func TestAnUnchosenScopeAsksTheQuestion(t *testing.T) {
 	// Demo data never asks.
 	if _, err := s.List(context.Background(), campaign.Campaign{Demo: true}, false); err != nil {
 		t.Fatalf("demo: %v", err)
+	}
+}
+
+func TestDetailIsReusedByPreviewAndLaunchWithinTTL(t *testing.T) {
+	s, ghs, _, clk := setup()
+	campaign := gh(&tracked)
+	for range 3 {
+		if _, err := s.Detail(context.Background(), campaign, 5); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := ghs.getCalls.Load(); got != 1 {
+		t.Fatalf("detail source called %d times within cache lifetime", got)
+	}
+	clk.add(61 * time.Second)
+	if _, err := s.Detail(context.Background(), campaign, 5); err != nil {
+		t.Fatal(err)
+	}
+	if got := ghs.getCalls.Load(); got != 2 {
+		t.Fatalf("expired detail cache made %d source calls, want 2", got)
 	}
 }
 

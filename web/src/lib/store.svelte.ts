@@ -1,13 +1,13 @@
 import * as realApi from './api'
 import type {
-  AppState, Campaign, CampaignInput, CampaignPatch, GithubStatus, Hero, HeroesConfig, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
+  AppState, Campaign, CampaignInput, CampaignPatch, GithubStatus, Hero, HeroesConfig, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
   SessionInfo,
 } from './api'
 
 export type Client = Pick<
   typeof realApi,
   | 'getState' | 'createSession' | 'deleteSession' | 'addCampaign' | 'updateCampaign' | 'removeCampaign'
-  | 'getQuests' | 'getQuest' | 'getGithub' | 'setScope' | 'getScopeOptions' | 'getProjectSuggestions' | 'createSampleCampaign'
+  | 'getQuests' | 'getQuest' | 'previewQuestLaunch' | 'getGithub' | 'setScope' | 'getScopeOptions' | 'getProjectSuggestions' | 'createSampleCampaign'
   | 'adoptStarterHeroes' | 'getHeroesConfig' | 'saveHeroesConfig'
 >
 
@@ -84,6 +84,7 @@ export class AppStore {
   version = $state('')
   claude = $state<AppState['claude']>({ found: true })
   defaultHeroes = $state(false)
+  defaultHero = $state('')
   partyError = $state('')
   heroes = $state<Hero[]>([])
   campaigns = $state<Campaign[]>([])
@@ -158,6 +159,7 @@ export class AppStore {
       this.version = st.version
       this.claude = st.claude
       this.defaultHeroes = st.defaultHeroes
+      this.defaultHero = st.defaultHero ?? ''
       this.partyError = st.partyError ?? ''
       this.heroes = st.heroes
       this.campaigns = st.campaigns
@@ -474,6 +476,38 @@ export class AppStore {
       this.error = null
     } catch (e) {
       this.error = this.fail(e)
+    } finally {
+      this.busy = false
+    }
+  }
+
+  async previewQuestLaunch(number: number, hero: string): Promise<LaunchPreview | null> {
+    const campaign = this.campaign
+    if (!campaign) return null
+    try {
+      return await this.client.previewQuestLaunch(campaign.id, number, hero)
+    } catch (e) {
+      this.error = this.fail(e)
+      return null
+    }
+  }
+
+  async launchQuest(number: number, hero: string, briefingId?: string): Promise<boolean> {
+    const campaign = this.campaign
+    if (!campaign) {
+      this.error = 'Add or select a campaign first.'
+      return false
+    }
+    this.busy = true
+    try {
+      const sess = await this.client.createSession({ campaign: campaign.id, hero, quest: number, briefingId })
+      this.sessions = [...this.sessions, sess]
+      this.activeId = sess.id
+      this.error = null
+      return true
+    } catch (e) {
+      this.error = this.fail(e)
+      return false
     } finally {
       this.busy = false
     }

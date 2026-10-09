@@ -3,16 +3,20 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/dkage/dungeon-master/internal/briefing"
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/fsutil"
 	"github.com/dkage/dungeon-master/internal/history"
+	"github.com/dkage/dungeon-master/internal/launcher"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/quests"
 	"github.com/dkage/dungeon-master/internal/session"
 )
 
@@ -39,6 +43,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/campaigns/{id}/scope/options", s.handleScopeOptions)
 	mux.HandleFunc("GET /api/campaigns/{id}/quests", s.handleQuests)
 	mux.HandleFunc("GET /api/campaigns/{id}/quests/{number}", s.handleQuest)
+	mux.HandleFunc("POST /api/campaigns/{id}/quests/{number}/launch-preview", s.handleQuestLaunchPreview)
 
 	mux.HandleFunc("POST /api/sessions", s.handleCreate)
 	mux.HandleFunc("DELETE /api/sessions/{id}", s.handleDelete)
@@ -66,13 +71,14 @@ type sessionJSON struct {
 }
 
 type stateJSON struct {
-	Version    string              `json:"version"`
-	Claude     claudeJSON          `json:"claude"`
-	Defaulted  bool                `json:"defaultHeroes"`
-	PartyError string              `json:"partyError,omitempty"`
-	Heroes     []heroJSON          `json:"heroes"`
-	Campaigns  []campaign.Campaign `json:"campaigns"`
-	Sessions   []sessionJSON       `json:"sessions"`
+	Version     string              `json:"version"`
+	Claude      claudeJSON          `json:"claude"`
+	Defaulted   bool                `json:"defaultHeroes"`
+	DefaultHero string              `json:"defaultHero"`
+	PartyError  string              `json:"partyError,omitempty"`
+	Heroes      []heroJSON          `json:"heroes"`
+	Campaigns   []campaign.Campaign `json:"campaigns"`
+	Sessions    []sessionJSON       `json:"sessions"`
 }
 
 type heroConfigJSON struct {
@@ -123,13 +129,14 @@ func (s *Server) handleState(w http.ResponseWriter, _ *http.Request) {
 	partyError := s.cfg.PartyError
 	s.partyMu.RUnlock()
 	st := stateJSON{
-		Version:    s.cfg.Version,
-		Claude:     claudeJSON{Found: s.cfg.Claude != "", Path: s.cfg.Claude, Error: s.cfg.ClaudeErr},
-		Defaulted:  partyState.Defaulted,
-		PartyError: partyError,
-		Heroes:     []heroJSON{},
-		Campaigns:  s.cfg.Campaigns.List(),
-		Sessions:   s.sessionViews(),
+		Version:     s.cfg.Version,
+		Claude:      claudeJSON{Found: s.cfg.Claude != "", Path: s.cfg.Claude, Error: s.cfg.ClaudeErr},
+		Defaulted:   partyState.Defaulted,
+		DefaultHero: partyState.DefaultHero,
+		PartyError:  partyError,
+		Heroes:      []heroJSON{},
+		Campaigns:   s.cfg.Campaigns.List(),
+		Sessions:    s.sessionViews(),
 	}
 	for _, h := range partyState.Heroes {
 		st.Heroes = append(st.Heroes, heroJSON{ID: h.ID, Label: h.Label})
@@ -333,8 +340,12 @@ type createReq struct {
 	Hero   string `json:"hero"`
 	Shell  bool   `json:"shell"`
 	Opener string `json:"opener"`
-	Cols   int    `json:"cols"`
-	Rows   int    `json:"rows"`
+	Quest  int    `json:"quest,omitempty"`
+	// BriefingID refers only to a preview created by this server for the same
+	// campaign, quest, and hero; it is never interpreted as a filesystem path.
+	BriefingID string `json:"briefingId,omitempty"`
+	Cols       int    `json:"cols"`
+	Rows       int    `json:"rows"`
 }
 
 func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -353,6 +364,14 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.Opener) > maxOpener {
 		httpErr(w, http.StatusBadRequest, "opener too long")
+		return
+	}
+	if req.Quest < 0 || (req.Quest == 0 && req.BriefingID != "") {
+		httpErr(w, http.StatusBadRequest, "invalid quest briefing reference")
+		return
+	}
+	if req.Quest > 0 && (req.Hero == "" || req.Shell) {
+		httpErr(w, http.StatusBadRequest, "a quest session requires a hero")
 		return
 	}
 	cols, rows := req.Cols, req.Rows
@@ -380,7 +399,41 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 			httpErr(w, http.StatusServiceUnavailable, "claude not found: "+s.cfg.ClaudeErr)
 			return
 		}
-		spec = s.heroSpecWithGate(h, req.Opener)
+		if req.Quest > 0 {
+			if req.Opener != "" {
+				httpErr(w, http.StatusBadRequest, "quest sessions use their generated briefing opener")
+				return
+			}
+			d, err := s.cfg.Quests.Detail(r.Context(), camp, req.Quest)
+			if err != nil {
+				if errors.Is(err, quests.ErrNotFound) {
+					httpErrCode(w, http.StatusNotFound, "not_found", "That issue was not found.")
+					return
+				}
+				questsErr(w, err, camp.Repo)
+				return
+			}
+			if reason := questStartBlock(d); reason != "" {
+				httpErrCode(w, http.StatusConflict, "quest_not_startable", reason)
+				return
+			}
+			plan, err := s.questLaunchPlan(camp, d, h, req.BriefingID)
+			if err != nil {
+				if req.BriefingID != "" {
+					httpErrCode(w, http.StatusConflict, "preview_expired", "The briefing preview is no longer available. Preview it again before starting.")
+				} else {
+					httpErr(w, http.StatusInternalServerError, "could not prepare the private task briefing")
+				}
+				return
+			}
+			spec = s.heroSpecWithOpts(h, launcher.Opts{
+				Opener: plan.opener, AppendSystemPrompt: briefing.Instructions,
+				AddDirs: []string{filepath.Dir(plan.path)},
+			})
+			spec.Meta["title"] = fmt.Sprintf("#%d %s", d.Number, d.Title)
+		} else {
+			spec = s.heroSpecWithGate(h, req.Opener)
+		}
 	default:
 		httpErr(w, http.StatusBadRequest, "give either hero or shell")
 		return

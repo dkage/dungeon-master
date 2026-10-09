@@ -47,6 +47,7 @@ type fakeQuests struct {
 	repo      quests.Repo
 	scope     campaign.Scope
 	number    int
+	getCalls  int
 }
 
 func (f *fakeQuests) set(list []quests.Quest, err error) {
@@ -81,6 +82,7 @@ func (f *fakeQuests) Get(_ context.Context, repo quests.Repo, n int) (quests.Det
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.repo, f.number = repo, n
+	f.getCalls++
 	d := f.detail
 	d.Number = n
 	return d, f.err

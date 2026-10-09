@@ -23,7 +23,12 @@ function store(setup: (s: AppStore) => void = () => {}) {
   const s = new AppStore({
     getState: vi.fn(), createSession: vi.fn(), deleteSession: vi.fn(),
     addCampaign: vi.fn(), updateCampaign: vi.fn(), removeCampaign: vi.fn(),
-    getQuests: vi.fn(), getQuest: vi.fn(), getGithub: vi.fn(), setScope: vi.fn(), getScopeOptions: vi.fn(),
+    getQuests: vi.fn(), getQuest: vi.fn(), previewQuestLaunch: vi.fn(async () => ({
+      content: '# Task briefing\n\nReviewable context.', truncated: false, commentsShown: 1, commentsTotal: 1,
+      canStart: true, hero: 'opus', heroLabel: 'Opus', directory: '/p/c1', briefingId: 'preview-1',
+      briefingFile: '/state/briefings/c1/3-opus-preview-1.md', opener: 'Read the briefing.',
+      systemPrompt: 'Keep to the issue.', command: ['claude', '--model', 'm1'],
+    })), getGithub: vi.fn(), setScope: vi.fn(), getScopeOptions: vi.fn(),
     getProjectSuggestions: vi.fn(async () => []), createSampleCampaign: vi.fn(async () => camp('sample', { sample: true, demo: true })),
     adoptStarterHeroes: vi.fn(async () => ({ saved: true })),
     getHeroesConfig: vi.fn(async () => ({ defaultHero: 'opus', heroes: [{ id: 'opus', label: 'Opus', args: ['--model', 'm1'], env: ['API_KEY='] }] })),
@@ -474,14 +479,26 @@ describe('QuestDetail', () => {
     expect((window as unknown as { pwned?: number }).pwned).toBeUndefined()
   })
 
-  it('opens and closes the plain-text task briefing preview', async () => {
-    render(QuestDetail, { store: open(detail({ briefing: { content: '<script>untrusted</script>', truncated: true, commentsShown: 5, commentsTotal: 12 } })) })
-    await fireEvent.click(screen.getByRole('button', { name: 'Brief' }))
-    expect(screen.getByRole('dialog', { name: 'Task briefing' })).toBeInTheDocument()
+  it('reviews the exact launch plan and starts with the same briefing', async () => {
+    const s = open(detail({ state: 'open' }))
+    const preview = vi.spyOn(s, 'previewQuestLaunch').mockResolvedValue({
+      content: '<script>untrusted</script>', truncated: true, commentsShown: 5, commentsTotal: 12,
+      canStart: true, hero: 'opus', heroLabel: 'Opus', directory: '/p/c1', briefingId: 'preview-1',
+      briefingFile: '/state/briefings/c1/3-opus-preview-1.md', opener: 'Read the briefing.',
+      systemPrompt: 'Keep to the issue.', command: ['claude', '--model', 'm1'],
+    })
+    const start = vi.spyOn(s, 'launchQuest').mockResolvedValue(true)
+    render(QuestDetail, { store: s })
+    expect(screen.getByLabelText('Launch with')).toHaveValue('opus')
+    await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+    expect(preview).toHaveBeenCalledWith(3, 'opus')
+    expect(screen.getByRole('dialog', { name: 'Review launch plan' })).toBeInTheDocument()
     expect(screen.getByText('<script>untrusted</script>')).toBeInTheDocument()
     expect(screen.getByText(/5 of 12 comments · some context was shortened/)).toBeInTheDocument()
-    await fireEvent.click(screen.getByRole('button', { name: 'Close briefing' }))
-    expect(screen.queryByRole('dialog', { name: 'Task briefing' })).not.toBeInTheDocument()
+    expect(screen.getByText('/state/briefings/c1/3-opus-preview-1.md')).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Start expedition' }))
+    expect(start).toHaveBeenCalledWith(3, 'opus', 'preview-1')
+    expect(screen.queryByRole('dialog', { name: 'Review launch plan' })).not.toBeInTheDocument()
   })
 
   it('navigates to related quests and back to the list', async () => {

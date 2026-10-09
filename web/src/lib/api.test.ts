@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ApiError, addCampaign, createSession, deleteSession, getGithub, getQuest, getQuests, getScopeOptions, getState, removeCampaign,
-  setScope, termUrl, updateCampaign, getProjectSuggestions, createSampleCampaign, adoptStarterHeroes, getHeroesConfig, saveHeroesConfig,
+  setScope, termUrl, updateCampaign, getProjectSuggestions, createSampleCampaign, adoptStarterHeroes, getHeroesConfig, saveHeroesConfig, previewQuestLaunch,
 } from './api'
 
 function mockFetch(status: number, body?: unknown) {
@@ -110,6 +110,16 @@ describe('api', () => {
       'GET /api/campaigns/c1/quests/42',
     ])
     for (const [, init] of f.mock.calls as unknown as [string, RequestInit][]) expect(init.headers).toEqual({})
+  })
+
+  it('requests a launch preview with the selected hero', async () => {
+    const f = mockFetch(200, { canStart: true, briefingId: 'preview-1', command: ['claude'] })
+    await previewQuestLaunch('c/1', 42, 'opus')
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/campaigns/c%2F1/quests/42/launch-preview')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body as string)).toEqual({ hero: 'opus' })
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
   })
 
   it('marks background polling and reads the GitHub budget', async () => {

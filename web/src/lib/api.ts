@@ -68,6 +68,7 @@ export interface AppState {
   version: string
   claude: { found: boolean; path?: string; error?: string }
   defaultHeroes: boolean
+  defaultHero?: string
   partyError?: string
   heroes: Hero[]
   campaigns: Campaign[]
@@ -87,8 +88,27 @@ export interface CreateRequest {
   hero?: string
   shell?: boolean
   opener?: string
+  quest?: number
+  briefingId?: string
   cols?: number
   rows?: number
+}
+
+export interface LaunchPreview {
+  content: string
+  truncated: boolean
+  commentsShown: number
+  commentsTotal: number
+  canStart: boolean
+  reason?: string
+  hero?: string
+  heroLabel?: string
+  directory?: string
+  briefingId?: string
+  briefingFile?: string
+  opener?: string
+  systemPrompt?: string
+  command?: string[]
 }
 
 export type QuestState = 'open' | 'locked' | 'claimed' | 'cleared'
@@ -253,6 +273,8 @@ export const getScopeOptions = (campaignId: string) =>
 export const getGithub = () => call<GithubStatus>('GET', '/api/github') as Promise<GithubStatus>
 export const getQuest = (campaignId: string, number: number) =>
   call<QuestDetail>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}`) as Promise<QuestDetail>
+export const previewQuestLaunch = (campaignId: string, number: number, hero: string) =>
+  call<LaunchPreview>('POST', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}/launch-preview`, { hero }) as Promise<LaunchPreview>
 export const createSession = (req: CreateRequest) =>
   call<SessionInfo>('POST', '/api/sessions', req) as Promise<SessionInfo>
 export const deleteSession = (id: string) =>

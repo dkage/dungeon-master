@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -51,6 +52,7 @@ type Service struct {
 	cache    map[string]entry
 	inflight map[string]*call
 	counts   map[string]countsEntry
+	details  map[string]detailEntry
 }
 
 type entry struct {
@@ -62,6 +64,13 @@ type countsEntry struct {
 	counts  Counts
 	fetched time.Time
 }
+
+type detailEntry struct {
+	detail  Detail
+	fetched time.Time
+}
+
+const maxCachedDetails = 100
 
 type call struct {
 	done    chan struct{}
@@ -101,7 +110,7 @@ func NewService(o ServiceOptions) *Service {
 	}
 	return &Service{
 		github: o.GitHub, demo: o.Demo, ttl: o.TTL, countsTTL: o.CountsTTL, minRefresh: o.MinRefresh, now: o.Now,
-		cache: map[string]entry{}, inflight: map[string]*call{}, counts: map[string]countsEntry{},
+		cache: map[string]entry{}, inflight: map[string]*call{}, counts: map[string]countsEntry{}, details: map[string]detailEntry{},
 	}
 }
 
@@ -252,8 +261,8 @@ func (s *Service) Counts(ctx context.Context, c campaign.Campaign) (Counts, erro
 	return counts, nil
 }
 
-// Detail returns one quest in full. It is not cached: opening an issue is a
-// deliberate act and costs a single request.
+// Detail returns one quest in full. The short cache lets an explicit Brief
+// preview and Start action reuse the request made when the issue was opened.
 func (s *Service) Detail(ctx context.Context, c campaign.Campaign, number int) (Detail, error) {
 	t, err := s.pick(c)
 	if err != nil && !errors.Is(err, ErrScopeNeeded) {
@@ -265,7 +274,32 @@ func (s *Service) Detail(ctx context.Context, c campaign.Campaign, number int) (
 		if perr != nil {
 			return Detail{}, ErrNoRepo
 		}
-		return s.github.Get(ctx, repo, number)
+		t = target{src: s.github, repo: repo, name: "github", key: "github:" + c.Repo}
 	}
-	return t.src.Get(ctx, t.repo, number)
+	key := t.key + "|detail:" + strconv.Itoa(number)
+	now := s.now()
+	s.mu.Lock()
+	if cached, ok := s.details[key]; ok && now.Sub(cached.fetched) < s.ttl {
+		s.mu.Unlock()
+		return cached.detail, nil
+	}
+	s.mu.Unlock()
+	d, err := t.src.Get(ctx, t.repo, number)
+	if err != nil {
+		return Detail{}, err
+	}
+	s.mu.Lock()
+	s.details[key] = detailEntry{detail: d, fetched: s.now()}
+	for len(s.details) > maxCachedDetails {
+		oldKey := ""
+		var oldest time.Time
+		for candidate, item := range s.details {
+			if oldKey == "" || item.fetched.Before(oldest) {
+				oldKey, oldest = candidate, item.fetched
+			}
+		}
+		delete(s.details, oldKey)
+	}
+	s.mu.Unlock()
+	return d, nil
 }
