@@ -48,6 +48,9 @@ A filter box at the top. Typing filters campaigns and expeditions in place. Ctrl
 | `>_`   | opens a **scratch shell**: a plain terminal in the home directory, not tied to any campaign |
 | `+`    | **adds a campaign** with the operating system's folder picker (see §3)                      |
 
+Milestone: M4 campaign actions. M3.6 keeps the first-run repo suggestions and typed path; these quick actions follow
+the quest launch path.
+
 ### 2.3 Campaign card
 
 One card per campaign: name, `owner/repo` (or "no GitHub repository"), and two buttons.
@@ -57,6 +60,8 @@ One card per campaign: name, `owner/repo` (or "no GitHub repository"), and two b
 - `⋯` opens: Open folder (in Finder or the file manager), Change which issues to show (the scope picker), Rename,
   Remove (asks once, says files are not touched).
 - The sample campaign carries a **Sample** badge and a "Remove sample" entry instead of Remove.
+
+Milestone: M4 campaign actions and free sessions.
 
 ### 2.4 Expeditions under a card
 
@@ -100,7 +105,8 @@ Rules:
 - Tests: a fake picker binary on `PATH` in feature tests (picked, cancelled, slow, missing), and the hostile cases of
   the endpoint (wrong Origin, no token, concurrent calls).
 
-Milestone: M3.6 (first run), since adding a project is step 2 of the Start-here checklist.
+Milestone: M4 usability follow-up. M3.6 keeps the typed path and repository suggestions so first run works in browser
+and headless environments; the native folder picker and confirmation flow can follow the quest-launch path.
 
 ## 4. Centre
 
@@ -238,15 +244,18 @@ and **Create from defaults**, **Open in editor** and **Reveal**:
 
 - `party.toml` (heroes), and later the terminal look and notification settings if they are files.
 
+Milestone: M4.5 usability follow-up. Hero editing remains in M3.6 Settings; this section is for direct file status and
+file actions.
+
 The same pattern as the starter-heroes action in `PLAN_EXPERIENCE.md` §5.3, applied to every file.
 
 ### 6.4 Other sections
 
 | Section            | Contents                                                                  | Milestone |
 |--------------------|---------------------------------------------------------------------------|-----------|
-| Appearance & words | theme pack and palette (§6.5), selectable panel fonts and sizes, hints, reduced motion | M3.6 |
+| Appearance & words | Dungeon/Neutral theme and word mode, selectable fonts, independent panel sizes | M3.6 |
 | GitHub             | account and token source, budget in plain words, write-back toggles (off) | M3.5      |
-| Terminal           | scrollback length (colours follow the palette); independent font size is in Appearance & words | M3.6/M4 |
+| Terminal           | scrollback length (colours follow the palette); independent font size is in Appearance & words | M4.5 |
 | Notifications      | when to notify (needs you, finished, failed), system notifications        | M4.5      |
 | Session titles     | automatic titles for free sessions                                        | later     |
 
@@ -332,11 +341,11 @@ is mostly data, not a rewrite:
   framed dark-red panels, a parchment terminal, Cinzel and Fira Code). Its colours, fonts and textures become the
   pack's tokens and assets; its generated HTML is a reference, never copied into `web/`.
 
-Milestones: M3.6 applies the Stitch v4 visual foundation to the Svelte cockpit shell and ships the seams (words table
-with keys and the Neutral pack, icons by meaning, tokens), Theme and Palette controls, the Dungeon and Neutral packs,
-and completeness and contrast tests. The right-panel split and its visual treatment are established in M3.6; M5a fills
-the reserved map area with the interactive graph. New packs, such as a starship pack, are a later initiative in
-`PLAN_V2.md`.
+Milestones: M3.6 applies the Stitch v4 visual foundation to the Svelte cockpit shell, records the Dungeon/Neutral theme
+choice, ships the glossary and font controls, and establishes the right-panel split. Full theme-pack data seams,
+multiple palettes, pack completeness and contrast tests are deferred until a second pack is approved; do not build a
+generic pack framework ahead of that need. M5a fills the reserved map area with the interactive graph. New packs, such
+as a starship pack, are a later initiative in `PLAN_V2.md`.
 
 ## 7. Keyboard and platform conventions
 
@@ -372,8 +381,9 @@ Notes:
 
 ### 7.2 Browser mode (`dungeon serve`)
 
-The same shortcuts are bound in the page, but a browser keeps some for itself (⌘, opens the browser's own settings in
-Chrome and Safari, ⌘W closes the tab, ⌘T opens a tab). In the browser:
+The planned in-page shortcuts are a later usability slice, after quest launch. A browser keeps some keys for itself
+(⌘, opens the browser's own settings in Chrome and Safari, ⌘W closes the tab, ⌘T opens a tab). When shortcuts are
+implemented:
 
 - shortcuts the browser reserves get a second binding that works (`Ctrl+,` or `g` then `s`), shown in the Keyboard
   Shortcuts help;
@@ -399,17 +409,22 @@ bindings; the R1 smoke test opens Settings with ⌘, and pastes into a text fiel
 
 ## 8. Milestone summary
 
-- **M3.6**: Stitch v4 cockpit shell and right-panel map/detail split; in-page shortcuts (§7.2), campaign `+` with the
-  folder picker, campaign card menus, scratch shell, onboarding, and the Settings page with Heroes, Local files and
-  Appearance & words, including the theme and palette pickers (§6.5).
-- **M4**: detail footer with hero combo, None skill choice and Start, Brief preview, quest chip in the centre header,
-  Terminal settings.
-- **M4.5**: "needs you" state dots, Dock or taskbar badge, Notifications settings.
+- **M3.6 (shipped)**: Stitch v4 cockpit shell and right-panel list/detail split; onboarding and sample campaign;
+  glossary, starter heroes and hero settings; Dungeon/Neutral appearance choice, three bundled reading fonts, and
+  independent panel font sizes. This is the scope in `PLAN_EXPERIENCE.md` §4 and the M3.6 acceptance issue.
+- **M4**: detail footer with hero combo, None skill choice and Start; Brief preview; quest chip in the centre header;
+  quest session titles; campaign action menu and free-session/shell actions. The operating-system folder picker is a
+  follow-up after the typed path and repository suggestions already available in first run.
+- **M4.5**: "needs you" state dots, Dock or taskbar badge, Notifications settings; Settings navigation and Local
+  files section; browser keyboard shortcuts and shortcut help; session terminal settings. Keep native app menus and
+  window state in R1.
 - **M5a**: the graph in the map area established in M3.6, Map / List behavior, expand, and drilling into halls
   (`PLAN_MAP.md`).
 - **M5b**: Spells settings (sources, recommendation rules, skill presets) and the populated skill combo.
 - **R1** (release): native menus with Settings on ⌘, and the standard Edit menu (§7.1), window state.
-- **Later**: session titles, art for hero crests.
+- **Later**: automatic titles for free sessions, art for hero crests.
+- **Later visual-system work**: add full pack/palette abstractions and contrast/completeness checks only when a second
+  theme pack is approved; M3.6's Dungeon/Neutral choice and font settings remain the v1 baseline.
 
 ## 9. Decisions and open questions
 
