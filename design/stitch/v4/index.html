@@ -1,0 +1,2849 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1" name="viewport">
+<title>Dungeon Master — AI Cockpit &amp; Quest Encounter Map</title>
+<style>
+    @import url('../assets/fonts/fonts.css');
+
+    :root {
+      color-scheme: dark;
+      --bg-root: #0a0405;
+      --bg-sidebar: #170709;
+      --bg-sidebar-card: #240b0e;
+      --bg-panel: #140709;
+      --bg-card: #1f0b0e;
+      --border-dark: #3b1418;
+      --border-gothic: #562024;
+      --border-metal: #7a3c2e;
+      --border-brass: #b88a44;
+      --brass-bright: #e7bf6e;
+      --gold-gothic: #d8a04b;
+      --amber-warm: #df973b;
+      --oxblood: #360608;
+      --oxblood-deep: #220305;
+      --oxblood-bright: #8a191f;
+      --oxblood-glow: rgba(184, 25, 33, 0.45);
+      --ember: #e75c2e;
+      --ember-glow: rgba(231, 92, 46, 0.4);
+
+      /* Papyrus / Parchment Tome Palette (Central Terminal) */
+      --parchment-base: #f3ebd8;
+      --parchment-deep: #e8dcc3;
+      --parchment-aged: #deceb0;
+      --ink-gall: #1a140e;
+      --ink-umber: #342417;
+      --ink-bistre: #4e3522;
+      --ink-crimson: #841818;
+      --ink-forest: #1c4e2b;
+      --ink-muted: #6e5944;
+      --ink-faint: #8f7962;
+
+      --text-main: #f0e6d6;
+      --text-muted: #ad9a88;
+      --text-faint: #786455;
+      --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-serif: "Cinzel", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      --font-mono: "Fira Code", ui-monospace, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      overflow: hidden;
+      font-family: var(--font-body);
+      background: var(--bg-root);
+      color: var(--text-main);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, select, input {
+      font-family: inherit;
+      color: inherit;
+    }
+    button { cursor: pointer; }
+
+    /* Gothic Ornate Relief Elements (Diablo Form & Panels) */
+    .gothic-relief-border {
+      border: 1px solid #783824;
+      box-shadow: 
+        inset 0 0 0 1px #2a0b0d,
+        inset 0 1px 0 rgba(232, 191, 110, 0.3),
+        0 2px 10px rgba(0,0,0,0.8);
+      position: relative;
+    }
+    .gothic-relief-border::after {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      pointer-events: none;
+      border: 1px solid rgba(184, 138, 68, 0.25);
+      border-radius: inherit;
+    }
+
+    /* App 3-column layout */
+    .cockpit-app {
+      display: grid;
+      grid-template-columns: 246px minmax(400px, 1fr) minmax(410px, 520px);
+      height: 100vh;
+      width: 100vw;
+      background: radial-gradient(circle at 50% 20%, #20070a 0%, #0a0304 80%);
+      position: relative;
+    }
+
+    /* LEFT SIDEBAR: Campaigns & Expeditions */
+    .sidebar {
+      background: linear-gradient(180deg, #1b0609 0%, #110305 100%);
+      border-right: 2px solid #3d1418;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      z-index: 10;
+      box-shadow: inset -1px 0 0 #5f241d, 5px 0 25px rgba(0,0,0,0.7);
+    }
+    .brand-bar {
+      padding: 15px 16px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      background: linear-gradient(180deg, #2f090d 0%, #1c0507 100%);
+      border-bottom: 2px solid #541d1a;
+      box-shadow: inset 0 1px 0 #8b3c2c, 0 3px 10px rgba(0,0,0,0.6);
+      position: relative;
+    }
+    .brand-icon {
+      width: 30px;
+      height: 30px;
+      background: radial-gradient(circle at 35% 35%, #b51c24, #400609);
+      border: 2px solid var(--border-brass);
+      border-radius: 5px;
+      box-shadow: 0 0 12px var(--oxblood-glow), inset 0 0 6px #100203;
+      display: grid;
+      place-items: center;
+      color: #ffd88a;
+      font-size: 15px;
+      font-family: var(--font-serif);
+      font-weight: 900;
+      text-shadow: 0 0 4px #000;
+    }
+    .brand-title {
+      font-family: var(--font-serif);
+      font-size: 15.5px;
+      letter-spacing: 0.08em;
+      color: #ebd19f;
+      font-weight: 800;
+      text-transform: uppercase;
+      text-shadow: 0 2px 4px #000, 0 0 10px rgba(235, 209, 159, 0.3);
+    }
+    .sidebar-actions {
+      padding: 12px 14px 8px;
+    }
+    .sidebar-search {
+      background: #150507;
+      border: 1px solid #481b1c;
+      border-radius: 5px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #ad8f86;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      box-shadow: inset 0 1px 4px #080102, 0 1px 0 #57201c;
+      transition: all 0.15s;
+    }
+    .sidebar-search:hover {
+      border-color: #8c4232;
+      color: #e5cbbf;
+      box-shadow: inset 0 1px 4px #080102, 0 0 8px rgba(184, 138, 68, 0.3);
+    }
+    .kbd-tag {
+      background: #23080b;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 9px;
+      border: 1px solid #5a221f;
+      color: #d1a580;
+      font-weight: 600;
+    }
+    .sidebar-section-title {
+      font-family: var(--font-serif);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #b3835e;
+      padding: 12px 16px 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sidebar-section-title::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, #5b211a, transparent);
+    }
+    .campaign-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 10px;
+    }
+    .campaign-card {
+      background: linear-gradient(180deg, #24090d 0%, #170407 100%);
+      border: 1px solid #5c201c;
+      border-radius: 6px;
+      padding: 11px 12px;
+      margin-bottom: 9px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.6), inset 0 1px 0 #5e231b;
+    }
+    .campaign-card.active {
+      background: linear-gradient(180deg, #320c11 0%, #1e0508 100%);
+      border-color: #9c4832;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.8), 0 0 12px rgba(184, 38, 44, 0.3), inset 0 1px 0 #9f4935;
+    }
+    .campaign-card.active::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 6px;
+      bottom: 6px;
+      width: 4px;
+      background: linear-gradient(180deg, #e7bf6e, #965b26);
+      border-radius: 0 3px 3px 0;
+      box-shadow: 0 0 8px rgba(231, 191, 110, 0.7);
+    }
+    .campaign-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .campaign-name {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #f7e6ce;
+      font-family: var(--font-serif);
+      letter-spacing: 0.03em;
+    }
+    .badge-sample {
+      font-size: 9px;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: rgba(184, 138, 68, 0.2);
+      border: 1px solid #b88a44;
+      color: #ffdca3;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    .campaign-desc {
+      font-size: 11px;
+      color: #aa8d83;
+      margin-top: 4px;
+    }
+    .expeditions-list {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid #3d1416;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .expedition-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      color: #d6b7aa;
+      background: rgba(18, 4, 6, 0.5);
+      border: 1px solid transparent;
+      text-align: left;
+      transition: all 0.12s;
+    }
+    .expedition-item:hover {
+      background: #2a0b0f;
+      color: #fff;
+      border-color: #5d1f1b;
+    }
+    .expedition-item.active {
+      background: linear-gradient(90deg, #380d12, #24080b);
+      color: #ffe6c7;
+      border-color: #793223;
+      box-shadow: inset 0 1px 0 rgba(231, 191, 110, 0.25);
+    }
+    .session-indicator {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #5c3836;
+      flex-shrink: 0;
+    }
+    .session-indicator.running {
+      background: #ff5238;
+      box-shadow: 0 0 8px #ff4624, 0 0 14px rgba(255, 70, 36, 0.6);
+      animation: pulse-glow 2s infinite;
+    }
+    .session-indicator.idle {
+      background: #6e4e46;
+    }
+    .session-indicator.waiting {
+      background: #df973b;
+      box-shadow: 0 0 6px #df973b;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.65; transform: scale(0.9); }
+    }
+
+    .sidebar-footer {
+      padding: 10px 14px;
+      background: #140406;
+      border-top: 2px solid #3e1418;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #ab8e83;
+    }
+    .sidebar-footer button {
+      background: linear-gradient(180deg, #24090d, #160406);
+      border: 1px solid #57201c;
+      color: #d8baad;
+      padding: 4px 9px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .sidebar-footer button:hover {
+      background: #310d12;
+      color: #fff;
+      border-color: #924334;
+      box-shadow: 0 0 8px rgba(184, 138, 68, 0.3);
+    }
+
+    /* CENTER COLUMN: Central Ancient Tome Papyrus Terminal */
+    .workspace-terminal {
+      background: #120907;
+      display: flex;
+      flex-direction: column;
+      border-right: 2px solid #4a1917;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
+    }
+    
+    /* Header plate with dark carved wood / antique brass filigree */
+    .terminal-nav {
+      height: 48px;
+      border-bottom: 2px solid #541d1a;
+      background: linear-gradient(180deg, #2a0a0f 0%, #180507 100%);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+      font-size: 12px;
+      z-index: 5;
+      box-shadow: inset 0 1px 0 #7b3225, 0 3px 12px rgba(0,0,0,0.8);
+      position: relative;
+    }
+    .terminal-nav::after {
+      content: "";
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.4), transparent);
+      pointer-events: none;
+    }
+    .terminal-tab-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(180deg, #f0e4cc 0%, #e1d1b2 100%);
+      border: 1px solid #754b23;
+      padding: 4px 12px;
+      border-radius: 5px;
+      color: var(--ink-gall);
+      font-family: var(--font-serif);
+      font-weight: 800;
+      font-size: 11.5px;
+      letter-spacing: 0.04em;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.5), inset 0 1px 0 #fff;
+    }
+    .wax-seal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #d12e2e, #6e0c0c);
+      box-shadow: 0 0 5px rgba(209, 46, 46, 0.8), inset 0 0 2px #000;
+      border: 1px solid #3c0606;
+      display: inline-block;
+    }
+    .terminal-meta-info {
+      color: #bfa08c;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+    .terminal-meta-info strong {
+      color: #f7e6ce;
+      font-family: var(--font-serif);
+      letter-spacing: 0.03em;
+    }
+    .terminal-meta-info code {
+      background: #100305;
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid #4a191d;
+      color: #df973b;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+    }
+    .terminal-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+    }
+    .term-btn {
+      background: linear-gradient(180deg, #26090c 0%, #140305 100%);
+      border: 1px solid #63241b;
+      color: #dfbfb1;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--font-serif);
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 1px 0 #5e241e;
+    }
+    .term-btn:hover {
+      background: linear-gradient(180deg, #370f14 0%, #200609 100%);
+      border-color: var(--brass-bright);
+      color: #fff2db;
+      box-shadow: 0 0 8px rgba(231, 191, 110, 0.35);
+    }
+
+    /* PAPYRUS / TOME TERMINAL VIEWPORT */
+    .terminal-viewport-wrapper {
+      flex: 1;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: #1a0c0a;
+      overflow: hidden;
+    }
+    .tome-book-frame {
+      flex: 1;
+      border-radius: 8px;
+      background: 
+        radial-gradient(circle at 50% 30%, rgba(255,255,255,0.4) 0%, transparent 80%),
+        linear-gradient(180deg, #f7f1e1 0%, #ede3cb 65%, #decfae 100%);
+      border: 2px solid #825a34;
+      box-shadow: 
+        inset 0 0 60px rgba(110, 68, 25, 0.35),
+        inset 0 0 15px rgba(60, 32, 10, 0.5),
+        inset 0 0 0 1px #fff0d6,
+        0 8px 30px rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    /* Antique tome filigree corner accents */
+    .tome-book-frame::before {
+      content: "⚜";
+      position: absolute;
+      top: 6px;
+      left: 10px;
+      font-size: 15px;
+      color: #9c7349;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .tome-book-frame::after {
+      content: "⚜";
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      font-size: 15px;
+      color: #9c7349;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .terminal-viewport {
+      flex: 1;
+      padding: 22px 28px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: var(--ink-umber);
+      position: relative;
+      z-index: 2;
+    }
+    .term-welcome {
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px dashed rgba(130, 90, 52, 0.4);
+    }
+    .term-banner {
+      color: var(--ink-crimson);
+      font-family: var(--font-serif);
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .term-banner::before {
+      content: "✦";
+      color: #a82e2e;
+    }
+    .term-banner-sub {
+      color: var(--ink-muted);
+      font-size: 11.5px;
+      font-style: italic;
+    }
+    .term-log {
+      margin-bottom: 9px;
+      font-weight: 500;
+    }
+    .term-log .dim { color: var(--ink-faint); font-weight: 400; }
+    .term-log .cyan { color: #1c525f; font-weight: 600; }
+    .term-log .gold { color: #87570b; font-weight: 700; }
+    .term-log .green { color: var(--ink-forest); font-weight: 700; }
+    .term-log .purple { color: #642b78; font-weight: 600; }
+    .term-log code {
+      background: rgba(110, 75, 40, 0.12);
+      border: 1px solid rgba(130, 90, 52, 0.3);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--ink-crimson);
+      font-weight: 600;
+    }
+    .term-log strong {
+      color: var(--ink-gall);
+      font-weight: 700;
+    }
+    .term-narrative {
+      color: var(--ink-gall);
+      margin-top: 14px;
+      padding: 10px 14px;
+      background: rgba(220, 203, 170, 0.35);
+      border-left: 3px solid #841818;
+      border-radius: 0 4px 4px 0;
+      font-style: italic;
+      font-size: 13px;
+    }
+
+    .term-prompt-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 16px;
+      color: var(--ink-gall);
+      background: rgba(240, 226, 201, 0.7);
+      border: 1px solid #baa27c;
+      padding: 6px 12px;
+      border-radius: 5px;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .term-prompt-line .prompt-symbol {
+      color: var(--ink-crimson);
+      font-weight: 800;
+      font-size: 14px;
+    }
+    .term-input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      color: var(--ink-gall);
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+    .term-input::placeholder {
+      color: #9c846d;
+      font-style: italic;
+    }
+    .term-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 15px;
+      background: var(--ink-gall);
+      vertical-align: middle;
+      animation: blink 1s steps(1) infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .terminal-quick-actions {
+      padding: 9px 18px;
+      background: linear-gradient(180deg, #1f0709 0%, #120305 100%);
+      border-top: 2px solid #4a1917;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #bfa08c;
+      box-shadow: inset 0 1px 0 #5d2218;
+    }
+    .badge-chip {
+      background: linear-gradient(180deg, #2b0b0f 0%, #170407 100%);
+      border: 1px solid #6b2621;
+      border-radius: 4px;
+      padding: 3px 8px;
+      color: #f0cfbe;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      transition: all 0.12s;
+    }
+    .badge-chip:hover {
+      border-color: var(--brass-bright);
+      color: #ffd88a;
+      box-shadow: 0 0 6px rgba(231, 191, 110, 0.4);
+    }
+
+    /* RIGHT COLUMN: Gothic Quest Cockpit (Diablo Relics & Iron/Brass Trim) */
+    .cockpit-panel {
+      background: linear-gradient(180deg, #170507 0%, #0d0204 100%);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      user-select: none;
+      min-width: 380px;
+      border-left: 2px solid #541c19;
+      box-shadow: -6px 0 30px rgba(0,0,0,0.85);
+    }
+    .panel-header-bar {
+      height: 48px;
+      background: linear-gradient(180deg, #310a0e 0%, #1a0507 100%);
+      border-bottom: 2px solid #5d221e;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 10px;
+      z-index: 5;
+      box-shadow: inset 0 1px 0 #8b3c2c, 0 3px 12px rgba(0,0,0,0.8);
+    }
+    .panel-header-title {
+      font-family: var(--font-serif);
+      font-size: 16px;
+      color: #f7e1b5;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-shadow: 0 2px 4px #000, 0 0 8px rgba(247, 225, 181, 0.25);
+    }
+    .jewel-accent {
+      width: 10px;
+      height: 10px;
+      background: radial-gradient(circle at 35% 35%, #ff4242, #7a090e);
+      border-radius: 50%;
+      border: 1px solid #e7bf6e;
+      box-shadow: 0 0 8px rgba(255, 66, 66, 0.8), inset 0 0 3px #000;
+    }
+    .panel-header-spacer { flex: 1; }
+    .segmented-control {
+      display: inline-flex;
+      background: #110305;
+      padding: 2px;
+      border: 1px solid #521c19;
+      border-radius: 6px;
+      box-shadow: inset 0 1px 3px #000;
+    }
+    .segmented-btn {
+      background: transparent;
+      border: 0;
+      padding: 4px 11px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--font-serif);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #ad8f85;
+      transition: all 0.12s;
+    }
+    .segmented-btn.active {
+      background: linear-gradient(180deg, #441117, #26080b);
+      color: #ffeed3;
+      border: 1px solid #843928;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.6), inset 0 1px 0 rgba(231, 191, 110, 0.3);
+    }
+    .icon-square-btn {
+      background: linear-gradient(180deg, #28090d, #140306);
+      border: 1px solid #5e241c;
+      color: #e5cbbf;
+      width: 28px;
+      height: 28px;
+      border-radius: 5px;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: bold;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+    }
+    .icon-square-btn:hover {
+      background: #370e13;
+      border-color: var(--brass-bright);
+      color: #fff;
+      box-shadow: 0 0 8px rgba(231, 191, 110, 0.4);
+    }
+
+    /* UPPER ENCOUNTER MAP PORTION */
+    .panel-top-portion {
+      height: 48%;
+      min-height: 260px;
+      position: relative;
+      overflow: hidden;
+      background: #090304;
+    }
+    .map-canvas-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: auto;
+      background-image: 
+        radial-gradient(circle at 50% 50%, rgba(20, 6, 8, 0.72) 0%, rgba(8, 2, 3, 0.94) 100%),
+        url('../assets/images/55bd72569546.png');
+      background-size: 550px;
+      background-repeat: repeat;
+    }
+    .map-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      box-shadow: inset 0 0 70px 20px rgba(5, 1, 2, 0.92);
+      z-index: 2;
+    }
+    .map-topline-bar {
+      position: absolute;
+      top: 10px;
+      left: 12px;
+      right: 12px;
+      z-index: 8;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+    }
+    .topline-title {
+      color: #faedd9;
+      font-family: var(--font-serif);
+      font-weight: 700;
+      background: rgba(22, 6, 9, 0.88);
+      padding: 4px 10px;
+      border-radius: 5px;
+      border: 1px solid #63261f;
+      backdrop-filter: blur(4px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.7);
+    }
+    .topline-title span {
+      color: #c9a799;
+      font-weight: 500;
+    }
+    .topline-pill-btn {
+      background: rgba(30, 8, 12, 0.88);
+      border: 1px solid #773127;
+      color: #ebd2c5;
+      font-family: var(--font-serif);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 10.5px;
+      backdrop-filter: blur(4px);
+      transition: all 0.15s;
+    }
+    .topline-pill-btn:hover {
+      background: #3e1218;
+      border-color: var(--brass-bright);
+      color: #fff;
+      box-shadow: 0 0 8px rgba(231, 191, 110, 0.4);
+    }
+
+    /* SVG Connectivity Graph & Corridors */
+    .map-links-svg {
+      position: absolute;
+      inset: 0;
+      width: 480px;
+      height: 480px;
+      pointer-events: none;
+      z-index: 3;
+    }
+    .corridor-path {
+      stroke: #592523;
+      stroke-width: 2.5;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .corridor-path.open {
+      stroke: #6bb395;
+      stroke-width: 2.5;
+      stroke-dasharray: none;
+      filter: drop-shadow(0 0 4px rgba(107, 179, 149, 0.4));
+    }
+    .corridor-path.locked {
+      stroke: #ad773c;
+      stroke-dasharray: 5 4;
+      stroke-width: 2;
+    }
+    .corridor-door {
+      fill: #22080a;
+      stroke: #e7bf6e;
+      stroke-width: 1.5;
+      filter: drop-shadow(0 0 5px rgba(231, 191, 110, 0.5));
+    }
+
+    /* Halls & Rooms */
+    .map-board {
+      position: relative;
+      width: 480px;
+      height: 480px;
+      margin: 0 auto;
+    }
+    .dungeon-hall {
+      position: absolute;
+      top: 50px;
+      left: 18px;
+      width: 420px;
+      height: 270px;
+      border: 1px solid #75332a;
+      border-radius: 12px;
+      background: 
+        radial-gradient(ellipse at 50% 25%, rgba(138, 25, 31, 0.22), transparent 75%),
+        rgba(19, 5, 7, 0.82);
+      box-shadow: 
+        0 0 30px rgba(0,0,0,0.8),
+        inset 0 0 35px rgba(138, 25, 31, 0.18),
+        inset 0 0 0 1px rgba(231, 191, 110, 0.15);
+      z-index: 2;
+    }
+    .hall-banner {
+      position: absolute;
+      top: 8px;
+      left: 14px;
+      font-size: 11px;
+      color: #ffdca3;
+      letter-spacing: 0.04em;
+      font-family: var(--font-serif);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-shadow: 0 1px 3px #000;
+    }
+    .hall-banner .sub {
+      color: #b08d81;
+      font-family: var(--font-body);
+      font-size: 10px;
+    }
+
+    .outskirts-label {
+      position: absolute;
+      top: 332px;
+      left: 22px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #b88a44;
+      font-family: var(--font-serif);
+      font-weight: 700;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .outskirts-label::after {
+      content: "";
+      width: 140px;
+      height: 1px;
+      background: linear-gradient(90deg, #6e2721, transparent);
+    }
+
+    /* ENCOUNTER ROOM CARDS (Gothic Iron Plated Tokens) */
+    .room-node {
+      position: absolute;
+      width: 98px;
+      height: 98px;
+      border-radius: 8px;
+      border: 1px solid #63261f;
+      background: linear-gradient(180deg, rgba(38, 11, 14, 0.94) 0%, rgba(20, 5, 7, 0.98) 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 4px 4px 6px;
+      cursor: pointer;
+      z-index: 5;
+      transition: all 0.15s ease-out;
+      outline: none;
+      box-shadow: 
+        0 4px 14px rgba(0,0,0,0.7), 
+        inset 0 1px 0 rgba(231, 191, 110, 0.2),
+        inset 0 0 10px rgba(0,0,0,0.6);
+    }
+    .room-node:hover {
+      border-color: #aa4d39;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.8), 0 0 14px rgba(231, 92, 46, 0.35);
+    }
+    .room-node.selected {
+      border-color: var(--brass-bright);
+      box-shadow: 
+        0 0 0 2px var(--brass-bright),
+        0 0 25px rgba(231, 191, 110, 0.5),
+        inset 0 0 16px rgba(184, 25, 33, 0.45);
+      transform: translateY(-2px);
+    }
+    .room-node.ready {
+      border-color: #8c4232;
+      box-shadow: 0 0 12px rgba(231, 92, 46, 0.3), inset 0 1px 0 rgba(255, 170, 100, 0.2);
+    }
+    .room-node.locked {
+      border-color: #4a1d1d;
+      background: linear-gradient(180deg, rgba(22, 6, 8, 0.95) 0%, rgba(12, 3, 4, 0.98) 100%);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    }
+    .room-node.cleared {
+      filter: saturate(0.4);
+      opacity: 0.75;
+      border-color: #46302e;
+    }
+    .room-node.assigned {
+      border-color: #9c6c37;
+      box-shadow: 0 0 12px rgba(223, 151, 59, 0.3);
+    }
+
+    .room-badge {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 17px;
+      height: 17px;
+      line-height: 16px;
+      text-align: center;
+      border-radius: 50%;
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #fff;
+      background: #732a22;
+      border: 1px solid #e7bf6e;
+      z-index: 6;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.8);
+    }
+    .room-node.ready .room-badge { background: #9c2718; color: #ffebc9; }
+    .room-node.locked .room-badge { background: #381313; color: #a8897c; border-color: #6d3a33; }
+    .room-node.cleared .room-badge { background: #26593a; color: #e1ffe8; border-color: #46a165; }
+    .room-node.assigned .room-badge { background: #8f581e; color: #fff3db; border-color: #df973b; }
+
+    /* Creature Sprites (rat ../assets/images/bcb65137ba29.png, goblin ../assets/images/0de927d22f2d.png, eye ../assets/images/6e6f91fe335c.png) */
+    .creature-viewport {
+      width: 58px;
+      height: 64px;
+      flex-shrink: 0;
+      background-repeat: no-repeat;
+      background-size: 232px 77px;
+      background-position: 0 -3px;
+      image-rendering: pixelated;
+      margin-top: 2px;
+    }
+    .creature-viewport.rat {
+      background-image: url('../assets/images/3fa739975e42.png');
+    }
+    .creature-viewport.goblin {
+      background-image: url('../assets/images/fd9bc34b2786.png');
+    }
+    .creature-viewport.eye {
+      background-image: url('../assets/images/20064ba6d969.png');
+    }
+    .creature-viewport.unknown-diamond {
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+      color: #8c5d4f;
+      font-family: var(--font-serif);
+      height: 64px;
+      width: 58px;
+    }
+    .room-node.animated .creature-viewport.animated-sprite {
+      animation: creature-idle 1.4s steps(4) infinite;
+    }
+    @keyframes creature-idle {
+      to { background-position-x: -232px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .room-node.animated .creature-viewport.animated-sprite {
+        animation: none !important;
+      }
+    }
+
+    .room-info-meta {
+      width: 100%;
+      text-align: center;
+      margin-top: 1px;
+    }
+    .room-num {
+      font-size: 10.5px;
+      font-weight: 800;
+      color: #faedd9;
+      line-height: 1.1;
+      font-family: var(--font-serif);
+    }
+    .room-num span {
+      font-weight: 600;
+      color: #baa095;
+      font-size: 9px;
+      text-transform: uppercase;
+    }
+    .room-title-snippet {
+      font-size: 9.5px;
+      color: #dfc8bd;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 88px;
+      margin: 1px auto 0;
+    }
+
+    /* Room Positions */
+    .node-pos-2 { left: 32px; top: 92px; }
+    .node-pos-3 { left: 148px; top: 92px; }
+    .node-pos-4 { left: 264px; top: 92px; }
+    .node-pos-5 { left: 264px; top: 206px; }
+    .node-pos-6 { left: 32px; top: 356px; }
+    .node-pos-7 { left: 148px; top: 356px; }
+    .node-pos-8 { left: 264px; top: 356px; }
+
+    /* LIST ALTERNATIVE VIEW */
+    .list-alternative-view {
+      position: absolute;
+      inset: 0;
+      background: #140407;
+      overflow-y: auto;
+      padding: 50px 14px 16px;
+      z-index: 10;
+      display: none;
+    }
+    .list-alternative-view.active {
+      display: block;
+    }
+    .list-filter-row {
+      margin-bottom: 12px;
+      display: flex;
+      gap: 8px;
+    }
+    .list-filter-input {
+      flex: 1;
+      background: #1d070b;
+      border: 1px solid #5a201d;
+      border-radius: 5px;
+      padding: 7px 12px;
+      font-size: 11.5px;
+      color: #faecd9;
+      box-shadow: inset 0 1px 4px #000;
+    }
+    .list-filter-input:focus {
+      outline: none;
+      border-color: var(--brass-bright);
+    }
+    .quest-list-item-btn {
+      width: 100%;
+      background: linear-gradient(180deg, #24090d, #160407);
+      border: 1px solid #57201c;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-align: left;
+      transition: all 0.12s;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    }
+    .quest-list-item-btn:hover {
+      background: #310c11;
+      border-color: #8c3b2c;
+    }
+    .quest-list-item-btn.selected {
+      border-color: var(--brass-bright);
+      background: linear-gradient(180deg, #3a1016, #22060a);
+      box-shadow: 0 0 12px rgba(231, 191, 110, 0.35);
+    }
+    .list-item-thumb {
+      width: 40px;
+      height: 40px;
+      background-repeat: no-repeat;
+      background-size: 160px 53px;
+      background-position: 0 -4px;
+      border-radius: 5px;
+      background-color: #0c0204;
+      border: 1px solid #56201d;
+      flex-shrink: 0;
+    }
+    .list-item-thumb.rat { background-image: url('../assets/images/3fa739975e42.png'); }
+    .list-item-thumb.goblin { background-image: url('../assets/images/fd9bc34b2786.png'); }
+    .list-item-thumb.eye { background-image: url('../assets/images/20064ba6d969.png'); }
+    .list-item-thumb.unknown {
+      display: grid;
+      place-items: center;
+      color: #8c5d4f;
+      font-size: 20px;
+    }
+    .list-item-body {
+      flex: 1;
+      min-width: 0;
+    }
+    .list-item-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #faedd9;
+      font-family: var(--font-serif);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .list-item-subtitle {
+      font-size: 10.5px;
+      color: #ab8e83;
+      margin-top: 2px;
+    }
+
+    /* HORIZONTAL SPLITTER (Gothic Forged Iron & Brass Hardware) */
+    .horizontal-splitter {
+      height: 10px;
+      background: linear-gradient(180deg, #26090d 0%, #120305 100%);
+      border-top: 1px solid #63241b;
+      border-bottom: 2px solid #360f14;
+      cursor: row-resize;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 10;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    }
+    .horizontal-splitter::before {
+      content: "";
+      width: 54px;
+      height: 3px;
+      border-top: 1px solid #d4a05a;
+      border-bottom: 1px solid #793c24;
+    }
+    .horizontal-splitter:hover {
+      background: #360c12;
+    }
+
+    /* BOTTOM PORTION: Selected Issue Detail & Pinned Launch Footer */
+    .panel-bottom-portion {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 200px;
+      background: linear-gradient(180deg, #170508 0%, #0d0204 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .detail-scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px 12px;
+    }
+    /* Diablo-style banner heading inspired by ../assets/images/993ca6871b69.png & ../assets/images/597429b08137.png */
+    .diablo-heading-banner {
+      background: linear-gradient(180deg, #5c0f14 0%, #290508 100%);
+      border: 1px solid #8e3627;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      box-shadow: 
+        inset 0 1px 0 rgba(231, 191, 110, 0.4),
+        inset 0 0 15px rgba(0,0,0,0.6),
+        0 4px 10px rgba(0,0,0,0.7);
+      position: relative;
+    }
+    .detail-heading-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .detail-title {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 16px;
+      line-height: 1.35;
+      color: #fff0d6;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-shadow: 0 2px 4px #000, 0 0 10px rgba(231, 191, 110, 0.3);
+    }
+    .detail-title span {
+      color: var(--brass-bright);
+      margin-right: 4px;
+    }
+    .chips-cluster {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 10px 0 12px;
+    }
+    .meta-chip {
+      font-size: 10.5px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #23080b;
+      border: 1px solid #5a201c;
+      color: #faedd9;
+      font-family: var(--font-serif);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .meta-chip.state-ready {
+      border-color: #8c3b2c;
+      background: rgba(140, 59, 44, 0.25);
+      color: #ffd6b0;
+      box-shadow: 0 0 6px rgba(231, 92, 46, 0.3);
+    }
+    .meta-chip.state-blocked {
+      border-color: #59251e;
+      background: rgba(45, 14, 16, 0.6);
+      color: #baa095;
+    }
+    .meta-chip.state-cleared {
+      border-color: #3b734e;
+      background: rgba(59, 115, 78, 0.25);
+      color: #c9ffd9;
+    }
+    .meta-chip.state-assigned {
+      border-color: #9c6c37;
+      background: rgba(156, 108, 55, 0.25);
+      color: #ffe3b5;
+    }
+    .meta-chip.label-tag {
+      background: #140406;
+      border-color: #48191c;
+      color: #bfa093;
+    }
+    .detail-prose {
+      font-size: 12.5px;
+      line-height: 1.65;
+      color: #e2cec4;
+      margin-bottom: 14px;
+    }
+    .dependency-box {
+      background: linear-gradient(180deg, #24090d, #140406);
+      border: 1px solid #63261f;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 11.5px;
+      color: #baa095;
+      box-shadow: inset 0 1px 0 rgba(231, 191, 110, 0.15);
+    }
+    .dependency-box strong {
+      color: #ffdca3;
+      font-family: var(--font-serif);
+    }
+    .blocker-link {
+      color: var(--brass-bright);
+      text-decoration: underline;
+      cursor: pointer;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .blocker-link:hover {
+      color: #fff;
+    }
+
+    /* PINNED ACTION LAUNCH FOOTER */
+    .pinned-launch-footer {
+      background: linear-gradient(180deg, #26090d 0%, #150306 100%);
+      border-top: 2px solid #561d19;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.6), inset 0 1px 0 #7b2f24;
+      position: relative;
+      z-index: 8;
+    }
+    .launch-combos-row {
+      display: flex;
+      gap: 10px;
+    }
+    .combo-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .combo-label {
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #c49969;
+      font-family: var(--font-serif);
+      font-weight: 800;
+    }
+    /* Ornate metallic input style */
+    .gothic-select {
+      background: linear-gradient(180deg, #1b0609, #0f0204);
+      border: 1px solid #743126;
+      border-radius: 5px;
+      padding: 6px 9px;
+      font-size: 11.5px;
+      color: #faeedb;
+      outline: none;
+      box-shadow: inset 0 1px 4px #000, 0 1px 0 rgba(231, 191, 110, 0.2);
+      transition: all 0.15s;
+    }
+    .gothic-select:focus {
+      border-color: var(--brass-bright);
+      box-shadow: 0 0 8px rgba(231, 191, 110, 0.4);
+    }
+    .gothic-select:disabled {
+      background: #120305;
+      border-color: #3b1416;
+      color: #634747;
+      cursor: not-allowed;
+    }
+
+    .launch-action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .launch-reason-notice {
+      font-size: 11px;
+      color: #df973b;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .launch-brief-snippet {
+      font-size: 10.5px;
+      color: #c4a395;
+    }
+
+    /* DIABLO-STYLE RUBY & BURNISHED GOLD ACTION BUTTON */
+    .gothic-launch-btn {
+      background: linear-gradient(180deg, #a32229 0%, #6e1115 50%, #3e070a 100%);
+      border: 2px solid var(--border-brass);
+      border-radius: 6px;
+      padding: 9px 22px;
+      color: #fff3db;
+      font-family: var(--font-serif);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      box-shadow: 
+        0 4px 14px rgba(0,0,0,0.8),
+        inset 0 1px 0 rgba(255, 235, 190, 0.4),
+        0 0 15px rgba(184, 25, 33, 0.6);
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      text-shadow: 0 2px 4px #000;
+      position: relative;
+    }
+    .gothic-launch-btn:hover:not(:disabled) {
+      background: linear-gradient(180deg, #c42b33 0%, #85171c 50%, #4f0a0e 100%);
+      border-color: #ffdca3;
+      box-shadow: 
+        0 6px 18px rgba(0,0,0,0.9),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6),
+        0 0 22px rgba(231, 92, 46, 0.8);
+      transform: translateY(-1px);
+      color: #ffffff;
+    }
+    .gothic-launch-btn:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+    .gothic-launch-btn:disabled {
+      background: #20080a;
+      border-color: #48191c;
+      color: #6a4c4c;
+      box-shadow: none;
+      text-shadow: none;
+      cursor: not-allowed;
+    }
+
+    /* MODAL OVERLAY & COMMAND PALETTE */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 2, 4, 0.85);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      display: none;
+      place-items: center;
+      padding: 20px;
+    }
+    .modal-overlay.open {
+      display: grid;
+    }
+    .modal-window {
+      width: min(640px, 94vw);
+      background: linear-gradient(180deg, #24080c 0%, #120305 100%);
+      border: 2px solid #823528;
+      border-radius: 10px;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.95), 0 0 30px rgba(231, 191, 110, 0.25);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: modal-appear 0.18s ease-out;
+    }
+    @keyframes modal-appear {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .modal-header {
+      padding: 14px 18px;
+      background: linear-gradient(180deg, #380c11 0%, #1d0508 100%);
+      border-bottom: 2px solid #5f201d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h2 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 17px;
+      color: #f7e1b5;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .modal-tabs {
+      display: flex;
+      background: #140406;
+      border-bottom: 1px solid #3c1214;
+      padding: 0 14px;
+    }
+    .modal-tab-btn {
+      background: transparent;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-family: var(--font-serif);
+      color: #b08d81;
+      font-weight: 700;
+    }
+    .modal-tab-btn.active {
+      color: #ffdca3;
+      border-bottom-color: var(--brass-bright);
+    }
+    .modal-body {
+      padding: 20px;
+      max-height: 440px;
+      overflow-y: auto;
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #e4d1c7;
+    }
+    .settings-group {
+      margin-bottom: 18px;
+    }
+    .settings-group h3 {
+      font-family: var(--font-serif);
+      font-size: 13.5px;
+      color: #fff0d6;
+      margin: 0 0 6px;
+    }
+    .settings-group p {
+      font-size: 11.5px;
+      color: #ab8e83;
+      margin: 0 0 10px;
+    }
+    .modal-footer {
+      padding: 12px 18px;
+      background: #120305;
+      border-top: 1px solid #48191c;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* COMMAND PALETTE */
+    .cmd-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 2, 4, 0.85);
+      backdrop-filter: blur(5px);
+      z-index: 120;
+      display: none;
+      justify-content: center;
+      padding-top: 12vh;
+    }
+    .cmd-overlay.open {
+      display: flex;
+    }
+    .cmd-box {
+      width: min(520px, 92vw);
+      background: linear-gradient(180deg, #24080c 0%, #150306 100%);
+      border: 2px solid #823528;
+      border-radius: 8px;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.95), 0 0 25px rgba(231, 191, 110, 0.25);
+      overflow: hidden;
+      height: fit-content;
+      max-height: 480px;
+      display: flex;
+      flex-direction: column;
+    }
+    .cmd-input-bar {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #5a1f1c;
+      gap: 10px;
+      background: #180407;
+    }
+    .cmd-input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      font-size: 14px;
+      color: #faeedb;
+    }
+    .cmd-results {
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .cmd-item {
+      padding: 8px 12px;
+      border-radius: 5px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #dfc7bc;
+      cursor: pointer;
+    }
+    .cmd-item:hover, .cmd-item.active {
+      background: #360d13;
+      color: #fff;
+    }
+
+    /* TOAST */
+    .toast-pill {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: linear-gradient(180deg, #320c11, #1a0407);
+      border: 2px solid var(--border-brass);
+      padding: 10px 18px;
+      border-radius: 8px;
+      color: #fff0d6;
+      font-family: var(--font-serif);
+      font-size: 12.5px;
+      letter-spacing: 0.03em;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.85), 0 0 15px rgba(231, 191, 110, 0.4);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+    .toast-pill.show {
+      display: flex;
+      animation: toast-in 0.2s ease-out;
+    }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 1080px) {
+      .cockpit-app {
+        grid-template-columns: 218px 1fr 392px;
+      }
+    }
+    @media (max-width: 860px) {
+      .cockpit-app {
+        grid-template-columns: 1fr 392px;
+      }
+      .sidebar {
+        display: none;
+      }
+    }
+  </style>
+<style>
+/* DIABLO METALLIC BUTTON STYLES */
+.term-btn,
+.sidebar-footer button,
+.topline-pill-btn,
+.icon-square-btn,
+.badge-chip,
+.segmented-btn {
+  border: 2px solid #5a3d24 !important;
+  outline: 1px solid #1c120a !important;
+  outline-offset: -3px !important;
+  box-shadow: inset 0 1px 1px rgba(225, 185, 120, 0.4), inset 0 -1px 2px rgba(0, 0, 0, 0.85), 0 2px 6px rgba(0,0,0,0.8) !important;
+  border-radius: 4px !important;
+  background: linear-gradient(180deg, #2c221b 0%, #18120e 50%, #0d0907 100%) !important;
+  color: #eed8b3 !important;
+  font-family: var(--font-serif) !important;
+  text-shadow: 0 1px 2px #000 !important;
+  transition: all 0.15s ease !important;
+}
+
+.term-btn:hover,
+.sidebar-footer button:hover,
+.topline-pill-btn:hover,
+.icon-square-btn:hover,
+.badge-chip:hover,
+.segmented-btn:hover {
+  border-color: #8f653a !important;
+  color: #fff1d6 !important;
+  box-shadow: 0 0 10px rgba(215, 140, 45, 0.45), inset 0 0 6px rgba(180, 40, 20, 0.35), 0 2px 8px rgba(0,0,0,0.9) !important;
+}
+
+/* Active and toggle states */
+.segmented-btn.active {
+  background: linear-gradient(180deg, #441416 0%, #24080a 50%, #150305 100%) !important;
+  border-color: #8f653a !important;
+  color: #ffdca3 !important;
+  box-shadow: 0 0 8px rgba(215, 140, 45, 0.4), inset 0 1px 2px rgba(240, 190, 110, 0.45), inset 0 0 6px rgba(138, 25, 31, 0.6) !important;
+}
+
+/* Spells quick action buttons */
+.badge-chip {
+  font-family: var(--font-mono), var(--font-serif) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+}
+
+/* PRIMARY DIABLO CTA BUTTON (GO TO SESSION) */
+.gothic-launch-btn {
+  position: relative !important;
+  background: linear-gradient(180deg, #66181b 0%, #3e0b0e 48%, #1c0305 100%) !important;
+  border: 2px solid #94602f !important;
+  outline: 1px solid #2b120c !important;
+  outline-offset: -3px !important;
+  border-radius: 4px !important;
+  color: #ffeed3 !important;
+  font-family: var(--font-serif) !important;
+  font-size: 13.5px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.1em !important;
+  text-shadow: 0 2px 4px #000, 0 0 8px rgba(235, 120, 40, 0.5) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.85), inset 0 1px 1px rgba(255, 220, 140, 0.55), inset 0 -2px 6px rgba(0,0,0,0.9), 0 0 15px rgba(200, 40, 30, 0.5) !important;
+  padding: 10px 24px !important;
+}
+
+.gothic-launch-btn::before, .gothic-launch-btn::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border: 1px solid #ffd88a;
+  pointer-events: none;
+}
+.gothic-launch-btn::before {
+  top: 1px; left: 1px;
+  border-right: none; border-bottom: none;
+}
+.gothic-launch-btn::after {
+  bottom: 1px; right: 1px;
+  border-left: none; border-top: none;
+}
+
+.gothic-launch-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #852125 0%, #520f13 48%, #280508 100%) !important;
+  border-color: #d49547 !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.9), inset 0 1px 2px rgba(255, 240, 180, 0.7), 0 0 22px rgba(235, 80, 40, 0.8), inset 0 0 10px rgba(184, 25, 33, 0.7) !important;
+  transform: translateY(-1px);
+}
+</style><link rel="stylesheet" href="../assets/fonts/fonts.css"/><style id="terminal-contrast-override">
+  /* Parchment terminal typography and high-contrast iron-gall ink */
+  .terminal-viewport,
+  #terminal-screen,
+  .term-log,
+  .term-welcome,
+  .tome-book-frame {
+    font-family: "Georgia", "Crimson Text", "Book Antiqua", "Palatino Linotype", Palatino, serif !important;
+    color: #1a0e08 !important;
+  }
+
+  /* 2. Timestamps and time badges */
+  #terminal-screen .term-log .dim,
+  .term-log .dim,
+  .term-log span:first-child {
+    color: #2a170d !important;
+    font-weight: 700 !important;
+    font-family: var(--font-mono), monospace !important;
+    opacity: 0.95 !important;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+  }
+
+  /* 3. Top red headings and subheadings */
+  .term-banner,
+  #terminal-screen .term-banner {
+    color: #5a0e07 !important;
+    font-family: "Georgia", "Cinzel", serif !important;
+    font-weight: 800 !important;
+    text-shadow: 0 1px 0 rgba(255, 240, 220, 0.5) !important;
+    letter-spacing: 0.04em !important;
+  }
+  .term-banner-sub,
+  #terminal-screen .term-banner-sub {
+    color: #3e2617 !important;
+    font-weight: 600 !important;
+  }
+
+  /* 4. Yellow/orange/faded log text, spell invoked notices, and labels */
+  #terminal-screen .term-log .gold,
+  .term-log .gold {
+    color: #5c2409 !important;
+    font-weight: 700 !important;
+  }
+  #terminal-screen .term-log .cyan,
+  .term-log .cyan {
+    color: #0d3a42 !important;
+    font-weight: 700 !important;
+  }
+  #terminal-screen .term-log .green,
+  .term-log .green {
+    color: #113f1e !important;
+    font-weight: 700 !important;
+  }
+  #terminal-screen .term-log .purple,
+  .term-log .purple {
+    color: #46144e !important;
+    font-weight: 700 !important;
+  }
+  #terminal-screen .term-log strong,
+  .term-log strong {
+    color: #1a0b05 !important;
+    font-weight: 800 !important;
+  }
+
+  /* 5. Code pills / badges on the parchment */
+  #terminal-screen .term-log code,
+  .term-log code {
+    background: rgba(84, 40, 14, 0.14) !important;
+    border: 1px solid #6b3516 !important;
+    color: #180b06 !important;
+    font-family: var(--font-mono), monospace !important;
+    font-weight: 700 !important;
+    padding: 1px 6px !important;
+    box-shadow: inset 0 1px 2px rgba(60, 25, 10, 0.15) !important;
+  }
+
+  /* Prompt input styling high contrast */
+  #terminal-screen .term-prompt-line {
+    background: rgba(224, 196, 148, 0.85) !important;
+    border: 1px solid #7c4c23 !important;
+  }
+  #terminal-screen .term-prompt-line .prompt-symbol {
+    color: #5a0e07 !important;
+    font-weight: 900 !important;
+  }
+  #terminal-screen .term-input {
+    font-family: "Georgia", serif !important;
+    color: #180b06 !important;
+    font-weight: 700 !important;
+  }
+  #terminal-screen .term-input::placeholder {
+    color: #5d3f2b !important;
+  }
+</style></head>
+<body style="cursor: default;">
+<div class="cockpit-app">
+<!-- LEFT COLUMN: Navigation -->
+<aside aria-label="Campaign and expedition navigation" class="sidebar" style="background: radial-gradient(circle at 50% 20%, rgba(35, 25, 23, 0.45) 0%, rgba(10, 8, 9, 0.94) 100%), url(&quot;../assets/images/8c39cd52d48b.png&quot;) center top / cover no-repeat, rgb(13, 10, 11); border-right: 1px solid rgb(60, 42, 30); box-shadow: rgba(0, 0, 0, 0.8) -10px 0px 30px inset;">
+<div class="brand-bar">
+<div class="brand-icon">⚔</div>
+<div class="brand-title">Dungeon Master</div>
+</div>
+<div class="sidebar-actions">
+<div class="sidebar-search" id="quick-jump-trigger">
+<span class="">Jump to quest or session...</span>
+<span class="kbd-tag">⌘K</span>
+</div>
+</div>
+<div class="sidebar-section-title">Campaigns</div>
+<div class="campaign-list">
+<div class="campaign-card active" id="campaign-sample">
+<div class="campaign-header-row">
+<span class="campaign-name">sample-campaign</span>
+<span class="badge-sample">Demo fixture</span>
+</div>
+<div class="campaign-desc">13 sample quests · local cockpit</div>
+<div class="expeditions-list">
+<button class="expedition-item active" data-quest-target="3" data-session-hero="Sonnet">
+<span class="session-indicator running" title="Running agent"></span>
+<span class="">#3 Signup Form (Sonnet)</span>
+</button>
+<button class="expedition-item" data-quest-target="6" data-session-hero="Opus">
+<span class="session-indicator waiting" title="Waiting on review"></span>
+<span class="">#6 Safari Login (Alice PR)</span>
+</button>
+<button class="expedition-item" id="scratch-shell-btn">
+<span class="session-indicator idle" title="Shell ready"></span>
+<span class="">○ Scratch Terminal</span>
+</button>
+</div>
+</div>
+<div class="campaign-card" style="opacity: 0.65;">
+<div class="campaign-header-row">
+<span class="campaign-name">internal/quests</span>
+<span class="kbd-tag">Git</span>
+</div>
+<div class="campaign-desc">Repository connected · clean</div>
+</div>
+</div>
+<div class="sidebar-footer">
+<button class="" id="add-campaign-btn"><span class="">+</span> Add project</button>
+<button class="" id="open-settings-btn" title="Cockpit Settings">⚙ Settings</button>
+</div>
+</aside>
+<!-- CENTER COLUMN: Papyrus / Tome Central Terminal -->
+<main aria-label="Live interactive terminal workspace" class="workspace-terminal">
+<div class="terminal-nav" style="min-height: 48px; height: 48px; padding: 0px 12px; gap: 8px; display: flex; align-items: center; overflow: hidden;"><div class="terminal-tab-pill" style="flex-shrink: 0; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; padding: 4px 8px; line-height: 1.2;"><span class="wax-seal-dot" style="flex-shrink: 0;"></span><span class="" id="term-session-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Expedition: #3 Signup Form</span></div><div class="terminal-meta-info" style="flex: 1 1 0%; min-width: 0px; display: flex; align-items: center; gap: 6px; font-size: 10.5px; overflow: hidden; white-space: nowrap;"><span class="" style="overflow: hidden; text-overflow: ellipsis;">Hero: <strong>Claude 3.7</strong></span><span class="">·</span><span class="" style="overflow: hidden; text-overflow: ellipsis;"><code>feat/signup-form</code></span></div><div class="terminal-actions" style="flex-shrink: 0; display: flex; gap: 4px;"><button class="term-btn" id="term-clear-btn" style="padding: 3px 6px; font-size: 10px;" title="Clear buffer">⌧ Clear</button><button class="term-btn" id="term-refresh-btn" style="padding: 3px 6px; font-size: 10px;" title="Refresh session context">↻ Reload</button><button class="term-btn" id="toggle-panel-btn" style="padding: 3px 6px; font-size: 10px;" title="Toggle right panel width">⇲ Expand</button></div></div>
+<div class="terminal-viewport-wrapper">
+<div class="tome-book-frame" style="background: url(&quot;../assets/images/97785ef87771.png&quot;) center center / cover no-repeat, rgb(222, 206, 176); border: 3px solid rgb(74, 40, 16); box-shadow: rgba(60, 32, 10, 0.55) 0px 0px 35px 8px inset, rgba(35, 18, 5, 0.35) 0px 0px 60px 15px inset, rgba(247, 225, 185, 0.45) 0px 0px 0px 1px inset, rgb(60, 30, 11) 0px 0px 0px 3px inset, rgba(0, 0, 0, 0.9) 0px 12px 35px; position: relative;"><style>
+  #terminal-screen::-webkit-scrollbar {
+    width: 15px;
+  }
+  #terminal-screen::-webkit-scrollbar-track {
+    background: linear-gradient(90deg, #2b170c 0%, #160a04 50%, #2b170c 100%);
+    border-left: 1px solid #6b4020;
+    border-right: 1px solid #4a2810;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.95), inset 1px 0 3px #0a0402;
+    border-radius: 2px;
+  }
+  #terminal-screen::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #f7ecd7 0%, #e6d2b0 35%, #d5ba8b 65%, #c29f6b 100%);
+    border: 1px solid #724b22;
+    outline: 1px solid #b88a44;
+    outline-offset: -2px;
+    border-radius: 3px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.85), inset 0 1px 1px #fffbee, inset 0 -1px 3px #6b451c;
+    position: relative;
+  }
+  #terminal-screen::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #fff7eb 0%, #f0dec0 35%, #dfc79c 65%, #ceae7d 100%);
+    outline-color: #d8a04b;
+  }
+  #terminal-screen::-webkit-scrollbar-button:single-button:vertical:decrement {
+    height: 14px;
+    background: linear-gradient(180deg, #5a341b, #261207);
+    border: 1px solid #7d4d25;
+    border-bottom: 1px solid #1a0802;
+  }
+  #terminal-screen::-webkit-scrollbar-button:single-button:vertical:increment {
+    height: 14px;
+    background: linear-gradient(180deg, #261207, #5a341b);
+    border: 1px solid #7d4d25;
+    border-top: 1px solid #1a0802;
+  }
+  #terminal-screen {
+    scrollbar-width: thin;
+    scrollbar-color: #d5ba8b #160a04;
+    color: #1e1208 !important;
+    font-family: var(--font-mono);
+    overflow-y: scroll;
+  }
+  #terminal-screen .term-log strong {
+    color: #150b04 !important;
+  }
+  #terminal-screen .term-log code {
+    background: rgba(90, 48, 16, 0.16) !important;
+    border: 1px solid rgba(130, 75, 25, 0.4) !important;
+    color: #721414 !important;
+  }
+  #terminal-screen .term-narrative {
+    background: rgba(210, 175, 122, 0.38) !important;
+    border-left: 3px solid #7a1515 !important;
+    color: #1e1106 !important;
+    box-shadow: inset 0 1px 4px rgba(115, 68, 24, 0.2);
+  }
+  #terminal-screen .term-prompt-line {
+    background: rgba(222, 190, 138, 0.72) !important;
+    border: 1px solid #9c703b !important;
+    box-shadow: inset 0 1px 4px rgba(78, 42, 14, 0.22) !important;
+  }
+</style>
+<div class="terminal-viewport" id="terminal-screen">
+<div class="term-welcome">
+<div class="term-banner" style="color: rgb(92, 18, 8); font-family: Georgia, Cinzel, &quot;Crimson Text&quot;, &quot;Book Antiqua&quot;, serif; font-weight: 900; font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; text-shadow: rgba(255, 245, 225, 0.6) 0px 1px 0px;">Claude Code v2.1.295 — Expedition session active</div>
+<div class="term-banner-sub" style="color: rgb(56, 33, 18); font-family: Georgia, &quot;Crimson Text&quot;, serif; font-size: 12px; font-weight: 600; font-style: italic;">Campaign: sample-campaign · Context: internal/quests/demo · Model: claude-3-7-sonnet</div>
+</div>
+<div class="term-log"><span class="dim">[10:14:02]</span> <span class="cyan" style="color: #124b54;">SessionStart:</span> Initialized hero configuration for <span class="gold" style="color: #704505;">#3 Build the signup form</span>.</div>
+<div class="term-log"><span class="dim">[10:14:03]</span> <span class="purple" style="color: #562066;">Quest Briefing:</span> Collect an email and password. Render form, submit to signup API, handle validation errors.</div>
+<div class="term-log"><span class="dim">[10:14:04]</span> <span class="green" style="color: #1a4d29;">Spell Invoked:</span> <code>/plan</code> analyzing dependency graph. Parent hall <strong>#1 Ship the onboarding flow</strong> confirmed. Blocker #2 marked completed.</div>
+<div class="term-log"><span class="dim">[10:14:15]</span> <span class="dim">git status:</span> On branch <code>feat/signup-form</code>. Working tree clean.</div>
+<div class="term-narrative">
+    ✦ Claude: I will now examine the API contract for the signup endpoint and draft the form component test suite.
+  </div>
+<div class="term-log" style="margin-top: 12px;"><span class="dim">[10:14:28]</span> <span class="cyan" style="color: #124b54;">Inspection:</span> Reading schema definition <code>packages/core/api/v1/signup.schema.json</code></div>
+<div class="term-log"><span class="dim">[10:14:31]</span> <span class="dim">payload specs:</span> <code>{ email: string, passwordHash: string, inviteCode?: string }</code></div>
+<div class="term-log"><span class="dim">[10:14:42]</span> <span class="green" style="color: #1a4d29;">Drafting Tests:</span> Generated <code>packages/client/__tests__/SignupForm.test.tsx</code> (8 assertions)</div>
+<div class="term-narrative">
+    ✦ Claude: Test suite drafted: verified email format validation, empty password prevention, API failure toast alert dispatch, and redirect upon 201 Created.
+  </div>
+<div class="term-log" style="margin-top: 12px;"><span class="dim">[10:15:05]</span> <span class="green" style="color: #1a4d29;">Spell Invoked:</span> <code>/test</code> runner executing Vitest suite...</div>
+<div class="term-log"><span class="dim">[10:15:08]</span> <span class="dim">PASS:</span> <code>SignupForm › renders email and password fields correctly</code> (18ms)</div>
+<div class="term-log"><span class="dim">[10:15:09]</span> <span class="dim">PASS:</span> <code>SignupForm › displays error banner on duplicate account 409</code> (24ms)</div>
+<div class="term-log"><span class="dim">[10:15:11]</span> <span class="dim">PASS:</span> <code>SignupForm › dispatches tracking event on submission</code> (12ms)</div>
+<div class="term-log"><span class="dim">[10:15:12]</span> <span class="green" style="color: #1a4d29;">Test Suite Result:</span> 3/3 passed (100% assertion coverage)</div>
+<div class="term-log" style="margin-top: 12px;"><span class="dim">[10:15:24]</span> <span class="purple" style="color: #562066;">Spell Invoked:</span> <code>/review</code> examining static types and security posture...</div>
+<div class="term-log"><span class="dim">[10:15:29]</span> <span class="dim">audit notice:</span> Form field sanitized against XSS payloads. Client-side rate-limiting hook attached.</div>
+<div class="term-log"><span class="dim">[10:15:35]</span> <span class="cyan" style="color: #124b54;">git diff:</span> <code>+142 lines</code> across 2 files, 0 warnings. Ready for PR commit.</div>
+<div class="term-narrative">
+    ✦ Claude: Components and tests are verified clean. Ready to inscribe next spell or commit to expedition branch.
+  </div>
+<div class="term-prompt-line" style="margin-top: 16px;">
+<span class="prompt-symbol" style="color: #7a1515;">❯</span>
+<input autofocus="" class="term-input" id="terminal-cli-input" placeholder="Inscribe spell or command (/test, /git, /plan, /compact)..." style="color: rgb(30, 16, 6); font-weight: 600;" type="text">
+<span class="term-cursor" style="background: #241407;"></span>
+</div>
+</div><style>
+  #terminal-screen .term-narrative {
+    background: rgba(48, 24, 10, 0.14) !important;
+    border-left: 3.5px solid #5a1e0c !important;
+    border-top: 1px solid rgba(90, 30, 12, 0.2) !important;
+    border-right: 1px solid rgba(90, 30, 12, 0.15) !important;
+    border-bottom: 1px solid rgba(90, 30, 12, 0.2) !important;
+    border-radius: 0 5px 5px 0 !important;
+    color: #100602 !important;
+    font-weight: 600 !important;
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    box-shadow: inset 0 1px 3px rgba(35, 15, 6, 0.15), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+    text-shadow: 0 0 1px rgba(255, 248, 230, 0.4) !important;
+    padding: 10px 14px !important;
+    letter-spacing: -0.01em !important;
+  }
+</style></div>
+</div>
+<div class="terminal-quick-actions">
+<span class="" style="font-family: var(--font-serif); font-weight: 700; color: #ffdca3;">Spells:</span>
+<span class="badge-chip">/plan</span>
+<span class="badge-chip">/review</span>
+<span class="badge-chip">/test</span>
+<span class="badge-chip">/pr</span>
+<span class="" style="margin-left: auto; color: #ab8e83;">Connected to local daemon via PTY</span>
+</div>
+</main>
+<!-- RIGHT COLUMN: Gothic Dungeon Encounter Cockpit -->
+<aside aria-label="Quest dependency encounter map" class="cockpit-panel">
+<!-- Panel Top Bar -->
+<header class="panel-header-bar">
+<div class="panel-header-title">
+<div class="jewel-accent"></div>
+<span class="">Quest Encounters</span>
+</div>
+<div class="panel-header-spacer"></div>
+<div aria-label="Map or list view" class="segmented-control" role="group">
+<button class="segmented-btn active" id="btn-view-map">Map</button>
+<button class="segmented-btn" id="btn-view-list">List</button>
+</div>
+<button class="icon-square-btn" id="btn-panel-help" title="Visual Grammar &amp; Rules">?</button>
+</header>
+<!-- UPPER PORTION: Map Visualization & Graph -->
+<section class="panel-top-portion" id="panel-top-section">
+<div class="map-canvas-container" id="map-scroll-canvas" style="background: radial-gradient(circle at 50% 40%, rgba(26, 18, 16, 0.45) 0%, rgba(8, 6, 8, 0.92) 100%), url(&quot;../assets/images/8c39cd52d48b.png&quot;) center center / cover no-repeat, rgb(9, 7, 9);">
+<div class="map-vignette"></div>
+<div class="map-topline-bar">
+<div class="topline-title">
+<span class="" id="hall-scope-name">Onboarding flow</span> <span class="">· 1 of 4 cleared</span>
+</div>
+<button class="topline-pill-btn" id="btn-view-all-quests">All 13 quests</button>
+</div>
+<div class="map-board" id="map-board-layer">
+<!-- Containing Hall: #1 Ship the onboarding flow -->
+<div class="dungeon-hall" id="hall-1-box">
+<div class="hall-banner">
+<strong>#1 Ship the onboarding flow</strong>
+<span class="sub">· Parent Hall (4 rooms)</span>
+</div>
+</div>
+<!-- SVG Corridors, Doors & Dependencies -->
+<svg aria-hidden="true" class="map-links-svg" viewBox="0 0 480 480">
+<!-- Path from Room 2 to Room 3 (Cleared edge) -->
+<path class="corridor-path open" d="M130 141 H148"></path>
+<!-- Path from Room 3 to Room 4 (Blocking edge with Door) -->
+<path class="corridor-path locked" d="M246 141 H264"></path>
+<rect class="corridor-door" height="16" rx="2" width="8" x="250" y="133"></rect>
+<!-- Path from Room 4 to Room 5 (Vertical locked edge) -->
+<path class="corridor-path locked" d="M313 190 V206"></path>
+<rect class="corridor-door" height="11" rx="2" width="8" x="309" y="193"></rect>
+<!-- Path from Room 7 to Room 5 (Outskirts blocker into Hall) -->
+<path class="corridor-path locked" d="M197 356 V300 H313 V286"></path>
+<rect class="corridor-door" height="11" rx="2" width="8" x="309" y="286"></rect>
+</svg>
+<!-- Room 2: Design the welcome screen (Cleared, Rat ../assets/images/bcb65137ba29.png) -->
+<button aria-label="Quest 2, Cleared, Trivial effort rat" aria-pressed="false" class="room-node cleared node-pos-2" data-quest="2">
+<span class="room-badge">✓</span>
+<div class="creature-viewport rat animated-sprite"></div>
+<div class="room-info-meta">
+<div class="room-num">#2 <span class="">trivial</span></div>
+<div class="room-title-snippet">Welcome screen</div>
+</div>
+</button>
+<!-- Room 3: Build the signup form (Active & Selected, Goblin ../assets/images/0de927d22f2d.png) -->
+<button aria-label="Quest 3, Ready, Moderate effort goblin" aria-pressed="true" class="room-node ready animated selected node-pos-3" data-quest="3">
+<span class="room-badge">!</span>
+<div class="creature-viewport goblin animated-sprite"></div>
+<div class="room-info-meta">
+<div class="room-num">#3 <span class="">moderate</span></div>
+<div class="room-title-snippet">Signup form</div>
+</div>
+</button>
+<!-- Room 4: Validate email addresses (Blocked by #3, Goblin ../assets/images/0de927d22f2d.png) -->
+<button aria-label="Quest 4, Blocked by 3, Moderate effort goblin" aria-pressed="false" class="room-node locked node-pos-4" data-quest="4">
+<span class="room-badge">▣</span>
+<div class="creature-viewport goblin animated-sprite"></div>
+<div class="room-info-meta">
+<div class="room-num">#4 <span class="">moderate</span></div>
+<div class="room-title-snippet">Validate emails</div>
+</div>
+</button>
+<!-- Room 5: Send the welcome email (Blocked by #4 & #7, Large Many-eyed Watcher ../assets/images/6e6f91fe335c.png) -->
+<button aria-label="Quest 5, Blocked by 4 and 7, Large effort many eyed creature" aria-pressed="false" class="room-node locked node-pos-5" data-quest="5">
+<span class="room-badge">▣</span>
+<div class="creature-viewport eye animated-sprite"></div>
+<div class="room-info-meta">
+<div class="room-num">#5 <span class="">large</span></div>
+<div class="room-title-snippet">Welcome email</div>
+</div>
+</button>
+<!-- OUTSKIRTS ENCOUNTERS -->
+<div class="outskirts-label">Outskirts · External Quests</div>
+<!-- Room 6: Safari Login Bug (Assigned to Alice, Unknown Effort) -->
+<button aria-label="Quest 6, Assigned to Alice, Unknown effort" aria-pressed="false" class="room-node assigned node-pos-6" data-quest="6">
+<span class="room-badge">@</span>
+<div class="creature-viewport unknown-diamond">◇</div>
+<div class="room-info-meta">
+<div class="room-num">#6 <span class="">unknown</span></div>
+<div class="room-title-snippet">Safari login bug</div>
+</div>
+</button>
+<!-- Room 7: Email Provider Decision (Open, Unknown Effort) -->
+<button aria-label="Quest 7, Open, Unknown effort diamond" aria-pressed="false" class="room-node ready node-pos-7" data-quest="7">
+<span class="room-badge">!</span>
+<div class="creature-viewport unknown-diamond">◇</div>
+<div class="room-info-meta">
+<div class="room-num">#7 <span class="">unknown</span></div>
+<div class="room-title-snippet">Email provider?</div>
+</div>
+</button>
+<!-- Room 8: Privacy Policy (Closed, not planned) -->
+<button aria-label="Quest 8, Closed" aria-pressed="false" class="room-node cleared node-pos-8" data-quest="8">
+<span class="room-badge">✕</span>
+<div class="creature-viewport unknown-diamond">◇</div>
+<div class="room-info-meta">
+<div class="room-num">#8 <span class="">closed</span></div>
+<div class="room-title-snippet">Privacy policy</div>
+</div>
+</button>
+</div>
+</div>
+<!-- ALTERNATIVE LIST VIEW -->
+<div class="list-alternative-view" id="list-alternative-container">
+<div class="list-filter-row">
+<input class="list-filter-input" id="list-search-input" placeholder="Search 13 sample quests..." type="text">
+</div>
+<div id="quest-list-items-target">
+        <button class="quest-list-item-btn " data-quest="1">
+          <div class="list-item-thumb unknown">
+            ◇
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#1 Ship the onboarding flow</div>
+            <div class="list-item-subtitle">Open Hall · unestimated</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn " data-quest="2">
+          <div class="list-item-thumb rat">
+            
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#2 Design the welcome screen</div>
+            <div class="list-item-subtitle">Cleared · trivial effort</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn selected" data-quest="3">
+          <div class="list-item-thumb goblin">
+            
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#3 Build the signup form</div>
+            <div class="list-item-subtitle">Ready · moderate effort</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn " data-quest="4">
+          <div class="list-item-thumb goblin">
+            
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#4 Validate email addresses</div>
+            <div class="list-item-subtitle">Blocked · moderate effort</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn " data-quest="5">
+          <div class="list-item-thumb eye">
+            
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#5 Send the welcome email</div>
+            <div class="list-item-subtitle">Blocked · large effort</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn " data-quest="6">
+          <div class="list-item-thumb unknown">
+            ◇
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#6 Login button unresponsive on Safari</div>
+            <div class="list-item-subtitle">Assigned to Alice · unknown effort</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn " data-quest="7">
+          <div class="list-item-thumb unknown">
+            ◇
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#7 Which email provider should we use?</div>
+            <div class="list-item-subtitle">Ready · unknown effort</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn " data-quest="8">
+          <div class="list-item-thumb unknown">
+            ◇
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#8 Write the privacy policy</div>
+            <div class="list-item-subtitle">Closed · unknown effort</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn " data-quest="9">
+          <div class="list-item-thumb unknown">
+            ◇
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#9 Evaluate rate-limit libraries</div>
+            <div class="list-item-subtitle">Ready · unknown effort</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn " data-quest="10">
+          <div class="list-item-thumb unknown">
+            ◇
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#10 Upgrade Node to the latest LTS</div>
+            <div class="list-item-subtitle">Assigned to Bob · unknown effort</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn " data-quest="11">
+          <div class="list-item-thumb unknown">
+            ◇
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#11 Build the admin dashboard</div>
+            <div class="list-item-subtitle">Open Hall · unestimated</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn " data-quest="12">
+          <div class="list-item-thumb unknown">
+            ◇
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#12 List users</div>
+            <div class="list-item-subtitle">Ready · unknown effort</div>
+          </div>
+        </button>
+      
+        <button class="quest-list-item-btn " data-quest="13">
+          <div class="list-item-thumb unknown">
+            ◇
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#13 Suspend a user</div>
+            <div class="list-item-subtitle">Blocked · unknown effort</div>
+          </div>
+        </button>
+      </div>
+</div>
+</section>
+<!-- RESIZABLE SPLITTER -->
+<div aria-hidden="true" class="horizontal-splitter" id="panel-resizer-handle" title="Drag to resize map and detail split"></div>
+<!-- LOWER PORTION: Selected Quest Detail -->
+<section class="panel-bottom-portion" id="panel-bottom-section">
+<div class="detail-scroll-area" id="quest-detail-content">
+      <div class="diablo-heading-banner">
+        <div class="detail-heading-row">
+          <h2 class="detail-title"><span class="">#3</span> Build the signup form</h2>
+          <button class="icon-square-btn" title="View on GitHub / Mirror" onclick="showToast('Opened local mirror for #3')">↗</button>
+        </div>
+      </div>
+      <div class="chips-cluster">
+        <span class="meta-chip state-ready">Ready</span>
+        <span class="meta-chip">Moderate effort</span>
+        <span class="meta-chip label-tag">demo</span>
+        
+      </div>
+      <div style="font-size: 11px; color: #bca196; margin-bottom: 8px;" class="">
+        Belongs to Hall: <strong style="color: #ffdca3;">#1 Ship the onboarding flow</strong>
+      </div>
+      <p class="detail-prose">Collect an email and password. Render the responsive form, submit to the signup API endpoint, and display actionable error toasts.</p>
+      <div class="dependency-box">
+        <strong>Blocked by:</strong> <button class="blocker-link" onclick="selectQuest(2)">#2 Design the welcome screen</button>
+      </div>
+      <div style="font-size: 11px; color: #a68b80; border-top: 1px solid #4a191c; padding-top: 10px; margin-top: 12px;" class="">
+        Part of #1 · #2 cleared
+      </div>
+    </div>
+<!-- PINNED ACTION LAUNCH FOOTER -->
+<footer class="pinned-launch-footer">
+<div class="launch-combos-row">
+<div class="combo-wrapper">
+<label class="combo-label" for="select-hero">Hero / Agent</label>
+<select class="gothic-select" id="select-hero">
+<option value="Sonnet">Claude 3.7 Sonnet (Recommended)</option>
+<option value="Opus">Claude 3 Opus (High reasoning)</option>
+<option value="Haiku">Claude 3.5 Haiku (Fast triage)</option>
+</select>
+</div>
+<div class="combo-wrapper">
+<label class="combo-label" for="select-spell">Spell / Skill</label>
+<select class="gothic-select" id="select-spell">
+<option value="none">None — Open without a skill</option>
+<optgroup label="Plan">
+<option selected="" value="/plan">/plan — Break down architecture</option>
+<option value="/research">/research — Survey libraries</option>
+</optgroup>
+<optgroup label="Do">
+<option value="/implement">/implement — Code changes &amp; tests</option>
+<option value="/refactor">/refactor — Clean code &amp; types</option>
+</optgroup>
+<optgroup label="Check">
+<option value="/test">/test — Run test runners</option>
+<option value="/review">/review — Security &amp; style check</option>
+</optgroup>
+</select>
+</div>
+</div>
+<div class="launch-action-row">
+<div id="launch-state-feedback">
+<span class="launch-brief-snippet" id="launch-brief-text"><span style="color: #ff5238; font-weight: 700;" class="">● Live expedition active</span> · Branch <code>feat/signup-form</code></span>
+</div>
+<button class="gothic-launch-btn" id="start-quest-btn">
+<span class="">▶</span>
+<span class="" id="launch-btn-label">Go to session</span>
+</button>
+</div>
+</footer>
+</section>
+</aside>
+</div>
+<!-- SETTINGS MODAL -->
+<div aria-labelledby="settings-heading" aria-modal="true" class="modal-overlay" id="settings-modal" role="dialog">
+<div class="modal-window">
+<div class="modal-header">
+<h2 class="" id="settings-heading"><span class="jewel-accent"></span> Cockpit Settings</h2>
+<button class="icon-square-btn" id="close-settings-btn">×</button>
+</div>
+<div class="modal-tabs">
+<button class="modal-tab-btn active">Heroes &amp; Models</button>
+<button class="modal-tab-btn">Spells &amp; Skills</button>
+<button class="modal-tab-btn">Appearance</button>
+<button class="modal-tab-btn">GitHub &amp; Scope</button>
+</div>
+<div class="modal-body">
+<div class="settings-group">
+<h3 class="">Configured Heroes (Claude Code Profiles)</h3>
+<p class="">Manage model temperature, tool permissions, and custom instructions per expedition hero.</p>
+<div style="background: #190508; border: 1px solid #581d1a; border-radius: 6px; padding: 10px; font-size: 11.5px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+<strong style="color: #ffdca3; font-family: var(--font-serif);">Sonnet (Default)</strong>
+<span class="meta-chip">claude-3-7-sonnet-20250219</span>
+</div>
+<div class="" style="color: #c4a395;">Auto-compact enabled · Bash, Edit, View, WebSearch tools active</div>
+</div>
+</div>
+<div class="settings-group">
+<h3 class="">Creature Roster &amp; Effort Mapping</h3>
+<p class="">Creatures visually represent explicit effort points. Species identity is deterministically hashed from local issue keys and remains stable across releases.</p>
+<div class="" style="font-size: 11px; color: #dfc7bc; line-height: 1.8;">
+          • <strong>Trivial (1 pt):</strong> Dungeon Rat (Supplied transparent sprite)<br>
+          • <strong>Moderate (3 pts):</strong> Goblin Scout (Supplied transparent sprite)<br>
+          • <strong>Large (8 pts):</strong> Many-Eyed Stone Watcher (Supplied transparent sprite)<br>
+          • <strong>Unestimated:</strong> Plain Diamond node (No hallucinated story points)
+        </div>
+</div>
+</div>
+<div class="modal-footer">
+<button class="term-btn" id="save-settings-btn" style="background: linear-gradient(180deg, #a32229, #5c0f14); color: white; border-color: var(--brass-bright); font-weight: 700;">Save Settings</button>
+</div>
+</div>
+</div>
+<!-- COMMAND PALETTE (CMD+K) -->
+<div aria-modal="true" class="cmd-overlay" id="cmd-palette" role="dialog">
+<div class="cmd-box">
+<div class="cmd-input-bar">
+<span class="" style="color: var(--brass-bright); font-size: 14px;">⌘</span>
+<input class="cmd-input" id="cmd-input" placeholder="Type a quest number, title, or spell..." type="text">
+<span class="kbd-tag">ESC</span>
+</div>
+<div class="cmd-results" id="cmd-results-list">
+<!-- Generated via JS -->
+</div>
+</div>
+</div>
+<!-- TOAST -->
+<div class="toast-pill" id="cockpit-toast" role="status">
+<span class="jewel-accent"></span>
+<span class="" id="toast-message">Expedition session started</span>
+</div>
+<script>
+  // Complete 13 sample quests mirroring sample-quests.json & demo fixtures
+  const sampleQuests = {
+    1: {
+      number: 1,
+      title: "Ship the onboarding flow",
+      state: "Open Hall",
+      effort: null,
+      creature: null,
+      parent: null,
+      blockedBy: [],
+      assignees: [],
+      closed: false,
+      description: "Epic container hall encompassing the initial user onboarding flow (#2 through #5).",
+      relation: "Parent Hall for #2, #3, #4, #5",
+      startable: false
+    },
+    2: {
+      number: 2,
+      title: "Design the welcome screen",
+      state: "Cleared",
+      effort: "Trivial",
+      creature: "rat",
+      parent: 1,
+      blockedBy: [],
+      assignees: [],
+      closed: true,
+      description: "Mockups for the first screen a new user sees after signup. Approved in design review.",
+      relation: "Part of #1 · PR #21 merged",
+      startable: false,
+      blocker: null
+    },
+    3: {
+      number: 3,
+      title: "Build the signup form",
+      state: "Ready",
+      effort: "Moderate",
+      creature: "goblin",
+      parent: 1,
+      blockedBy: [2],
+      assignees: [],
+      closed: false,
+      description: "Collect an email and password. Render the responsive form, submit to the signup API endpoint, and display actionable error toasts.",
+      relation: "Part of #1 · #2 cleared",
+      startable: true,
+      recommendedSpell: "/plan"
+    },
+    4: {
+      number: 4,
+      title: "Validate email addresses",
+      state: "Blocked",
+      effort: "Moderate",
+      creature: "goblin",
+      parent: 1,
+      blockedBy: [3],
+      assignees: [],
+      closed: false,
+      description: "Reject malformed email addresses and disposable domains on both client form submit and backend worker.",
+      relation: "Part of #1 · Blocked by #3",
+      startable: false,
+      blocker: 3
+    },
+    5: {
+      number: 5,
+      title: "Send the welcome email",
+      state: "Blocked",
+      effort: "Large",
+      creature: "eye",
+      parent: 1,
+      blockedBy: [4, 7],
+      assignees: [],
+      closed: false,
+      description: "Send the onboarding email once upon successful verification. Depends on email validation (#4) and selecting the email provider (#7).",
+      relation: "Part of #1 · Blocked by #4 and #7",
+      startable: false,
+      blocker: 4
+    },
+    6: {
+      number: 6,
+      title: "Login button unresponsive on Safari",
+      state: "Assigned to Alice",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: null,
+      blockedBy: [],
+      assignees: ["Alice"],
+      closed: false,
+      description: "The primary CTA button fails to dispatch touch events on Safari 17 iOS/macOS. Alice has opened an active PR #34.",
+      relation: "PR #34 open · Assigned to Alice",
+      startable: true,
+      recommendedSpell: "/review"
+    },
+    7: {
+      number: 7,
+      title: "Which email provider should we use?",
+      state: "Ready",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: null,
+      blockedBy: [],
+      assignees: [],
+      closed: false,
+      description: "Compare deliverability, pricing tiers, and latency between Postmark, Resend, and SES, then document decision.",
+      relation: "Decisional · Blocks #5",
+      startable: true,
+      recommendedSpell: "/research"
+    },
+    8: {
+      number: 8,
+      title: "Write the privacy policy",
+      state: "Closed",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: null,
+      blockedBy: [],
+      assignees: [],
+      closed: true,
+      description: "Draft terms of service and GDPR privacy notice. Closed as not planned for initial release.",
+      relation: "Standalone · Closed",
+      startable: false
+    },
+    9: {
+      number: 9,
+      title: "Evaluate rate-limit libraries",
+      state: "Ready",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: null,
+      blockedBy: [],
+      assignees: [],
+      closed: false,
+      description: "Research token bucket implementations for redis-based API throttling.",
+      relation: "Standalone research",
+      startable: true
+    },
+    10: {
+      number: 10,
+      title: "Upgrade Node to the latest LTS",
+      state: "Assigned to Bob",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: null,
+      blockedBy: [],
+      assignees: ["Bob"],
+      closed: false,
+      description: "Upgrade Docker base images and CI pipelines to Node v22 LTS.",
+      relation: "Assigned to Bob",
+      startable: true
+    },
+    11: {
+      number: 11,
+      title: "Build the admin dashboard",
+      state: "Open Hall",
+      effort: null,
+      creature: null,
+      parent: null,
+      blockedBy: [],
+      assignees: [],
+      closed: false,
+      description: "Epic milestone for user and subscription administration.",
+      relation: "Parent Hall for #12 and #13",
+      startable: false
+    },
+    12: {
+      number: 12,
+      title: "List users",
+      state: "Ready",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: 11,
+      blockedBy: [],
+      assignees: [],
+      closed: false,
+      description: "Paginated admin table showing registered user accounts and dates.",
+      relation: "Part of #11",
+      startable: true
+    },
+    13: {
+      number: 13,
+      title: "Suspend a user",
+      state: "Blocked",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: 11,
+      blockedBy: [12],
+      assignees: [],
+      closed: false,
+      description: "Allow platform admins to revoke active sessions and suspend malicious accounts.",
+      relation: "Part of #11 · Blocked by #12",
+      startable: false,
+      blocker: 12
+    }
+  };
+
+  let selectedQuestId = 3;
+  let currentView = 'map';
+
+  const detailArea = document.getElementById('quest-detail-content');
+  const toast = document.getElementById('cockpit-toast');
+  const toastMsg = document.getElementById('toast-message');
+  const startBtn = document.getElementById('start-quest-btn');
+  const launchBtnLabel = document.getElementById('launch-btn-label');
+  const launchBriefText = document.getElementById('launch-brief-text');
+  const selectHero = document.getElementById('select-hero');
+  const selectSpell = document.getElementById('select-spell');
+
+  function showToast(text) {
+    toastMsg.textContent = text;
+    toast.classList.add('show');
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => toast.classList.remove('show'), 3500);
+  }
+
+  function selectQuest(id) {
+    const q = sampleQuests[id];
+    if (!q) return;
+    selectedQuestId = id;
+
+    // Update room node selection in Map
+    document.querySelectorAll('.room-node').forEach(node => {
+      const match = Number(node.dataset.quest) === id;
+      node.classList.toggle('selected', match);
+      node.setAttribute('aria-pressed', String(match));
+    });
+
+    // Update list view selection
+    document.querySelectorAll('.quest-list-item-btn').forEach(btn => {
+      const match = Number(btn.dataset.quest) === id;
+      btn.classList.toggle('selected', match);
+    });
+
+    // Render detailed content
+    const effortBadge = q.effort ? `${q.effort} effort` : 'Unknown effort';
+    const stateClass = q.state === 'Ready' ? 'state-ready' :
+                       q.state === 'Blocked' ? 'state-blocked' :
+                       q.state === 'Cleared' ? 'state-cleared' : 'state-assigned';
+
+    let blockerHtml = '';
+    if (q.blockedBy && q.blockedBy.length > 0) {
+      blockerHtml = `<div class="dependency-box">
+        <strong>Blocked by:</strong> ${q.blockedBy.map(bId => `<button class="blocker-link" onclick="selectQuest(${bId})">#${bId} ${sampleQuests[bId].title}</button>`).join(', ')}
+      </div>`;
+    }
+
+    let parentHtml = '';
+    if (q.parent) {
+      parentHtml = `<div style="font-size: 11px; color: #bca196; margin-bottom: 8px;">
+        Belongs to Hall: <strong style="color: #ffdca3;">#${q.parent} ${sampleQuests[q.parent].title}</strong>
+      </div>`;
+    }
+
+    detailArea.innerHTML = `
+      <div class="diablo-heading-banner">
+        <div class="detail-heading-row">
+          <h2 class="detail-title"><span>#${q.number}</span> ${q.title}</h2>
+          <button class="icon-square-btn" title="View on GitHub / Mirror" onclick="showToast('Opened local mirror for #${q.number}')">↗</button>
+        </div>
+      </div>
+      <div class="chips-cluster">
+        <span class="meta-chip ${stateClass}">${q.state}</span>
+        <span class="meta-chip">${effortBadge}</span>
+        <span class="meta-chip label-tag">demo</span>
+        ${q.assignees.length ? `<span class="meta-chip label-tag">@${q.assignees[0]}</span>` : ''}
+      </div>
+      ${parentHtml}
+      <p class="detail-prose">${q.description}</p>
+      ${blockerHtml}
+      <div style="font-size: 11px; color: #a68b80; border-top: 1px solid #4a191c; padding-top: 10px; margin-top: 12px;">
+        ${q.relation}
+      </div>
+    `;
+
+    // Configure Launch Footer controls
+    if (q.recommendedSpell && selectSpell) {
+      selectSpell.value = q.recommendedSpell;
+    }
+
+    if (q.number === 3) {
+      startBtn.disabled = false;
+      launchBtnLabel.textContent = "Go to session";
+      launchBriefText.innerHTML = `<span style="color: #ff5238; font-weight: 700;">● Live expedition active</span> · Branch <code>feat/signup-form</code>`;
+      selectHero.disabled = false;
+      selectSpell.disabled = false;
+    } else if (q.startable) {
+      startBtn.disabled = false;
+      launchBtnLabel.textContent = "Start expedition";
+      launchBriefText.textContent = `Launch ${selectHero.value} on #${q.number}`;
+      selectHero.disabled = false;
+      selectSpell.disabled = false;
+    } else {
+      startBtn.disabled = true;
+      selectHero.disabled = true;
+      selectSpell.disabled = true;
+      if (q.blocker) {
+        launchBtnLabel.textContent = "Locked by #" + q.blocker;
+        launchBriefText.innerHTML = `<span class="launch-reason-notice">⚠ Blocked by <button class="blocker-link" onclick="selectQuest(${q.blocker})">#${q.blocker}</button></span>`;
+      } else {
+        launchBtnLabel.textContent = "Closed";
+        launchBriefText.textContent = q.state === 'Cleared' ? "Quest completed & PR merged" : "Quest not startable";
+      }
+    }
+  }
+
+  // Populate List Alternative View
+  function populateListView() {
+    const target = document.getElementById('quest-list-items-target');
+    target.innerHTML = Object.values(sampleQuests).map(q => {
+      const creatureClass = q.creature === 'rat' ? 'rat' :
+                            q.creature === 'goblin' ? 'goblin' :
+                            q.creature === 'eye' ? 'eye' : 'unknown';
+      const effortStr = q.effort ? `${q.effort.toLowerCase()} effort` : 'unestimated';
+      return `
+        <button class="quest-list-item-btn ${q.number === selectedQuestId ? 'selected' : ''}" data-quest="${q.number}">
+          <div class="list-item-thumb ${creatureClass}">
+            ${q.creature === 'unknown' || !q.creature ? '◇' : ''}
+          </div>
+          <div class="list-item-body">
+            <div class="list-item-title">#${q.number} ${q.title}</div>
+            <div class="list-item-subtitle">${q.state} · ${effortStr}</div>
+          </div>
+        </button>
+      `;
+    }).join('');
+
+    target.querySelectorAll('.quest-list-item-btn').forEach(btn => {
+      btn.addEventListener('click', () => selectQuest(Number(btn.dataset.quest)));
+    });
+  }
+
+  // Event Listeners for Rooms
+  document.querySelectorAll('.room-node').forEach(node => {
+    node.addEventListener('click', () => {
+      selectQuest(Number(node.dataset.quest));
+    });
+  });
+
+  // Map / List Toggle
+  const btnMap = document.getElementById('btn-view-map');
+  const btnList = document.getElementById('btn-view-list');
+  const listView = document.getElementById('list-alternative-container');
+
+  btnMap.addEventListener('click', () => {
+    btnMap.classList.add('active');
+    btnList.classList.remove('active');
+    listView.classList.remove('active');
+    currentView = 'map';
+  });
+
+  btnList.addEventListener('click', () => {
+    btnList.classList.add('active');
+    btnMap.classList.remove('active');
+    listView.classList.add('active');
+    currentView = 'list';
+    populateListView();
+  });
+
+  // Launch Button Action
+  startBtn.addEventListener('click', () => {
+    const q = sampleQuests[selectedQuestId];
+    if (selectedQuestId === 3) {
+      showToast(`Tome focused on active session: #${q.number}`);
+      document.getElementById('term-session-label').textContent = `Tome Expedition: #${q.number} ${q.title}`;
+    } else {
+      const spell = selectSpell.value !== 'none' ? ` with spell ${selectSpell.value}` : '';
+      showToast(`Dispatched Claude Code on #${q.number} (${selectHero.value})${spell}`);
+      document.getElementById('term-session-label').textContent = `Tome Expedition: #${q.number} ${q.title}`;
+    }
+  });
+
+  // Interactive Resizer
+  const resizer = document.getElementById('panel-resizer-handle');
+  const topSection = document.getElementById('panel-top-section');
+  let isResizing = false;
+
+  resizer.addEventListener('mousedown', () => {
+    isResizing = true;
+    document.body.style.cursor = 'row-resize';
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    const panelRect = document.querySelector('.cockpit-panel').getBoundingClientRect();
+    const newHeight = e.clientY - panelRect.top;
+    if (newHeight >= 200 && newHeight <= (panelRect.height - 180)) {
+      topSection.style.height = `${newHeight}px`;
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    isResizing = false;
+    document.body.style.cursor = 'default';
+  });
+
+  // Terminal CLI Input Simulator on Papyrus Canvas
+  const cliInput = document.getElementById('terminal-cli-input');
+  cliInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && cliInput.value.trim()) {
+      const val = cliInput.value.trim();
+      cliInput.value = '';
+      const screen = document.getElementById('terminal-screen');
+      const newLog = document.createElement('div');
+      newLog.className = 'term-log';
+      newLog.innerHTML = `<span class="dim">[${new Date().toLocaleTimeString()}]</span> <span class="cyan">❯ ${val}</span>`;
+      screen.insertBefore(newLog, screen.querySelector('.term-prompt-line'));
+
+      setTimeout(() => {
+        const resp = document.createElement('div');
+        resp.className = 'term-log';
+        resp.innerHTML = `<span class="dim">[${new Date().toLocaleTimeString()}]</span> <span class="gold">Claude:</span> Inscribing plan runes against repository...`;
+        screen.insertBefore(resp, screen.querySelector('.term-prompt-line'));
+        screen.scrollTop = screen.scrollHeight;
+      }, 350);
+    }
+  });
+
+  // Command Palette
+  const cmdPalette = document.getElementById('cmd-palette');
+  const cmdInput = document.getElementById('cmd-input');
+  const cmdResults = document.getElementById('cmd-results-list');
+
+  function openPalette() {
+    cmdPalette.classList.add('open');
+    cmdInput.value = '';
+    renderPaletteItems(Object.values(sampleQuests));
+    setTimeout(() => cmdInput.focus(), 50);
+  }
+
+  function closePalette() {
+    cmdPalette.classList.remove('open');
+  }
+
+  function renderPaletteItems(items) {
+    cmdResults.innerHTML = items.map((q, idx) => `
+      <div class="cmd-item ${idx === 0 ? 'active' : ''}" onclick="selectQuest(${q.number}); closePalette();">
+        <span><strong>#${q.number}</strong> ${q.title}</span>
+        <span class="meta-chip">${q.state}</span>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('quick-jump-trigger').addEventListener('click', openPalette);
+  window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      openPalette();
+    }
+    if (e.key === 'Escape') {
+      closePalette();
+      closeSettings();
+    }
+  });
+
+  cmdInput.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase();
+    const filtered = Object.values(sampleQuests).filter(q =>
+      q.title.toLowerCase().includes(query) ||
+      String(q.number).includes(query) ||
+      q.state.toLowerCase().includes(query)
+    );
+    renderPaletteItems(filtered);
+  });
+
+  cmdPalette.addEventListener('click', (e) => {
+    if (e.target === cmdPalette) closePalette();
+  });
+
+  // Settings Modal
+  const settingsModal = document.getElementById('settings-modal');
+  function openSettings() { settingsModal.classList.add('open'); }
+  function closeSettings() { settingsModal.classList.remove('open'); }
+
+  document.getElementById('open-settings-btn').addEventListener('click', openSettings);
+  document.getElementById('close-settings-btn').addEventListener('click', closeSettings);
+  document.getElementById('save-settings-btn').addEventListener('click', () => {
+    closeSettings();
+    showToast('Cockpit settings saved successfully');
+  });
+
+  // Help & All Quests triggers
+  document.getElementById('btn-panel-help').addEventListener('click', () => {
+    showToast('Creature = explicit effort. Room light/door = issue state. Selection never auto-launches.');
+  });
+  document.getElementById('btn-view-all-quests').addEventListener('click', () => {
+    showToast('Displaying repository-wide zoom for all 13 sample quests.');
+  });
+  document.getElementById('add-campaign-btn').addEventListener('click', () => {
+    showToast('Select local repository directory to register new campaign.');
+  });
+
+  // Initial selection
+  populateListView();
+  selectQuest(3);
+</script>
+
+
+
+
+
+
+
+
+
+
+</body></html>

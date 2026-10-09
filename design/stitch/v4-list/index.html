@@ -1,0 +1,2507 @@
+<!DOCTYPE html>
+
+<html lang="en" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>Dungeon Master — AI Cockpit &amp; Quest Encounter Map</title>
+<style>
+    @import url('../assets/fonts/fonts.css');
+
+    :root {
+      color-scheme: dark;
+      --bg-root: #0a0405;
+      --bg-sidebar: #170709;
+      --bg-sidebar-card: #240b0e;
+      --bg-panel: #140709;
+      --bg-card: #1f0b0e;
+      --border-dark: #3b1418;
+      --border-gothic: #562024;
+      --border-metal: #7a3c2e;
+      --border-brass: #b88a44;
+      --brass-bright: #e7bf6e;
+      --gold-gothic: #d8a04b;
+      --amber-warm: #df973b;
+      --oxblood: #360608;
+      --oxblood-deep: #220305;
+      --oxblood-bright: #8a191f;
+      --oxblood-glow: rgba(184, 25, 33, 0.45);
+      --ember: #e75c2e;
+      --ember-glow: rgba(231, 92, 46, 0.4);
+
+      /* Papyrus / Parchment Tome Palette (Central Terminal) */
+      --parchment-base: #f3ebd8;
+      --parchment-deep: #e8dcc3;
+      --parchment-aged: #deceb0;
+      --ink-gall: #1a140e;
+      --ink-umber: #342417;
+      --ink-bistre: #4e3522;
+      --ink-crimson: #841818;
+      --ink-forest: #1c4e2b;
+      --ink-muted: #6e5944;
+      --ink-faint: #8f7962;
+
+      --text-main: #f0e6d6;
+      --text-muted: #ad9a88;
+      --text-faint: #786455;
+      --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-serif: "Cinzel", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      --font-mono: "Fira Code", ui-monospace, Menlo, Monaco, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      overflow: hidden;
+      font-family: var(--font-body);
+      background: var(--bg-root);
+      color: var(--text-main);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, select, input {
+      font-family: inherit;
+      color: inherit;
+    }
+    button { cursor: pointer; }
+
+    /* Gothic Ornate Relief Elements (Diablo Form & Panels) */
+    .gothic-relief-border {
+      border: 1px solid #783824;
+      box-shadow: 
+        inset 0 0 0 1px #2a0b0d,
+        inset 0 1px 0 rgba(232, 191, 110, 0.3),
+        0 2px 10px rgba(0,0,0,0.8);
+      position: relative;
+    }
+    .gothic-relief-border::after {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      pointer-events: none;
+      border: 1px solid rgba(184, 138, 68, 0.25);
+      border-radius: inherit;
+    }
+
+    /* App 3-column layout */
+    .cockpit-app {
+      display: grid;
+      grid-template-columns: 246px minmax(400px, 1fr) minmax(410px, 520px);
+      height: 100vh;
+      width: 100vw;
+      background: radial-gradient(circle at 50% 20%, #20070a 0%, #0a0304 80%);
+      position: relative;
+    }
+
+    /* LEFT SIDEBAR: Campaigns & Expeditions */
+    .sidebar {
+      background: linear-gradient(180deg, #1b0609 0%, #110305 100%);
+      border-right: 2px solid #3d1418;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      z-index: 10;
+      box-shadow: inset -1px 0 0 #5f241d, 5px 0 25px rgba(0,0,0,0.7);
+    }
+    .brand-bar {
+      padding: 15px 16px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      background: linear-gradient(180deg, #2f090d 0%, #1c0507 100%);
+      border-bottom: 2px solid #541d1a;
+      box-shadow: inset 0 1px 0 #8b3c2c, 0 3px 10px rgba(0,0,0,0.6);
+      position: relative;
+    }
+    .brand-icon {
+      width: 30px;
+      height: 30px;
+      background: radial-gradient(circle at 35% 35%, #b51c24, #400609);
+      border: 2px solid var(--border-brass);
+      border-radius: 5px;
+      box-shadow: 0 0 12px var(--oxblood-glow), inset 0 0 6px #100203;
+      display: grid;
+      place-items: center;
+      color: #ffd88a;
+      font-size: 15px;
+      font-family: var(--font-serif);
+      font-weight: 900;
+      text-shadow: 0 0 4px #000;
+    }
+    .brand-title {
+      font-family: var(--font-serif);
+      font-size: 15.5px;
+      letter-spacing: 0.08em;
+      color: #ebd19f;
+      font-weight: 800;
+      text-transform: uppercase;
+      text-shadow: 0 2px 4px #000, 0 0 10px rgba(235, 209, 159, 0.3);
+    }
+    .sidebar-actions {
+      padding: 12px 14px 8px;
+    }
+    .sidebar-search {
+      background: #150507;
+      border: 1px solid #481b1c;
+      border-radius: 5px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #ad8f86;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      box-shadow: inset 0 1px 4px #080102, 0 1px 0 #57201c;
+      transition: all 0.15s;
+    }
+    .sidebar-search:hover {
+      border-color: #8c4232;
+      color: #e5cbbf;
+      box-shadow: inset 0 1px 4px #080102, 0 0 8px rgba(184, 138, 68, 0.3);
+    }
+    .kbd-tag {
+      background: #23080b;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 9px;
+      border: 1px solid #5a221f;
+      color: #d1a580;
+      font-weight: 600;
+    }
+    .sidebar-section-title {
+      font-family: var(--font-serif);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #b3835e;
+      padding: 12px 16px 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sidebar-section-title::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, #5b211a, transparent);
+    }
+    .campaign-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 10px;
+    }
+    .campaign-card {
+      background: linear-gradient(180deg, #24090d 0%, #170407 100%);
+      border: 1px solid #5c201c;
+      border-radius: 6px;
+      padding: 11px 12px;
+      margin-bottom: 9px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.6), inset 0 1px 0 #5e231b;
+    }
+    .campaign-card.active {
+      background: linear-gradient(180deg, #320c11 0%, #1e0508 100%);
+      border-color: #9c4832;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.8), 0 0 12px rgba(184, 38, 44, 0.3), inset 0 1px 0 #9f4935;
+    }
+    .campaign-card.active::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 6px;
+      bottom: 6px;
+      width: 4px;
+      background: linear-gradient(180deg, #e7bf6e, #965b26);
+      border-radius: 0 3px 3px 0;
+      box-shadow: 0 0 8px rgba(231, 191, 110, 0.7);
+    }
+    .campaign-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .campaign-name {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #f7e6ce;
+      font-family: var(--font-serif);
+      letter-spacing: 0.03em;
+    }
+    .badge-sample {
+      font-size: 9px;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: rgba(184, 138, 68, 0.2);
+      border: 1px solid #b88a44;
+      color: #ffdca3;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    .campaign-desc {
+      font-size: 11px;
+      color: #aa8d83;
+      margin-top: 4px;
+    }
+    .expeditions-list {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid #3d1416;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .expedition-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px;
+      border-radius: 4px;
+      font-size: 11.5px;
+      color: #d6b7aa;
+      background: rgba(18, 4, 6, 0.5);
+      border: 1px solid transparent;
+      text-align: left;
+      transition: all 0.12s;
+    }
+    .expedition-item:hover {
+      background: #2a0b0f;
+      color: #fff;
+      border-color: #5d1f1b;
+    }
+    .expedition-item.active {
+      background: linear-gradient(90deg, #380d12, #24080b);
+      color: #ffe6c7;
+      border-color: #793223;
+      box-shadow: inset 0 1px 0 rgba(231, 191, 110, 0.25);
+    }
+    .session-indicator {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #5c3836;
+      flex-shrink: 0;
+    }
+    .session-indicator.running {
+      background: #ff5238;
+      box-shadow: 0 0 8px #ff4624, 0 0 14px rgba(255, 70, 36, 0.6);
+      animation: pulse-glow 2s infinite;
+    }
+    .session-indicator.idle {
+      background: #6e4e46;
+    }
+    .session-indicator.waiting {
+      background: #df973b;
+      box-shadow: 0 0 6px #df973b;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.65; transform: scale(0.9); }
+    }
+
+    .sidebar-footer {
+      padding: 10px 14px;
+      background: #140406;
+      border-top: 2px solid #3e1418;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #ab8e83;
+    }
+    .sidebar-footer button {
+      background: linear-gradient(180deg, #24090d, #160406);
+      border: 1px solid #57201c;
+      color: #d8baad;
+      padding: 4px 9px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .sidebar-footer button:hover {
+      background: #310d12;
+      color: #fff;
+      border-color: #924334;
+      box-shadow: 0 0 8px rgba(184, 138, 68, 0.3);
+    }
+
+    /* CENTER COLUMN: Central Ancient Tome Papyrus Terminal */
+    .workspace-terminal {
+      background: #120907;
+      display: flex;
+      flex-direction: column;
+      border-right: 2px solid #4a1917;
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.9);
+    }
+    
+    .terminal-nav {
+      height: 48px;
+      border-bottom: 2px solid #541d1a;
+      background: linear-gradient(180deg, #2a0a0f 0%, #180507 100%);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 12px;
+      font-size: 12px;
+      z-index: 5;
+      box-shadow: inset 0 1px 0 #7b3225, 0 3px 12px rgba(0,0,0,0.8);
+      position: relative;
+    }
+    .terminal-nav::after {
+      content: "";
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.4), transparent);
+      pointer-events: none;
+    }
+    .terminal-tab-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(180deg, #f0e4cc 0%, #e1d1b2 100%);
+      border: 1px solid #754b23;
+      padding: 4px 12px;
+      border-radius: 5px;
+      color: var(--ink-gall);
+      font-family: var(--font-serif);
+      font-weight: 800;
+      font-size: 11.5px;
+      letter-spacing: 0.04em;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.5), inset 0 1px 0 #fff;
+    }
+    .wax-seal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #d12e2e, #6e0c0c);
+      box-shadow: 0 0 5px rgba(209, 46, 46, 0.8), inset 0 0 2px #000;
+      border: 1px solid #3c0606;
+      display: inline-block;
+    }
+    .terminal-meta-info {
+      color: #bfa08c;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+    .terminal-meta-info strong {
+      color: #f7e6ce;
+      font-family: var(--font-serif);
+      letter-spacing: 0.03em;
+    }
+    .terminal-meta-info code {
+      background: #100305;
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid #4a191d;
+      color: #df973b;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+    }
+    .terminal-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+    }
+    .term-btn {
+      background: linear-gradient(180deg, #26090c 0%, #140305 100%);
+      border: 1px solid #63241b;
+      color: #dfbfb1;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--font-serif);
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.6), inset 0 1px 0 #5e241e;
+    }
+    .term-btn:hover {
+      background: linear-gradient(180deg, #370f14 0%, #200609 100%);
+      border-color: var(--brass-bright);
+      color: #fff2db;
+      box-shadow: 0 0 8px rgba(231, 191, 110, 0.35);
+    }
+
+    /* PAPYRUS / TOME TERMINAL VIEWPORT */
+    .terminal-viewport-wrapper {
+      flex: 1;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      background: #1a0c0a;
+      overflow: hidden;
+    }
+    .tome-book-frame {
+      flex: 1;
+      border-radius: 8px;
+      background: 
+        radial-gradient(circle at 50% 30%, rgba(255,255,255,0.4) 0%, transparent 80%),
+        linear-gradient(180deg, #f7f1e1 0%, #ede3cb 65%, #decfae 100%);
+      border: 2px solid #825a34;
+      box-shadow: 
+        inset 0 0 60px rgba(110, 68, 25, 0.35),
+        inset 0 0 15px rgba(60, 32, 10, 0.5),
+        inset 0 0 0 1px #fff0d6,
+        0 8px 30px rgba(0,0,0,0.85);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    .tome-book-frame::before {
+      content: "⚜";
+      position: absolute;
+      top: 6px;
+      left: 10px;
+      font-size: 15px;
+      color: #9c7349;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .tome-book-frame::after {
+      content: "⚜";
+      position: absolute;
+      top: 6px;
+      right: 10px;
+      font-size: 15px;
+      color: #9c7349;
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .terminal-viewport {
+      flex: 1;
+      padding: 22px 28px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: var(--ink-umber);
+      position: relative;
+      z-index: 2;
+    }
+    .term-welcome {
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px dashed rgba(130, 90, 52, 0.4);
+    }
+    .term-banner {
+      color: var(--ink-crimson);
+      font-family: var(--font-serif);
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .term-banner::before {
+      content: "✦";
+      color: #a82e2e;
+    }
+    .term-banner-sub {
+      color: var(--ink-muted);
+      font-size: 11.5px;
+      font-style: italic;
+    }
+    .term-log {
+      margin-bottom: 9px;
+      font-weight: 500;
+    }
+    .term-log .dim { color: var(--ink-faint); font-weight: 400; }
+    .term-log .cyan { color: #1c525f; font-weight: 600; }
+    .term-log .gold { color: #87570b; font-weight: 700; }
+    .term-log .green { color: var(--ink-forest); font-weight: 700; }
+    .term-log .purple { color: #642b78; font-weight: 600; }
+    .term-log code {
+      background: rgba(110, 75, 40, 0.12);
+      border: 1px solid rgba(130, 90, 52, 0.3);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--ink-crimson);
+      font-weight: 600;
+    }
+    .term-log strong {
+      color: var(--ink-gall);
+      font-weight: 700;
+    }
+    .term-narrative {
+      color: var(--ink-gall);
+      margin-top: 14px;
+      padding: 10px 14px;
+      background: rgba(220, 203, 170, 0.35);
+      border-left: 3px solid #841818;
+      border-radius: 0 4px 4px 0;
+      font-style: italic;
+      font-size: 13px;
+    }
+
+    .term-prompt-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 16px;
+      color: var(--ink-gall);
+      background: rgba(240, 226, 201, 0.7);
+      border: 1px solid #baa27c;
+      padding: 6px 12px;
+      border-radius: 5px;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .term-prompt-line .prompt-symbol {
+      color: var(--ink-crimson);
+      font-weight: 800;
+      font-size: 14px;
+    }
+    .term-input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      color: var(--ink-gall);
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+    .term-input::placeholder {
+      color: #9c846d;
+      font-style: italic;
+    }
+    .term-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 15px;
+      background: var(--ink-gall);
+      vertical-align: middle;
+      animation: blink 1s steps(1) infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .terminal-quick-actions {
+      padding: 9px 18px;
+      background: linear-gradient(180deg, #1f0709 0%, #120305 100%);
+      border-top: 2px solid #4a1917;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: #bfa08c;
+      box-shadow: inset 0 1px 0 #5d2218;
+    }
+    .badge-chip {
+      background: linear-gradient(180deg, #2b0b0f 0%, #170407 100%);
+      border: 1px solid #6b2621;
+      border-radius: 4px;
+      padding: 3px 8px;
+      color: #f0cfbe;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      transition: all 0.12s;
+    }
+
+    /* RIGHT COLUMN: Gothic Quest Cockpit (Diablo Relics & Iron/Brass Trim) */
+    .cockpit-panel {
+      background: linear-gradient(180deg, #170507 0%, #0d0204 100%);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      user-select: none;
+      min-width: 380px;
+      border-left: 2px solid #541c19;
+      box-shadow: -6px 0 30px rgba(0,0,0,0.85);
+    }
+    .panel-header-bar {
+      height: 48px;
+      background: linear-gradient(180deg, #310a0e 0%, #1a0507 100%);
+      border-bottom: 2px solid #5d221e;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 10px;
+      z-index: 5;
+      box-shadow: inset 0 1px 0 #8b3c2c, 0 3px 12px rgba(0,0,0,0.8);
+    }
+    .panel-header-title {
+      font-family: var(--font-serif);
+      font-size: 16px;
+      color: #f7e1b5;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-shadow: 0 2px 4px #000, 0 0 8px rgba(247, 225, 181, 0.25);
+    }
+    .jewel-accent {
+      width: 10px;
+      height: 10px;
+      background: radial-gradient(circle at 35% 35%, #ff4242, #7a090e);
+      border-radius: 50%;
+      border: 1px solid #e7bf6e;
+      box-shadow: 0 0 8px rgba(255, 66, 66, 0.8), inset 0 0 3px #000;
+    }
+    .panel-header-spacer { flex: 1; }
+    .segmented-control {
+      display: inline-flex;
+      background: #110305;
+      padding: 2px;
+      border: 1px solid #521c19;
+      border-radius: 6px;
+      box-shadow: inset 0 1px 3px #000;
+    }
+    .segmented-btn {
+      background: transparent;
+      border: 0;
+      padding: 4px 11px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--font-serif);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: #ad8f85;
+      transition: all 0.12s;
+    }
+    .segmented-btn.active {
+      background: linear-gradient(180deg, #441117, #26080b);
+      color: #ffeed3;
+      border: 1px solid #843928;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.6), inset 0 1px 0 rgba(231, 191, 110, 0.3);
+    }
+    .icon-square-btn {
+      background: linear-gradient(180deg, #28090d, #140306);
+      border: 1px solid #5e241c;
+      color: #e5cbbf;
+      width: 28px;
+      height: 28px;
+      border-radius: 5px;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: bold;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+    }
+
+    /* UPPER ENCOUNTER VIEW PORTION */
+    .panel-top-portion {
+      height: 52%;
+      min-height: 280px;
+      position: relative;
+      overflow: hidden;
+      background: #090304;
+    }
+
+    /* GOTHIC QUEST LIST VIEW STYLES */
+    .gothic-quest-list-panel {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+      overflow: hidden;
+    }
+    .list-view-filter-bar {
+      padding: 10px 14px 8px;
+      background: linear-gradient(180deg, rgba(28, 9, 13, 0.95) 0%, rgba(16, 4, 7, 0.92) 100%);
+      border-bottom: 2px solid #541d1a;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.6);
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .list-filter-tabs {
+      display: flex;
+      gap: 5px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .filter-tab-pill {
+      background: linear-gradient(180deg, #240a0e 0%, #150306 100%);
+      border: 1px solid #5c221c;
+      border-radius: 4px;
+      padding: 3px 9px;
+      font-size: 10.5px;
+      font-family: var(--font-serif);
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: #c9ab9e;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .filter-tab-pill:hover {
+      border-color: #8f653a;
+      color: #fff0d6;
+    }
+    .filter-tab-pill.active {
+      background: linear-gradient(180deg, #53171b 0%, #2f0a0d 100%);
+      border-color: #b88a44;
+      color: #ffdca3;
+      box-shadow: 0 0 8px rgba(215, 140, 45, 0.4), inset 0 1px 1px rgba(255, 220, 140, 0.4);
+    }
+    .list-items-scroll-deck {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    /* Scrollbars styled with gothic ivory & brass */
+    .list-items-scroll-deck::-webkit-scrollbar,
+    .detail-scroll-area::-webkit-scrollbar {
+      width: 13px;
+    }
+    .list-items-scroll-deck::-webkit-scrollbar-track,
+    .detail-scroll-area::-webkit-scrollbar-track {
+      background: linear-gradient(90deg, #2b170c 0%, #160a04 50%, #2b170c 100%);
+      border-left: 1px solid #5a3219;
+      border-right: 1px solid #3c1e0b;
+      box-shadow: inset 0 0 8px rgba(0,0,0,0.9);
+    }
+    .list-items-scroll-deck::-webkit-scrollbar-thumb,
+    .detail-scroll-area::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, #f7ecd7 0%, #e6d2b0 35%, #d5ba8b 65%, #c29f6b 100%);
+      border: 1px solid #724b22;
+      outline: 1px solid #b88a44;
+      outline-offset: -2px;
+      border-radius: 2px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.85), inset 0 1px 1px #fffbee;
+    }
+
+    /* GOTHIC ROW CARD */
+    .gothic-quest-row {
+      width: 100%;
+      background: linear-gradient(180deg, rgba(38, 12, 16, 0.92) 0%, rgba(20, 5, 8, 0.96) 100%);
+      border: 1.5px solid #5c201c;
+      border-radius: 6px;
+      padding: 7px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-align: left;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.15s ease;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.7), inset 0 1px 0 rgba(231, 191, 110, 0.18);
+    }
+    .gothic-quest-row:hover {
+      background: linear-gradient(180deg, rgba(52, 16, 21, 0.95) 0%, rgba(28, 7, 11, 0.98) 100%);
+      border-color: #8c3b2c;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.85), 0 0 10px rgba(231, 92, 46, 0.25);
+    }
+    /* SELECTED ACTIVE ROW */
+    .gothic-quest-row.selected {
+      background: linear-gradient(180deg, #461217 0%, #29080c 60%, #1a0406 100%) !important;
+      border: 2px solid #e7bf6e !important;
+      box-shadow: 
+        0 0 0 1px #220508,
+        0 0 16px rgba(231, 191, 110, 0.55),
+        inset 0 1px 2px rgba(255, 235, 180, 0.6),
+        inset 0 0 14px rgba(184, 25, 33, 0.5) !important;
+      transform: translateY(-1px);
+    }
+    .gothic-quest-row.selected::before {
+      content: "✦";
+      position: absolute;
+      left: -9px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #ffd88a;
+      font-size: 11px;
+      text-shadow: 0 0 6px #ff7b2b;
+    }
+
+    /* Creature Row Thumbnail with sprite cropping */
+    .quest-creature-avatar {
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+      border-radius: 5px;
+      border: 1.5px solid #6c2b23;
+      background-color: #0d0305;
+      background-repeat: no-repeat;
+      background-size: 176px 58px;
+      background-position: 0 -4px;
+      image-rendering: pixelated;
+      box-shadow: inset 0 0 8px #000, 0 2px 5px rgba(0,0,0,0.6);
+      position: relative;
+    }
+    .gothic-quest-row.selected .quest-creature-avatar {
+      border-color: #e7bf6e;
+      box-shadow: 0 0 8px rgba(231, 191, 110, 0.6), inset 0 0 6px #000;
+    }
+    .quest-creature-avatar.rat {
+      background-image: url('../assets/images/d7ae9d09a441.png');
+    }
+    .quest-creature-avatar.goblin {
+      background-image: url('../assets/images/00dbe393ed94.png');
+    }
+    .quest-creature-avatar.eye {
+      background-image: url('../assets/images/f29ade4f389c.png');
+    }
+    .quest-creature-avatar.unknown {
+      display: grid;
+      place-items: center;
+      color: #8c5d4f;
+      font-family: var(--font-serif);
+      font-size: 20px;
+      background-image: none;
+    }
+
+    /* Status badge marker on avatar */
+    .avatar-status-pip {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 16px;
+      height: 16px;
+      line-height: 15px;
+      text-align: center;
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 900;
+      border: 1px solid #ffd88a;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      z-index: 2;
+    }
+    .avatar-status-pip.ready {
+      background: radial-gradient(circle at 35% 35%, #d12e2e, #6e0c0c);
+      color: #ffeed3;
+      box-shadow: 0 0 7px rgba(231, 92, 46, 0.7);
+    }
+    .avatar-status-pip.cleared {
+      background: radial-gradient(circle at 35% 35%, #2a7e48, #113f21);
+      border-color: #7ce89e;
+      color: #dffff0;
+    }
+    .avatar-status-pip.blocked {
+      background: #361414;
+      border-color: #793c24;
+      color: #a8887b;
+    }
+    .avatar-status-pip.assigned {
+      background: radial-gradient(circle at 35% 35%, #8e581b, #442408);
+      border-color: #e7bf6e;
+      color: #fff2d4;
+    }
+    .avatar-status-pip.closed {
+      background: #201a1c;
+      border-color: #554448;
+      color: #88777a;
+    }
+
+    .quest-row-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .quest-row-title-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .quest-row-title {
+      font-family: var(--font-serif);
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #f7e6ce;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      letter-spacing: 0.02em;
+    }
+    .gothic-quest-row.selected .quest-row-title {
+      color: #fff3dd;
+      text-shadow: 0 0 6px rgba(231, 191, 110, 0.4);
+    }
+    .quest-row-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 2px;
+      font-size: 10.5px;
+      color: #ad8f85;
+    }
+    .quest-status-chip {
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .quest-status-chip.ready {
+      background: rgba(184, 40, 30, 0.3);
+      border: 1px solid #9c362a;
+      color: #ffcbb8;
+    }
+    .quest-status-chip.cleared {
+      background: rgba(40, 110, 60, 0.3);
+      border: 1px solid #3c7d4e;
+      color: #bbf7cf;
+    }
+    .quest-status-chip.blocked {
+      background: rgba(50, 20, 20, 0.45);
+      border: 1px solid #5a2723;
+      color: #bfa097;
+    }
+    .quest-status-chip.assigned {
+      background: rgba(140, 90, 30, 0.3);
+      border: 1px solid #8e622b;
+      color: #ffdca3;
+    }
+    .quest-status-chip.closed {
+      background: rgba(30, 25, 27, 0.6);
+      border: 1px solid #4a3e42;
+      color: #928387;
+    }
+
+    /* HORIZONTAL SPLITTER (Gothic Forged Iron & Brass Hardware) */
+    .horizontal-splitter {
+      height: 10px;
+      background: linear-gradient(180deg, #26090d 0%, #120305 100%);
+      border-top: 1px solid #63241b;
+      border-bottom: 2px solid #360f14;
+      cursor: row-resize;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 10;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    }
+    .horizontal-splitter::before {
+      content: "";
+      width: 54px;
+      height: 3px;
+      border-top: 1px solid #d4a05a;
+      border-bottom: 1px solid #793c24;
+    }
+    .horizontal-splitter:hover {
+      background: #360c12;
+    }
+
+    /* BOTTOM PORTION: Selected Issue Detail & Pinned Launch Footer */
+    .panel-bottom-portion {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 190px;
+      background: linear-gradient(180deg, #170508 0%, #0d0204 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .detail-scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 18px 12px;
+    }
+    .diablo-heading-banner {
+      background: linear-gradient(180deg, #5c0f14 0%, #290508 100%);
+      border: 1px solid #8e3627;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      box-shadow: 
+        inset 0 1px 0 rgba(231, 191, 110, 0.4),
+        inset 0 0 15px rgba(0,0,0,0.6),
+        0 4px 10px rgba(0,0,0,0.7);
+      position: relative;
+    }
+    .detail-heading-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .detail-title {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 16px;
+      line-height: 1.35;
+      color: #fff0d6;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-shadow: 0 2px 4px #000, 0 0 10px rgba(231, 191, 110, 0.3);
+    }
+    .detail-title span {
+      color: var(--brass-bright);
+      margin-right: 4px;
+    }
+    .chips-cluster {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 10px 0 12px;
+    }
+    .meta-chip {
+      font-size: 10.5px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #23080b;
+      border: 1px solid #5a201c;
+      color: #faedd9;
+      font-family: var(--font-serif);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .meta-chip.state-ready {
+      border-color: #8c3b2c;
+      background: rgba(140, 59, 44, 0.25);
+      color: #ffd6b0;
+      box-shadow: 0 0 6px rgba(231, 92, 46, 0.3);
+    }
+    .meta-chip.state-blocked {
+      border-color: #59251e;
+      background: rgba(45, 14, 16, 0.6);
+      color: #baa095;
+    }
+    .meta-chip.state-cleared {
+      border-color: #3b734e;
+      background: rgba(59, 115, 78, 0.25);
+      color: #c9ffd9;
+    }
+    .meta-chip.state-assigned {
+      border-color: #9c6c37;
+      background: rgba(156, 108, 55, 0.25);
+      color: #ffe3b5;
+    }
+    .meta-chip.label-tag {
+      background: #140406;
+      border-color: #48191c;
+      color: #bfa093;
+    }
+    .detail-prose {
+      font-size: 12.5px;
+      line-height: 1.65;
+      color: #e2cec4;
+      margin-bottom: 14px;
+    }
+    .dependency-box {
+      background: linear-gradient(180deg, #24090d, #140406);
+      border: 1px solid #63261f;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 11.5px;
+      color: #baa095;
+      box-shadow: inset 0 1px 0 rgba(231, 191, 110, 0.15);
+    }
+    .dependency-box strong {
+      color: #ffdca3;
+      font-family: var(--font-serif);
+    }
+    .blocker-link {
+      color: var(--brass-bright);
+      text-decoration: underline;
+      cursor: pointer;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .blocker-link:hover {
+      color: #fff;
+    }
+
+    /* PINNED ACTION LAUNCH FOOTER */
+    .pinned-launch-footer {
+      background: linear-gradient(180deg, #26090d 0%, #150306 100%);
+      border-top: 2px solid #561d19;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.6), inset 0 1px 0 #7b2f24;
+      position: relative;
+      z-index: 8;
+    }
+    .launch-combos-row {
+      display: flex;
+      gap: 10px;
+    }
+    .combo-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .combo-label {
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #c49969;
+      font-family: var(--font-serif);
+      font-weight: 800;
+    }
+    .gothic-select {
+      background: linear-gradient(180deg, #1b0609, #0f0204);
+      border: 1px solid #743126;
+      border-radius: 5px;
+      padding: 6px 9px;
+      font-size: 11.5px;
+      color: #faeedb;
+      outline: none;
+      box-shadow: inset 0 1px 4px #000, 0 1px 0 rgba(231, 191, 110, 0.2);
+      transition: all 0.15s;
+    }
+    .gothic-select:focus {
+      border-color: var(--brass-bright);
+      box-shadow: 0 0 8px rgba(231, 191, 110, 0.4);
+    }
+    .gothic-select:disabled {
+      background: #120305;
+      border-color: #3b1416;
+      color: #634747;
+      cursor: not-allowed;
+    }
+
+    .launch-action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .launch-brief-snippet {
+      font-size: 10.5px;
+      color: #c4a395;
+    }
+
+    /* DIABLO-STYLE RUBY & BURNISHED GOLD ACTION BUTTON */
+    .gothic-launch-btn {
+      background: linear-gradient(180deg, #66181b 0%, #3e0b0e 48%, #1c0305 100%) !important;
+      border: 2px solid #94602f !important;
+      outline: 1px solid #2b120c !important;
+      outline-offset: -3px !important;
+      border-radius: 4px !important;
+      padding: 10px 24px !important;
+      color: #ffeed3 !important;
+      font-family: var(--font-serif) !important;
+      font-size: 13.5px !important;
+      font-weight: 800 !important;
+      letter-spacing: 0.1em !important;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.85), inset 0 1px 1px rgba(255, 220, 140, 0.55), inset 0 -2px 6px rgba(0,0,0,0.9), 0 0 15px rgba(200, 40, 30, 0.5) !important;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      text-shadow: 0 2px 4px #000, 0 0 8px rgba(235, 120, 40, 0.5) !important;
+      position: relative;
+    }
+    .gothic-launch-btn::before, .gothic-launch-btn::after {
+      content: "";
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border: 1px solid #ffd88a;
+      pointer-events: none;
+    }
+    .gothic-launch-btn::before {
+      top: 1px; left: 1px;
+      border-right: none; border-bottom: none;
+    }
+    .gothic-launch-btn::after {
+      bottom: 1px; right: 1px;
+      border-left: none; border-top: none;
+    }
+    .gothic-launch-btn:hover:not(:disabled) {
+      background: linear-gradient(180deg, #852125 0%, #520f13 48%, #280508 100%) !important;
+      border-color: #d49547 !important;
+      color: #ffffff !important;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.9), inset 0 1px 2px rgba(255, 240, 180, 0.7), 0 0 22px rgba(235, 80, 40, 0.8), inset 0 0 10px rgba(184, 25, 33, 0.7) !important;
+      transform: translateY(-1px);
+    }
+    .gothic-launch-btn:disabled {
+      background: #20080a !important;
+      border-color: #48191c !important;
+      color: #6a4c4c !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      cursor: not-allowed;
+    }
+
+    /* MODAL OVERLAY & COMMAND PALETTE */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 2, 4, 0.85);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      display: none;
+      place-items: center;
+      padding: 20px;
+    }
+    .modal-overlay.open {
+      display: grid;
+    }
+    .modal-window {
+      width: min(640px, 94vw);
+      background: linear-gradient(180deg, #24080c 0%, #120305 100%);
+      border: 2px solid #823528;
+      border-radius: 10px;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.95), 0 0 30px rgba(231, 191, 110, 0.25);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 14px 18px;
+      background: linear-gradient(180deg, #380c11 0%, #1d0508 100%);
+      border-bottom: 2px solid #5f201d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h2 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 17px;
+      color: #f7e1b5;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .modal-tabs {
+      display: flex;
+      background: #140406;
+      border-bottom: 1px solid #3c1214;
+      padding: 0 14px;
+    }
+    .modal-tab-btn {
+      background: transparent;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-family: var(--font-serif);
+      color: #b08d81;
+      font-weight: 700;
+    }
+    .modal-tab-btn.active {
+      color: #ffdca3;
+      border-bottom-color: var(--brass-bright);
+    }
+    .modal-body {
+      padding: 20px;
+      max-height: 440px;
+      overflow-y: auto;
+      font-size: 12.5px;
+      line-height: 1.6;
+      color: #e4d1c7;
+    }
+    .settings-group {
+      margin-bottom: 18px;
+    }
+    .settings-group h3 {
+      font-family: var(--font-serif);
+      font-size: 13.5px;
+      color: #fff0d6;
+      margin: 0 0 6px;
+    }
+    .settings-group p {
+      font-size: 11.5px;
+      color: #ab8e83;
+      margin: 0 0 10px;
+    }
+    .modal-footer {
+      padding: 12px 18px;
+      background: #120305;
+      border-top: 1px solid #48191c;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* COMMAND PALETTE */
+    .cmd-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 2, 4, 0.85);
+      backdrop-filter: blur(5px);
+      z-index: 120;
+      display: none;
+      justify-content: center;
+      padding-top: 12vh;
+    }
+    .cmd-overlay.open {
+      display: flex;
+    }
+    .cmd-box {
+      width: min(520px, 92vw);
+      background: linear-gradient(180deg, #24080c 0%, #150306 100%);
+      border: 2px solid #823528;
+      border-radius: 8px;
+      box-shadow: 0 15px 50px rgba(0,0,0,0.95), 0 0 25px rgba(231, 191, 110, 0.25);
+      overflow: hidden;
+      height: fit-content;
+      max-height: 480px;
+      display: flex;
+      flex-direction: column;
+    }
+    .cmd-input-bar {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border-bottom: 1px solid #5a1f1c;
+      gap: 10px;
+      background: #180407;
+    }
+    .cmd-input {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      font-size: 14px;
+      color: #faeedb;
+    }
+    .cmd-results {
+      overflow-y: auto;
+      padding: 8px;
+    }
+    .cmd-item {
+      padding: 8px 12px;
+      border-radius: 5px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #dfc7bc;
+      cursor: pointer;
+    }
+    .cmd-item:hover, .cmd-item.active {
+      background: #360d13;
+      color: #fff;
+    }
+
+    /* TOAST */
+    .toast-pill {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: linear-gradient(180deg, #320c11, #1a0407);
+      border: 2px solid var(--border-brass);
+      padding: 10px 18px;
+      border-radius: 8px;
+      color: #fff0d6;
+      font-family: var(--font-serif);
+      font-size: 12.5px;
+      letter-spacing: 0.03em;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.85), 0 0 15px rgba(231, 191, 110, 0.4);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      gap: 10px;
+    }
+    .toast-pill.show {
+      display: flex;
+      animation: toast-in 0.2s ease-out;
+    }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* DIABLO METALLIC BUTTON STYLES */
+    .term-btn,
+    .sidebar-footer button,
+    .icon-square-btn,
+    .badge-chip,
+    .segmented-btn {
+      border: 2px solid #5a3d24 !important;
+      outline: 1px solid #1c120a !important;
+      outline-offset: -3px !important;
+      box-shadow: inset 0 1px 1px rgba(225, 185, 120, 0.4), inset 0 -1px 2px rgba(0, 0, 0, 0.85), 0 2px 6px rgba(0,0,0,0.8) !important;
+      border-radius: 4px !important;
+      background: linear-gradient(180deg, #2c221b 0%, #18120e 50%, #0d0907 100%) !important;
+      color: #eed8b3 !important;
+      font-family: var(--font-serif) !important;
+      text-shadow: 0 1px 2px #000 !important;
+      transition: all 0.15s ease !important;
+    }
+
+    .term-btn:hover,
+    .sidebar-footer button:hover,
+    .icon-square-btn:hover,
+    .badge-chip:hover,
+    .segmented-btn:hover {
+      border-color: #8f653a !important;
+      color: #fff1d6 !important;
+      box-shadow: 0 0 10px rgba(215, 140, 45, 0.45), inset 0 0 6px rgba(180, 40, 20, 0.35), 0 2px 8px rgba(0,0,0,0.9) !important;
+    }
+
+    .segmented-btn.active {
+      background: linear-gradient(180deg, #441416 0%, #24080a 50%, #150305 100%) !important;
+      border-color: #8f653a !important;
+      color: #ffdca3 !important;
+      box-shadow: 0 0 8px rgba(215, 140, 45, 0.4), inset 0 1px 2px rgba(240, 190, 110, 0.45), inset 0 0 6px rgba(138, 25, 31, 0.6) !important;
+    }
+
+    @media (max-width: 1080px) {
+      .cockpit-app {
+        grid-template-columns: 218px 1fr 392px;
+      }
+    }
+    @media (max-width: 860px) {
+      .cockpit-app {
+        grid-template-columns: 1fr 392px;
+      }
+      .sidebar {
+        display: none;
+      }
+    }
+  </style>
+<link rel="stylesheet" href="../assets/fonts/fonts.css"/>
+<style id="terminal-contrast-override">
+  .terminal-viewport,
+  #terminal-screen,
+  .term-log,
+  .term-welcome,
+  .tome-book-frame {
+    font-family: "Georgia", "Crimson Text", "Book Antiqua", "Palatino Linotype", Palatino, serif !important;
+    color: #1a0e08 !important;
+  }
+  #terminal-screen .term-log .dim,
+  .term-log .dim {
+    color: #2a170d !important;
+    font-weight: 700 !important;
+    font-family: var(--font-mono), monospace !important;
+    opacity: 0.95 !important;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+  }
+  .term-banner,
+  #terminal-screen .term-banner {
+    color: #5a0e07 !important;
+    font-family: "Georgia", "Cinzel", serif !important;
+    font-weight: 800 !important;
+    text-shadow: 0 1px 0 rgba(255, 240, 220, 0.5) !important;
+    letter-spacing: 0.04em !important;
+  }
+  .term-banner-sub,
+  #terminal-screen .term-banner-sub {
+    color: #3e2617 !important;
+    font-weight: 600 !important;
+  }
+  #terminal-screen .term-log .gold, .term-log .gold { color: #5c2409 !important; font-weight: 700 !important; }
+  #terminal-screen .term-log .cyan, .term-log .cyan { color: #0d3a42 !important; font-weight: 700 !important; }
+  #terminal-screen .term-log .green, .term-log .green { color: #113f1e !important; font-weight: 700 !important; }
+  #terminal-screen .term-log .purple, .term-log .purple { color: #46144e !important; font-weight: 700 !important; }
+  #terminal-screen .term-log strong, .term-log strong { color: #1a0b05 !important; font-weight: 800 !important; }
+
+  #terminal-screen .term-log code,
+  .term-log code {
+    background: rgba(84, 40, 14, 0.14) !important;
+    border: 1px solid #6b3516 !important;
+    color: #180b06 !important;
+    font-family: var(--font-mono), monospace !important;
+    font-weight: 700 !important;
+    padding: 1px 6px !important;
+    box-shadow: inset 0 1px 2px rgba(60, 25, 10, 0.15) !important;
+  }
+  #terminal-screen .term-prompt-line {
+    background: rgba(224, 196, 148, 0.85) !important;
+    border: 1px solid #7c4c23 !important;
+  }
+  #terminal-screen .term-prompt-line .prompt-symbol {
+    color: #5a0e07 !important;
+    font-weight: 900 !important;
+  }
+  #terminal-screen .term-input {
+    font-family: "Georgia", serif !important;
+    color: #180b06 !important;
+    font-weight: 700 !important;
+  }
+  #terminal-screen .term-input::placeholder {
+    color: #5d3f2b !important;
+  }
+</style>
+</head>
+<body style="cursor: default;">
+<div class="cockpit-app">
+<!-- LEFT COLUMN: Navigation -->
+<aside aria-label="Campaign and expedition navigation" class="sidebar" style="background: radial-gradient(circle at 50% 20%, rgba(35, 25, 23, 0.45) 0%, rgba(10, 8, 9, 0.94) 100%), url('../assets/images/103e1602d0e3.png') center top / cover no-repeat, rgb(13, 10, 11); border-right: 1px solid rgb(60, 42, 30); box-shadow: rgba(0, 0, 0, 0.8) -10px 0px 30px inset;">
+<div class="brand-bar">
+<div class="brand-icon">⚔</div>
+<div class="brand-title">Dungeon Master</div>
+</div>
+<div class="sidebar-actions">
+<div class="sidebar-search" id="quick-jump-trigger">
+<span>Jump to quest or session...</span>
+<span class="kbd-tag">⌘K</span>
+</div>
+</div>
+<div class="sidebar-section-title">Campaigns</div>
+<div class="campaign-list">
+<div class="campaign-card active" id="campaign-sample">
+<div class="campaign-header-row">
+<span class="campaign-name">sample-campaign</span>
+<span class="badge-sample">Demo fixture</span>
+</div>
+<div class="campaign-desc">13 sample quests · local cockpit</div>
+<div class="expeditions-list">
+<button class="expedition-item active" data-quest-target="3">
+<span class="session-indicator running" title="Running agent"></span>
+<span>#3 Signup Form (Sonnet)</span>
+</button>
+<button class="expedition-item" data-quest-target="6">
+<span class="session-indicator waiting" title="Waiting on review"></span>
+<span>#6 Safari Login (Alice PR)</span>
+</button>
+<button class="expedition-item" id="scratch-shell-btn">
+<span class="session-indicator idle" title="Shell ready"></span>
+<span>○ Scratch Terminal</span>
+</button>
+</div>
+</div>
+<div class="campaign-card" style="opacity: 0.65;">
+<div class="campaign-header-row">
+<span class="campaign-name">internal/quests</span>
+<span class="kbd-tag">Git</span>
+</div>
+<div class="campaign-desc">Repository connected · clean</div>
+</div>
+</div>
+<div class="sidebar-footer">
+<button id="add-campaign-btn"><span>+</span> Add project</button>
+<button id="open-settings-btn" title="Cockpit Settings">⚙ Settings</button>
+</div>
+</aside>
+<!-- CENTER COLUMN: Papyrus / Tome Central Terminal -->
+<main aria-label="Live interactive terminal workspace" class="workspace-terminal">
+<div class="terminal-nav" style="min-height: 48px; height: 48px; padding: 0px 12px; gap: 8px; display: flex; align-items: center; overflow: hidden;">
+<div class="terminal-tab-pill" style="flex-shrink: 0; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; padding: 4px 8px; line-height: 1.2;">
+<span class="wax-seal-dot" style="flex-shrink: 0;"></span>
+<span id="term-session-label" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Expedition: #3 Signup Form</span>
+</div>
+<div class="terminal-meta-info" style="flex: 1 1 0%; min-width: 0px; display: flex; align-items: center; gap: 6px; font-size: 10.5px; overflow: hidden; white-space: nowrap;">
+<span style="overflow: hidden; text-overflow: ellipsis;">Hero: <strong>Claude 3.7</strong></span>
+<span>·</span>
+<span style="overflow: hidden; text-overflow: ellipsis;"><code>feat/signup-form</code></span>
+</div>
+<div class="terminal-actions" style="flex-shrink: 0; display: flex; gap: 4px;">
+<button class="term-btn" id="term-clear-btn" style="padding: 3px 6px; font-size: 10px;" title="Clear buffer">⌧ Clear</button>
+<button class="term-btn" id="term-refresh-btn" style="padding: 3px 6px; font-size: 10px;" title="Refresh session context">↻ Reload</button>
+<button class="term-btn" id="toggle-panel-btn" style="padding: 3px 6px; font-size: 10px;" title="Toggle right panel width">⇲ Expand</button>
+</div>
+</div>
+<div class="terminal-viewport-wrapper">
+<div class="tome-book-frame" style="background: url('../assets/images/6a8650faf410.png') center center / cover no-repeat, rgb(222, 206, 176); border: 3px solid rgb(74, 40, 16); box-shadow: rgba(60, 32, 10, 0.55) 0px 0px 35px 8px inset, rgba(35, 18, 5, 0.35) 0px 0px 60px 15px inset, rgba(247, 225, 185, 0.45) 0px 0px 0px 1px inset, rgb(60, 30, 11) 0px 0px 0px 3px inset, rgba(0, 0, 0, 0.9) 0px 12px 35px; position: relative;">
+<style>
+  #terminal-screen::-webkit-scrollbar { width: 15px; }
+  #terminal-screen::-webkit-scrollbar-track {
+    background: linear-gradient(90deg, #2b170c 0%, #160a04 50%, #2b170c 100%);
+    border-left: 1px solid #6b4020;
+    border-right: 1px solid #4a2810;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.95);
+    border-radius: 2px;
+  }
+  #terminal-screen::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #f7ecd7 0%, #e6d2b0 35%, #d5ba8b 65%, #c29f6b 100%);
+    border: 1px solid #724b22;
+    outline: 1px solid #b88a44;
+    outline-offset: -2px;
+    border-radius: 3px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.85), inset 0 1px 1px #fffbee, inset 0 -1px 3px #6b451c;
+  }
+  #terminal-screen {
+    scrollbar-width: thin;
+    scrollbar-color: #d5ba8b #160a04;
+    color: #1e1208 !important;
+    font-family: var(--font-mono);
+    overflow-y: scroll;
+  }
+  #terminal-screen .term-narrative {
+    background: rgba(48, 24, 10, 0.14) !important;
+    border-left: 3.5px solid #5a1e0c !important;
+    border-top: 1px solid rgba(90, 30, 12, 0.2) !important;
+    border-right: 1px solid rgba(90, 30, 12, 0.15) !important;
+    border-bottom: 1px solid rgba(90, 30, 12, 0.2) !important;
+    border-radius: 0 5px 5px 0 !important;
+    color: #100602 !important;
+    font-weight: 600 !important;
+    font-size: 12.5px !important;
+    line-height: 1.65 !important;
+    box-shadow: inset 0 1px 3px rgba(35, 15, 6, 0.15), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+    padding: 10px 14px !important;
+  }
+</style>
+<div class="terminal-viewport" id="terminal-screen">
+<div class="term-welcome">
+<div class="term-banner" style="color: rgb(92, 18, 8); font-family: Georgia, Cinzel, serif; font-weight: 900; font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; text-shadow: rgba(255, 245, 225, 0.6) 0px 1px 0px;">Claude Code v2.1.295 — Expedition session active</div>
+<div class="term-banner-sub" style="color: rgb(56, 33, 18); font-family: Georgia, serif; font-size: 12px; font-weight: 600; font-style: italic;">Campaign: sample-campaign · Context: internal/quests/demo · Model: claude-3-7-sonnet</div>
+</div>
+<div class="term-log"><span class="dim">[10:14:02]</span> <span class="cyan" style="color: #124b54;">SessionStart:</span> Initialized hero configuration for <span class="gold" style="color: #704505;">#3 Build the signup form</span>.</div>
+<div class="term-log"><span class="dim">[10:14:03]</span> <span class="purple" style="color: #562066;">Quest Briefing:</span> Collect an email and password. Render form, submit to signup API, handle validation errors.</div>
+<div class="term-log"><span class="dim">[10:14:04]</span> <span class="green" style="color: #1a4d29;">Spell Invoked:</span> <code>/plan</code> analyzing dependency graph. Parent hall <strong>#1 Ship the onboarding flow</strong> confirmed. Blocker #2 marked completed.</div>
+<div class="term-log"><span class="dim">[10:14:15]</span> <span class="dim">git status:</span> On branch <code>feat/signup-form</code>. Working tree clean.</div>
+<div class="term-narrative">
+    ✦ Claude: I will now examine the API contract for the signup endpoint and draft the form component test suite.
+</div>
+<div class="term-log" style="margin-top: 12px;"><span class="dim">[10:14:28]</span> <span class="cyan" style="color: #124b54;">Inspection:</span> Reading schema definition <code>packages/core/api/v1/signup.schema.json</code></div>
+<div class="term-log"><span class="dim">[10:14:31]</span> <span class="dim">payload specs:</span> <code>{ email: string, passwordHash: string, inviteCode?: string }</code></div>
+<div class="term-log"><span class="dim">[10:14:42]</span> <span class="green" style="color: #1a4d29;">Drafting Tests:</span> Generated <code>packages/client/__tests__/SignupForm.test.tsx</code> (8 assertions)</div>
+<div class="term-narrative">
+    ✦ Claude: Test suite drafted: verified email format validation, empty password prevention, API failure toast alert dispatch, and redirect upon 201 Created.
+</div>
+<div class="term-log" style="margin-top: 12px;"><span class="dim">[10:15:05]</span> <span class="green" style="color: #1a4d29;">Spell Invoked:</span> <code>/test</code> runner executing Vitest suite...</div>
+<div class="term-log"><span class="dim">[10:15:08]</span> <span class="dim">PASS:</span> <code>SignupForm › renders email and password fields correctly</code> (18ms)</div>
+<div class="term-log"><span class="dim">[10:15:09]</span> <span class="dim">PASS:</span> <code>SignupForm › displays error banner on duplicate account 409</code> (24ms)</div>
+<div class="term-log"><span class="dim">[10:15:11]</span> <span class="dim">PASS:</span> <code>SignupForm › dispatches tracking event on submission</code> (12ms)</div>
+<div class="term-log"><span class="dim">[10:15:12]</span> <span class="green" style="color: #1a4d29;">Test Suite Result:</span> 3/3 passed (100% assertion coverage)</div>
+<div class="term-log" style="margin-top: 12px;"><span class="dim">[10:15:24]</span> <span class="purple" style="color: #562066;">Spell Invoked:</span> <code>/review</code> examining static types and security posture...</div>
+<div class="term-log"><span class="dim">[10:15:29]</span> <span class="dim">audit notice:</span> Form field sanitized against XSS payloads. Client-side rate-limiting hook attached.</div>
+<div class="term-log"><span class="dim">[10:15:35]</span> <span class="cyan" style="color: #124b54;">git diff:</span> <code>+142 lines</code> across 2 files, 0 warnings. Ready for PR commit.</div>
+<div class="term-narrative">
+    ✦ Claude: Components and tests are verified clean. Ready to inscribe next spell or commit to expedition branch.
+</div>
+<div class="term-prompt-line" style="margin-top: 16px;">
+<span class="prompt-symbol" style="color: #7a1515;">❯</span>
+<input autofocus="" class="term-input" id="terminal-cli-input" placeholder="Inscribe spell or command (/test, /git, /plan, /compact)..." style="color: rgb(30, 16, 6); font-weight: 600;" type="text"/>
+<span class="term-cursor" style="background: #241407;"></span>
+</div>
+</div>
+</div>
+</div>
+<div class="terminal-quick-actions">
+<span style="font-family: var(--font-serif); font-weight: 700; color: #ffdca3;">Spells:</span>
+<span class="badge-chip">/plan</span>
+<span class="badge-chip">/review</span>
+<span class="badge-chip">/test</span>
+<span class="badge-chip">/pr</span>
+<span style="margin-left: auto; color: #ab8e83;">Connected to local daemon via PTY</span>
+</div>
+</main>
+<!-- RIGHT COLUMN: Gothic Quest Cockpit (LIST VIEW ACTIVE STATE) -->
+<aside aria-label="Quest dependency encounter map" class="cockpit-panel">
+<!-- Panel Top Bar with LIST Active -->
+<header class="panel-header-bar">
+<div class="panel-header-title">
+<div class="jewel-accent"></div>
+<span>Quest Encounters</span>
+</div>
+<div class="panel-header-spacer"></div>
+<div aria-label="Map or list view" class="segmented-control" role="group">
+<button aria-pressed="false" class="segmented-btn" id="btn-view-map">Map</button>
+<button aria-pressed="true" class="segmented-btn active" id="btn-view-list">List</button>
+</div>
+<button class="icon-square-btn" id="btn-panel-help" title="Visual Grammar &amp; Rules">?</button>
+</header>
+<!-- UPPER PORTION: Gothic Scrollable Quest List Deck -->
+<section class="panel-top-portion" id="panel-top-section" style="background: radial-gradient(circle at 50% 40%, rgba(26, 18, 16, 0.45) 0%, rgba(8, 6, 8, 0.92) 100%), url('../assets/images/103e1602d0e3.png') center center / cover no-repeat, rgb(9, 7, 9);">
+<div class="gothic-quest-list-panel">
+<!-- Filter Tabs Header -->
+<div class="list-view-filter-bar">
+<div class="list-filter-tabs">
+<button class="filter-tab-pill active" data-filter="all">All (13)</button>
+<button class="filter-tab-pill" data-filter="ready">Ready (4)</button>
+<button class="filter-tab-pill" data-filter="in-progress">In Progress (2)</button>
+<button class="filter-tab-pill" data-filter="blocked">Blocked (3)</button>
+<button class="filter-tab-pill" data-filter="cleared">Cleared (4)</button>
+</div>
+</div>
+<!-- Scrollable Quest List Rows -->
+<div class="list-items-scroll-deck" id="quest-list-container">
+<!-- #2 Cleared · Trivial (Rat) -->
+<div class="gothic-quest-row" data-quest="2" onclick="selectQuest(2)">
+<div class="quest-creature-avatar rat" title="Trivial (1 pt): Dungeon Rat">
+<span class="avatar-status-pip cleared">✓</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title">#2 Design the welcome screen</span>
+<span class="quest-status-chip cleared">Cleared</span>
+</div>
+<div class="quest-row-meta">
+<span>Trivial effort</span>
+<span>·</span>
+<span>Part of #1</span>
+</div>
+</div>
+</div>
+<!-- #3 Ready · Moderate (Goblin) - ACTIVE SELECTION -->
+<div class="gothic-quest-row selected" data-quest="3" onclick="selectQuest(3)">
+<div class="quest-creature-avatar goblin" title="Moderate (3 pts): Goblin Scout">
+<span class="avatar-status-pip ready">!</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title">#3 Build the signup form</span>
+<span class="quest-status-chip ready">Ready</span>
+</div>
+<div class="quest-row-meta">
+<span style="color: #ffdca3; font-weight: 600;">Moderate effort</span>
+<span>·</span>
+<span>Demo Fixture</span>
+</div>
+</div>
+</div>
+<!-- #4 Blocked · Moderate (Goblin) -->
+<div class="gothic-quest-row" data-quest="4" onclick="selectQuest(4)">
+<div class="quest-creature-avatar goblin" title="Moderate (3 pts): Goblin Scout">
+<span class="avatar-status-pip blocked">▣</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title">#4 Validate email addresses</span>
+<span class="quest-status-chip blocked">Blocked</span>
+</div>
+<div class="quest-row-meta">
+<span>Moderate effort</span>
+<span>·</span>
+<span>Blocked by #3</span>
+</div>
+</div>
+</div>
+<!-- #5 Blocked · Large (Many-eyed Watcher) -->
+<div class="gothic-quest-row" data-quest="5" onclick="selectQuest(5)">
+<div class="quest-creature-avatar eye" title="Large (8 pts): Many-Eyed Stone Watcher">
+<span class="avatar-status-pip blocked">▣</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title">#5 Send the welcome email</span>
+<span class="quest-status-chip blocked">Blocked</span>
+</div>
+<div class="quest-row-meta">
+<span>Large effort</span>
+<span>·</span>
+<span>Blocked by #4, #7</span>
+</div>
+</div>
+</div>
+<!-- #6 Assigned to Alice · Unknown -->
+<div class="gothic-quest-row" data-quest="6" onclick="selectQuest(6)">
+<div class="quest-creature-avatar unknown" title="Unestimated Diamond">
+          ◇
+          <span class="avatar-status-pip assigned">@</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title">#6 Login button unresponsive on Safari</span>
+<span class="quest-status-chip assigned">Alice</span>
+</div>
+<div class="quest-row-meta">
+<span>Unknown effort</span>
+<span>·</span>
+<span>PR #34 Open</span>
+</div>
+</div>
+</div>
+<!-- #7 Ready · Unknown -->
+<div class="gothic-quest-row" data-quest="7" onclick="selectQuest(7)">
+<div class="quest-creature-avatar unknown" title="Unestimated Diamond">
+          ◇
+          <span class="avatar-status-pip ready">!</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title">#7 Which email provider should we use?</span>
+<span class="quest-status-chip ready">Ready</span>
+</div>
+<div class="quest-row-meta">
+<span>Decisional</span>
+<span>·</span>
+<span>Blocks #5</span>
+</div>
+</div>
+</div>
+<!-- #8 Closed · Unknown -->
+<div class="gothic-quest-row" data-quest="8" onclick="selectQuest(8)">
+<div class="quest-creature-avatar unknown" title="Unestimated Diamond">
+          ◇
+          <span class="avatar-status-pip closed">✕</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title" style="text-decoration: line-through; opacity: 0.75;">#8 Write the privacy policy</span>
+<span class="quest-status-chip closed">Closed</span>
+</div>
+<div class="quest-row-meta">
+<span>Closed as not planned</span>
+</div>
+</div>
+</div>
+<!-- #9 Ready · Standalone Research -->
+<div class="gothic-quest-row" data-quest="9" onclick="selectQuest(9)">
+<div class="quest-creature-avatar unknown" title="Unestimated Diamond">
+          ◇
+          <span class="avatar-status-pip ready">!</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title">#9 Evaluate rate-limit libraries</span>
+<span class="quest-status-chip ready">Ready</span>
+</div>
+<div class="quest-row-meta">
+<span>Standalone triage</span>
+</div>
+</div>
+</div>
+<!-- #10 Assigned to Bob -->
+<div class="gothic-quest-row" data-quest="10" onclick="selectQuest(10)">
+<div class="quest-creature-avatar unknown" title="Unestimated Diamond">
+          ◇
+          <span class="avatar-status-pip assigned">@</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title">#10 Upgrade Node to the latest LTS</span>
+<span class="quest-status-chip assigned">Bob</span>
+</div>
+<div class="quest-row-meta">
+<span>DevOps · Node v22</span>
+</div>
+</div>
+</div>
+<!-- #1 Ship the onboarding flow (Epic container) -->
+<div class="gothic-quest-row" data-quest="1" onclick="selectQuest(1)">
+<div class="quest-creature-avatar unknown" title="Parent Hall">
+          ⚜
+          <span class="avatar-status-pip ready">○</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title">#1 Ship the onboarding flow</span>
+<span class="quest-status-chip ready">Epic Hall</span>
+</div>
+<div class="quest-row-meta">
+<span>Parent of #2..#5 (4 rooms)</span>
+</div>
+</div>
+</div>
+<!-- #12 List users -->
+<div class="gothic-quest-row" data-quest="12" onclick="selectQuest(12)">
+<div class="quest-creature-avatar unknown">
+          ◇
+          <span class="avatar-status-pip ready">!</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title">#12 List users</span>
+<span class="quest-status-chip ready">Ready</span>
+</div>
+<div class="quest-row-meta">
+<span>Admin hall</span>
+</div>
+</div>
+</div>
+<!-- #13 Suspend a user -->
+<div class="gothic-quest-row" data-quest="13" onclick="selectQuest(13)">
+<div class="quest-creature-avatar unknown">
+          ◇
+          <span class="avatar-status-pip blocked">▣</span>
+</div>
+<div class="quest-row-content">
+<div class="quest-row-title-bar">
+<span class="quest-row-title">#13 Suspend a user</span>
+<span class="quest-status-chip blocked">Blocked</span>
+</div>
+<div class="quest-row-meta">
+<span>Blocked by #12</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- RESIZABLE SPLITTER -->
+<div aria-hidden="true" class="horizontal-splitter" id="panel-resizer-handle" title="Drag to resize list and detail split"></div>
+<!-- LOWER PORTION: Selected Quest Detail (#3 Kept in sync) -->
+<section class="panel-bottom-portion" id="panel-bottom-section">
+<div class="detail-scroll-area" id="quest-detail-content">
+<div class="diablo-heading-banner">
+<div class="detail-heading-row">
+<h2 class="detail-title"><span>#3</span> Build the signup form</h2>
+<button class="icon-square-btn" onclick="showToast('Opened local mirror for #3')" title="View on GitHub / Mirror">↗</button>
+</div>
+</div>
+<div class="chips-cluster">
+<span class="meta-chip state-ready">Ready</span>
+<span class="meta-chip">Moderate effort</span>
+<span class="meta-chip label-tag">demo</span>
+</div>
+<div style="font-size: 11px; color: #bca196; margin-bottom: 8px;">
+        Belongs to Hall: <strong style="color: #ffdca3;">#1 Ship the onboarding flow</strong>
+</div>
+<p class="detail-prose">Collect an email and password. Render the responsive form, submit to the signup API endpoint, and display actionable error toasts.</p>
+<div class="dependency-box">
+<strong>Blocked by:</strong> <button class="blocker-link" onclick="selectQuest(2)">#2 Design the welcome screen</button>
+</div>
+<div style="font-size: 11px; color: #a68b80; border-top: 1px solid #4a191c; padding-top: 10px; margin-top: 12px;">
+        Part of #1 · #2 cleared
+      </div>
+</div>
+<!-- PINNED ACTION LAUNCH FOOTER -->
+<footer class="pinned-launch-footer">
+<div class="launch-combos-row">
+<div class="combo-wrapper">
+<label class="combo-label" for="select-hero">Hero / Agent</label>
+<select class="gothic-select" id="select-hero">
+<option value="Sonnet">Claude 3.7 Sonnet (Recommended)</option>
+<option value="Opus">Claude 3 Opus (High reasoning)</option>
+<option value="Haiku">Claude 3.5 Haiku (Fast triage)</option>
+</select>
+</div>
+<div class="combo-wrapper">
+<label class="combo-label" for="select-spell">Spell / Skill</label>
+<select class="gothic-select" id="select-spell">
+<option value="none">None — Open without a skill</option>
+<optgroup label="Plan">
+<option selected="" value="/plan">/plan — Break down architecture</option>
+<option value="/research">/research — Survey libraries</option>
+</optgroup>
+<optgroup label="Do">
+<option value="/implement">/implement — Code changes &amp; tests</option>
+<option value="/refactor">/refactor — Clean code &amp; types</option>
+</optgroup>
+<optgroup label="Check">
+<option value="/test">/test — Run test runners</option>
+<option value="/review">/review — Security &amp; style check</option>
+</optgroup>
+</select>
+</div>
+</div>
+<div class="launch-action-row">
+<div id="launch-state-feedback">
+<span class="launch-brief-snippet" id="launch-brief-text"><span style="color: #ff5238; font-weight: 700;">● Live expedition active</span> · Branch <code>feat/signup-form</code></span>
+</div>
+<button class="gothic-launch-btn" id="start-quest-btn">
+<span>▶</span>
+<span id="launch-btn-label">Go to session</span>
+</button>
+</div>
+</footer>
+</section>
+</aside>
+</div>
+<!-- SETTINGS MODAL -->
+<div aria-labelledby="settings-heading" aria-modal="true" class="modal-overlay" id="settings-modal" role="dialog">
+<div class="modal-window">
+<div class="modal-header">
+<h2 id="settings-heading"><span class="jewel-accent"></span> Cockpit Settings</h2>
+<button class="icon-square-btn" id="close-settings-btn">×</button>
+</div>
+<div class="modal-tabs">
+<button class="modal-tab-btn active">Heroes &amp; Models</button>
+<button class="modal-tab-btn">Spells &amp; Skills</button>
+<button class="modal-tab-btn">Appearance</button>
+<button class="modal-tab-btn">GitHub &amp; Scope</button>
+</div>
+<div class="modal-body">
+<div class="settings-group">
+<h3>Configured Heroes (Claude Code Profiles)</h3>
+<p>Manage model temperature, tool permissions, and custom instructions per expedition hero.</p>
+<div style="background: #190508; border: 1px solid #581d1a; border-radius: 6px; padding: 10px; font-size: 11.5px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+<strong style="color: #ffdca3; font-family: var(--font-serif);">Sonnet (Default)</strong>
+<span class="meta-chip">claude-3-7-sonnet-20250219</span>
+</div>
+<div style="color: #c4a395;">Auto-compact enabled · Bash, Edit, View, WebSearch tools active</div>
+</div>
+</div>
+<div class="settings-group">
+<h3>Creature Roster &amp; Effort Mapping</h3>
+<p>Creatures visually represent explicit effort points. Species identity is deterministically hashed from local issue keys and remains stable across releases.</p>
+<div style="font-size: 11px; color: #dfc7bc; line-height: 1.8;">
+          • <strong>Trivial (1 pt):</strong> Dungeon Rat (Supplied transparent sprite)<br/>
+          • <strong>Moderate (3 pts):</strong> Goblin Scout (Supplied transparent sprite)<br/>
+          • <strong>Large (8 pts):</strong> Many-Eyed Stone Watcher (Supplied transparent sprite)<br/>
+          • <strong>Unestimated:</strong> Plain Diamond node (No hallucinated story points)
+</div>
+</div>
+</div>
+<div class="modal-footer">
+<button class="term-btn" id="save-settings-btn" style="background: linear-gradient(180deg, #a32229, #5c0f14); color: white; border-color: var(--brass-bright); font-weight: 700;">Save Settings</button>
+</div>
+</div>
+</div>
+<!-- COMMAND PALETTE (CMD+K) -->
+<div aria-modal="true" class="cmd-overlay" id="cmd-palette" role="dialog">
+<div class="cmd-box">
+<div class="cmd-input-bar">
+<span style="color: var(--brass-bright); font-size: 14px;">⌘</span>
+<input class="cmd-input" id="cmd-input" placeholder="Type a quest number, title, or spell..." type="text"/>
+<span class="kbd-tag">ESC</span>
+</div>
+<div class="cmd-results" id="cmd-results-list"></div>
+</div>
+</div>
+<!-- TOAST -->
+<div class="toast-pill" id="cockpit-toast" role="status">
+<span class="jewel-accent"></span>
+<span id="toast-message">Expedition session started</span>
+</div>
+<script>
+  const sampleQuests = {
+    1: {
+      number: 1,
+      title: "Ship the onboarding flow",
+      state: "Epic Hall",
+      effort: null,
+      creature: null,
+      parent: null,
+      blockedBy: [],
+      assignees: [],
+      closed: false,
+      description: "Epic container hall encompassing the initial user onboarding flow (#2 through #5).",
+      relation: "Parent Hall for #2, #3, #4, #5",
+      startable: false
+    },
+    2: {
+      number: 2,
+      title: "Design the welcome screen",
+      state: "Cleared",
+      effort: "Trivial",
+      creature: "rat",
+      parent: 1,
+      blockedBy: [],
+      assignees: [],
+      closed: true,
+      description: "Mockups for the first screen a new user sees after signup. Approved in design review.",
+      relation: "Part of #1 · PR #21 merged",
+      startable: false,
+      blocker: null
+    },
+    3: {
+      number: 3,
+      title: "Build the signup form",
+      state: "Ready",
+      effort: "Moderate",
+      creature: "goblin",
+      parent: 1,
+      blockedBy: [2],
+      assignees: [],
+      closed: false,
+      description: "Collect an email and password. Render the responsive form, submit to the signup API endpoint, and display actionable error toasts.",
+      relation: "Part of #1 · #2 cleared",
+      startable: true,
+      recommendedSpell: "/plan"
+    },
+    4: {
+      number: 4,
+      title: "Validate email addresses",
+      state: "Blocked",
+      effort: "Moderate",
+      creature: "goblin",
+      parent: 1,
+      blockedBy: [3],
+      assignees: [],
+      closed: false,
+      description: "Reject malformed email addresses and disposable domains on both client form submit and backend worker.",
+      relation: "Part of #1 · Blocked by #3",
+      startable: false,
+      blocker: 3
+    },
+    5: {
+      number: 5,
+      title: "Send the welcome email",
+      state: "Blocked",
+      effort: "Large",
+      creature: "eye",
+      parent: 1,
+      blockedBy: [4, 7],
+      assignees: [],
+      closed: false,
+      description: "Send the onboarding email once upon successful verification. Depends on email validation (#4) and selecting the email provider (#7).",
+      relation: "Part of #1 · Blocked by #4 and #7",
+      startable: false,
+      blocker: 4
+    },
+    6: {
+      number: 6,
+      title: "Login button unresponsive on Safari",
+      state: "Assigned to Alice",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: null,
+      blockedBy: [],
+      assignees: ["Alice"],
+      closed: false,
+      description: "The primary CTA button fails to dispatch touch events on Safari 17 iOS/macOS. Alice has opened an active PR #34.",
+      relation: "PR #34 open · Assigned to Alice",
+      startable: true,
+      recommendedSpell: "/review"
+    },
+    7: {
+      number: 7,
+      title: "Which email provider should we use?",
+      state: "Ready",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: null,
+      blockedBy: [],
+      assignees: [],
+      closed: false,
+      description: "Compare deliverability, pricing tiers, and latency between Postmark, Resend, and SES, then document decision.",
+      relation: "Decisional · Blocks #5",
+      startable: true,
+      recommendedSpell: "/research"
+    },
+    8: {
+      number: 8,
+      title: "Write the privacy policy",
+      state: "Closed",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: null,
+      blockedBy: [],
+      assignees: [],
+      closed: true,
+      description: "Draft terms of service and GDPR privacy notice. Closed as not planned for initial release.",
+      relation: "Standalone · Closed",
+      startable: false
+    },
+    9: {
+      number: 9,
+      title: "Evaluate rate-limit libraries",
+      state: "Ready",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: null,
+      blockedBy: [],
+      assignees: [],
+      closed: false,
+      description: "Research token bucket implementations for redis-based API throttling.",
+      relation: "Standalone research",
+      startable: true
+    },
+    10: {
+      number: 10,
+      title: "Upgrade Node to the latest LTS",
+      state: "Assigned to Bob",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: null,
+      blockedBy: [],
+      assignees: ["Bob"],
+      closed: false,
+      description: "Upgrade Docker base images and CI pipelines to Node v22 LTS.",
+      relation: "Assigned to Bob",
+      startable: true
+    },
+    11: {
+      number: 11,
+      title: "Build the admin dashboard",
+      state: "Epic Hall",
+      effort: null,
+      creature: null,
+      parent: null,
+      blockedBy: [],
+      assignees: [],
+      closed: false,
+      description: "Epic milestone for user and subscription administration.",
+      relation: "Parent Hall for #12 and #13",
+      startable: false
+    },
+    12: {
+      number: 12,
+      title: "List users",
+      state: "Ready",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: 11,
+      blockedBy: [],
+      assignees: [],
+      closed: false,
+      description: "Paginated admin table showing registered user accounts and dates.",
+      relation: "Part of #11",
+      startable: true
+    },
+    13: {
+      number: 13,
+      title: "Suspend a user",
+      state: "Blocked",
+      effort: "Unknown",
+      creature: "unknown",
+      parent: 11,
+      blockedBy: [12],
+      assignees: [],
+      closed: false,
+      description: "Allow platform admins to revoke active sessions and suspend malicious accounts.",
+      relation: "Part of #11 · Blocked by #12",
+      startable: false,
+      blocker: 12
+    }
+  };
+
+  let selectedQuestId = 3;
+
+  const detailArea = document.getElementById('quest-detail-content');
+  const toast = document.getElementById('cockpit-toast');
+  const toastMsg = document.getElementById('toast-message');
+  const startBtn = document.getElementById('start-quest-btn');
+  const launchBtnLabel = document.getElementById('launch-btn-label');
+  const launchBriefText = document.getElementById('launch-brief-text');
+  const selectHero = document.getElementById('select-hero');
+  const selectSpell = document.getElementById('select-spell');
+
+  function showToast(text) {
+    toastMsg.textContent = text;
+    toast.classList.add('show');
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => toast.classList.remove('show'), 3500);
+  }
+
+  function selectQuest(id) {
+    const q = sampleQuests[id];
+    if (!q) return;
+    selectedQuestId = id;
+
+    // Update list item selection visual styles
+    document.querySelectorAll('.gothic-quest-row').forEach(row => {
+      const match = Number(row.dataset.quest) === id;
+      row.classList.toggle('selected', match);
+    });
+
+    // Render detailed content
+    const effortBadge = q.effort ? `${q.effort} effort` : 'Unknown effort';
+    const stateClass = q.state === 'Ready' ? 'state-ready' :
+                       q.state === 'Blocked' ? 'state-blocked' :
+                       q.state === 'Cleared' ? 'state-cleared' : 'state-assigned';
+
+    let blockerHtml = '';
+    if (q.blockedBy && q.blockedBy.length > 0) {
+      blockerHtml = `<div class="dependency-box">
+        <strong>Blocked by:</strong> ${q.blockedBy.map(bId => `<button class="blocker-link" onclick="selectQuest(${bId})">#${bId} ${sampleQuests[bId].title}</button>`).join(', ')}
+      </div>`;
+    }
+
+    let parentHtml = '';
+    if (q.parent) {
+      parentHtml = `<div style="font-size: 11px; color: #bca196; margin-bottom: 8px;">
+        Belongs to Hall: <strong style="color: #ffdca3;">#${q.parent} ${sampleQuests[q.parent].title}</strong>
+      </div>`;
+    }
+
+    detailArea.innerHTML = `
+      <div class="diablo-heading-banner">
+        <div class="detail-heading-row">
+          <h2 class="detail-title"><span>#${q.number}</span> ${q.title}</h2>
+          <button class="icon-square-btn" title="View on GitHub / Mirror" onclick="showToast('Opened local mirror for #${q.number}')">↗</button>
+        </div>
+      </div>
+      <div class="chips-cluster">
+        <span class="meta-chip ${stateClass}">${q.state}</span>
+        <span class="meta-chip">${effortBadge}</span>
+        <span class="meta-chip label-tag">demo</span>
+        ${q.assignees.length ? `<span class="meta-chip label-tag">@${q.assignees[0]}</span>` : ''}
+      </div>
+      ${parentHtml}
+      <p class="detail-prose">${q.description}</p>
+      ${blockerHtml}
+      <div style="font-size: 11px; color: #a68b80; border-top: 1px solid #4a191c; padding-top: 10px; margin-top: 12px;">
+        ${q.relation}
+      </div>
+    `;
+
+    // Configure Launch Footer controls
+    if (q.recommendedSpell && selectSpell) {
+      selectSpell.value = q.recommendedSpell;
+    }
+
+    if (q.number === 3) {
+      startBtn.disabled = false;
+      launchBtnLabel.textContent = "Go to session";
+      launchBriefText.innerHTML = `<span style="color: #ff5238; font-weight: 700;">● Live expedition active</span> · Branch <code>feat/signup-form</code>`;
+      selectHero.disabled = false;
+      selectSpell.disabled = false;
+    } else if (q.startable) {
+      startBtn.disabled = false;
+      launchBtnLabel.textContent = "Start expedition";
+      launchBriefText.textContent = `Launch ${selectHero.value} on #${q.number}`;
+      selectHero.disabled = false;
+      selectSpell.disabled = false;
+    } else {
+      startBtn.disabled = true;
+      selectHero.disabled = true;
+      selectSpell.disabled = true;
+      if (q.blocker) {
+        launchBtnLabel.textContent = "Locked by #" + q.blocker;
+        launchBriefText.innerHTML = `<span class="launch-reason-notice">⚠ Blocked by <button class="blocker-link" onclick="selectQuest(${q.blocker})">#${q.blocker}</button></span>`;
+      } else {
+        launchBtnLabel.textContent = "Closed";
+        launchBriefText.textContent = q.state === 'Cleared' ? "Quest completed & PR merged" : "Quest not startable";
+      }
+    }
+  }
+
+  // Filter tabs handling
+  document.querySelectorAll('.filter-tab-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.filter-tab-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      const filter = pill.dataset.filter;
+      const rows = document.querySelectorAll('.gothic-quest-row');
+
+      rows.forEach(row => {
+        const qId = Number(row.dataset.quest);
+        const q = sampleQuests[qId];
+        if (filter === 'all') {
+          row.style.display = 'flex';
+        } else if (filter === 'ready') {
+          row.style.display = q.state === 'Ready' ? 'flex' : 'none';
+        } else if (filter === 'in-progress') {
+          row.style.display = (q.number === 3 || q.state.includes('Assigned')) ? 'flex' : 'none';
+        } else if (filter === 'blocked') {
+          row.style.display = q.state === 'Blocked' ? 'flex' : 'none';
+        } else if (filter === 'cleared') {
+          row.style.display = (q.state === 'Cleared' || q.closed) ? 'flex' : 'none';
+        }
+      });
+    });
+  });
+
+  // Launch Button Action
+  startBtn.addEventListener('click', () => {
+    const q = sampleQuests[selectedQuestId];
+    if (selectedQuestId === 3) {
+      showToast(`Tome focused on active session: #${q.number}`);
+      document.getElementById('term-session-label').textContent = `Tome Expedition: #${q.number} ${q.title}`;
+    } else {
+      const spell = selectSpell.value !== 'none' ? ` with spell ${selectSpell.value}` : '';
+      showToast(`Dispatched Claude Code on #${q.number} (${selectHero.value})${spell}`);
+      document.getElementById('term-session-label').textContent = `Tome Expedition: #${q.number} ${q.title}`;
+    }
+  });
+
+  // Resizer logic
+  const resizer = document.getElementById('panel-resizer-handle');
+  const topSection = document.getElementById('panel-top-section');
+  let isResizing = false;
+
+  resizer.addEventListener('mousedown', () => {
+    isResizing = true;
+    document.body.style.cursor = 'row-resize';
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    const panelRect = document.querySelector('.cockpit-panel').getBoundingClientRect();
+    const newHeight = e.clientY - panelRect.top;
+    if (newHeight >= 200 && newHeight <= (panelRect.height - 180)) {
+      topSection.style.height = `${newHeight}px`;
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    isResizing = false;
+    document.body.style.cursor = 'default';
+  });
+
+  // Terminal CLI Input Simulator on Papyrus Canvas
+  const cliInput = document.getElementById('terminal-cli-input');
+  cliInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && cliInput.value.trim()) {
+      const val = cliInput.value.trim();
+      cliInput.value = '';
+      const screen = document.getElementById('terminal-screen');
+      const newLog = document.createElement('div');
+      newLog.className = 'term-log';
+      newLog.innerHTML = `<span class="dim">[${new Date().toLocaleTimeString()}]</span> <span class="cyan">❯ ${val}</span>`;
+      screen.insertBefore(newLog, screen.querySelector('.term-prompt-line'));
+
+      setTimeout(() => {
+        const resp = document.createElement('div');
+        resp.className = 'term-log';
+        resp.innerHTML = `<span class="dim">[${new Date().toLocaleTimeString()}]</span> <span class="gold">Claude:</span> Inscribing plan runes against repository...`;
+        screen.insertBefore(resp, screen.querySelector('.term-prompt-line'));
+        screen.scrollTop = screen.scrollHeight;
+      }, 350);
+    }
+  });
+
+  // Command Palette
+  const cmdPalette = document.getElementById('cmd-palette');
+  const cmdInput = document.getElementById('cmd-input');
+  const cmdResults = document.getElementById('cmd-results-list');
+
+  function openPalette() {
+    cmdPalette.classList.add('open');
+    cmdInput.value = '';
+    renderPaletteItems(Object.values(sampleQuests));
+    setTimeout(() => cmdInput.focus(), 50);
+  }
+
+  function closePalette() {
+    cmdPalette.classList.remove('open');
+  }
+
+  function renderPaletteItems(items) {
+    cmdResults.innerHTML = items.map((q, idx) => `
+      <div class="cmd-item ${idx === 0 ? 'active' : ''}" onclick="selectQuest(${q.number}); closePalette();">
+        <span><strong>#${q.number}</strong> ${q.title}</span>
+        <span class="meta-chip">${q.state}</span>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('quick-jump-trigger').addEventListener('click', openPalette);
+  window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      openPalette();
+    }
+    if (e.key === 'Escape') {
+      closePalette();
+      closeSettings();
+    }
+  });
+
+  // Settings Modal
+  const settingsModal = document.getElementById('settings-modal');
+  function openSettings() { settingsModal.classList.add('open'); }
+  function closeSettings() { settingsModal.classList.remove('open'); }
+
+  document.getElementById('open-settings-btn').addEventListener('click', openSettings);
+  document.getElementById('close-settings-btn').addEventListener('click', closeSettings);
+  document.getElementById('save-settings-btn').addEventListener('click', () => {
+    closeSettings();
+    showToast('Cockpit settings saved successfully');
+  });
+
+  document.getElementById('btn-panel-help').addEventListener('click', () => {
+    showToast('Creature = explicit effort. Status pip = state. Selection keeps terminal and details synced.');
+  });
+  document.getElementById('add-campaign-btn').addEventListener('click', () => {
+    showToast('Select local repository directory to register new campaign.');
+  });
+
+  // Left sidebar buttons
+  document.querySelectorAll('.expedition-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.expedition-item').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const targetQuest = btn.dataset.questTarget;
+      if (targetQuest) selectQuest(Number(targetQuest));
+    });
+  });
+
+  // Initial selection
+  selectQuest(3);
+</script>
+</body></html>
