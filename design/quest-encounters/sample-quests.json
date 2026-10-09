@@ -1,0 +1,155 @@
+{
+  "_note": "Design fixture only. Titles and relations mirror internal/quests/demo/demo.go. effortTier and creatureId are local visual mock data, not GitHub fields or the app API.",
+  "source": "demo",
+  "issues": [
+    {
+      "number": 1,
+      "title": "Ship the onboarding flow",
+      "labels": ["epic"],
+      "milestone": "v1",
+      "parent": null,
+      "blockedBy": [],
+      "assignees": [],
+      "closed": false,
+      "effortTier": null,
+      "creatureId": null
+    },
+    {
+      "number": 2,
+      "title": "Design the welcome screen",
+      "labels": ["design"],
+      "parent": 1,
+      "blockedBy": [],
+      "assignees": [],
+      "closed": true,
+      "closedReason": "completed",
+      "pullRequests": [{ "number": 21, "state": "merged" }],
+      "effortTier": "trivial",
+      "creatureId": "dungeon-rat"
+    },
+    {
+      "number": 3,
+      "title": "Build the signup form",
+      "labels": ["feature"],
+      "parent": 1,
+      "blockedBy": [2],
+      "assignees": [],
+      "closed": false,
+      "effortTier": "moderate",
+      "creatureId": "goblin-scout"
+    },
+    {
+      "number": 4,
+      "title": "Validate email addresses",
+      "labels": ["feature"],
+      "parent": 1,
+      "blockedBy": [3],
+      "assignees": [],
+      "closed": false,
+      "effortTier": "moderate",
+      "creatureId": "goblin-scout"
+    },
+    {
+      "number": 5,
+      "title": "Send the welcome email",
+      "labels": ["feature"],
+      "parent": 1,
+      "blockedBy": [4, 7],
+      "assignees": [],
+      "closed": false,
+      "effortTier": "large",
+      "creatureId": "many-eyed-stone-watcher"
+    },
+    {
+      "number": 6,
+      "title": "Login button unresponsive on Safari",
+      "labels": ["bug"],
+      "parent": null,
+      "blockedBy": [],
+      "assignees": ["alice"],
+      "closed": false,
+      "pullRequests": [{ "number": 34, "state": "open" }],
+      "effortTier": null,
+      "creatureId": null
+    },
+    {
+      "number": 7,
+      "title": "Which email provider should we use?",
+      "labels": ["question"],
+      "parent": null,
+      "blockedBy": [],
+      "assignees": [],
+      "closed": false,
+      "effortTier": null,
+      "creatureId": null
+    },
+    {
+      "number": 8,
+      "title": "Write the privacy policy",
+      "labels": ["docs"],
+      "parent": null,
+      "blockedBy": [],
+      "assignees": [],
+      "closed": true,
+      "closedReason": "not planned",
+      "effortTier": null,
+      "creatureId": null
+    },
+    {
+      "number": 9,
+      "title": "Evaluate rate-limit libraries",
+      "labels": ["research"],
+      "parent": null,
+      "blockedBy": [],
+      "assignees": [],
+      "closed": false,
+      "effortTier": null,
+      "creatureId": null
+    },
+    {
+      "number": 10,
+      "title": "Upgrade Node to the latest LTS",
+      "labels": ["chore"],
+      "parent": null,
+      "blockedBy": [],
+      "assignees": ["bob"],
+      "closed": false,
+      "effortTier": null,
+      "creatureId": null
+    },
+    {
+      "number": 11,
+      "title": "Build the admin dashboard",
+      "labels": ["epic"],
+      "milestone": "v2",
+      "parent": null,
+      "blockedBy": [],
+      "assignees": [],
+      "closed": false,
+      "effortTier": null,
+      "creatureId": null
+    },
+    {
+      "number": 12,
+      "title": "List users",
+      "labels": ["feature"],
+      "parent": 11,
+      "blockedBy": [],
+      "assignees": [],
+      "closed": false,
+      "effortTier": null,
+      "creatureId": null
+    },
+    {
+      "number": 13,
+      "title": "Suspend a user",
+      "labels": ["feature"],
+      "parent": 11,
+      "blockedBy": [12],
+      "assignees": [],
+      "closed": false,
+      "effortTier": null,
+      "creatureId": null
+    }
+  ]
+}

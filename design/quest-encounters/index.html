@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quest encounters — right panel study</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #080d12;
+      color: #e9ecee;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button, select { font: inherit; }
+    button { cursor: pointer; }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 218px minmax(360px, 1fr) 392px; }
+    .sidebar { padding: 21px 14px; background: #111820; border-right: 1px solid #27323c; }
+    .brand { margin-bottom: 32px; color: #d7bd8e; font: 24px Georgia, serif; letter-spacing: .02em; }
+    .eyebrow { color: #8f9ca6; font-size: 10px; font-weight: 750; letter-spacing: .15em; text-transform: uppercase; }
+    .campaign { margin-top: 12px; padding: 12px; border: 1px solid #3c4d57; border-radius: 10px; background: #1a252d; }
+    .campaign strong { font-size: 13px; }
+    .campaign small { display: block; margin-top: 5px; color: #a8b3b9; }
+    .sidebar .sub { margin: 16px 0 0 13px; color: #cbd4d8; font-size: 12px; line-height: 2.2; }
+    .sidebar .sub span { color: #d6ae66; }
+    .terminal { min-width: 0; background: #0b1016; }
+    .terminal-head { height: 62px; display: flex; align-items: center; gap: 9px; padding: 0 19px; border-bottom: 1px solid #28343d; color: #b9c5ca; font-size: 12px; }
+    .terminal-head strong { color: #eff1ed; font-size: 13px; }
+    .terminal-head .spacer { flex: 1; }
+    .terminal-head button, .icon-button { background: transparent; border: 1px solid #48555a; color: #cbd6d9; border-radius: 6px; min-width: 27px; height: 27px; }
+    .terminal-body { padding: 27px; color: #94a5a8; font: 12px/1.85 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .terminal-body .green { color: #b3d5ab; }
+    .terminal-body .warm { color: #dfbd82; }
+    .cursor { display: inline-block; width: 7px; height: 15px; background: #b7c7c1; vertical-align: -3px; animation: blink 1.1s steps(1) infinite; }
+    .panel { height: 100vh; min-height: 750px; border-left: 1px solid #42505a; background: #111820; display: grid; grid-template-rows: 62px minmax(380px, 1fr) 8px 348px; }
+    .panel-head { display: flex; align-items: center; gap: 11px; padding: 0 15px; border-bottom: 1px solid #35434b; }
+    .panel-head h1 { margin: 0; font: 18px Georgia, serif; color: #f0dfc0; }
+    .panel-head .spacer { flex: 1; }
+    .toggle { display: inline-flex; padding: 2px; border: 1px solid #4a5b60; border-radius: 7px; background: #0e151b; }
+    .toggle button { background: transparent; border: 0; border-radius: 5px; padding: 4px 8px; color: #aebdc1; font-size: 11px; }
+    .toggle button[aria-pressed="true"] { background: #394e53; color: white; }
+    .map-shell { position: relative; overflow: hidden; }
+    .map-surface { position: relative; width: 100%; height: 100%; min-height: 380px; background-image: linear-gradient(#08131acc, #08131ae0), url('assets/stone-floor.png'); background-size: auto, 620px; }
+    .map-surface::after { content: ""; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 70px 18px #071016ad; }
+    .map-topline { position: absolute; z-index: 4; left: 15px; top: 10px; right: 15px; display: flex; justify-content: space-between; align-items: center; color: #b7c6c9; font-size: 11px; }
+    .map-topline strong { color: #e6ede9; font-weight: 700; }
+    .map-topline button { border: 1px solid #536466; background: #13232a; color: #d6e4df; border-radius: 5px; padding: 4px 7px; font-size: 10px; }
+    .map-world { position: absolute; inset: 0; width: 392px; height: 500px; left: 50%; transform: translateX(-50%); }
+    .hall { position: absolute; z-index: 1; left: 15px; top: 57px; width: 362px; height: 294px; border: 1px solid #66715d; border-radius: 20px; background: radial-gradient(ellipse at 50% 20%, #646d4030, transparent 70%), #101d23aa; box-shadow: 0 0 22px #dfa65318, inset 0 0 35px #c8a45d18; }
+    .hall-name { position: absolute; left: 16px; top: 11px; color: #eed9ab; font-size: 11px; letter-spacing: .02em; }
+    .hall-name span { color: #a9b6b0; }
+    .links { position: absolute; z-index: 1; inset: 0; pointer-events: none; }
+    .links path { fill: none; stroke: #9eb1ad; stroke-width: 2; opacity: .66; }
+    .links path.closed { stroke: #617777; opacity: .52; }
+    .links path.locked { stroke: #d7a45f; stroke-dasharray: 5 4; opacity: .75; }
+    .links .door { fill: #352b25; stroke: #ddae72; stroke-width: 1.5; }
+    .room { position: absolute; z-index: 3; width: 104px; height: 103px; display: flex; align-items: center; flex-direction: column; padding: 4px 3px 5px; border-radius: 12px; border: 1px solid #739496; background: linear-gradient(#20353acc, #122127e8); box-shadow: 0 0 15px #78b7c330, inset 0 0 11px #b7e0e013; color: #f2f4ef; }
+    .room:hover, .room:focus-visible { outline: 2px solid #e9d6a1; outline-offset: 2px; }
+    .room[aria-pressed="true"] { border-color: #efd496; box-shadow: 0 0 0 2px #e5bb73, 0 0 30px #e4ab546b, inset 0 0 15px #f3d09527; }
+    .room.locked { border-color: #8c795f; background: linear-gradient(#282827df, #171c20ed); box-shadow: 0 0 10px #b5864830; }
+    .room.cleared { filter: saturate(.35); opacity: .75; box-shadow: none; }
+    .room.claimed { border-color: #c9a76a; box-shadow: 0 0 18px #e1a34b42; }
+    .room .state { position: absolute; right: 5px; top: 4px; min-width: 17px; height: 17px; line-height: 16px; border-radius: 50%; background: #dbe5dc; color: #132228; font-size: 12px; font-weight: 800; text-align: center; }
+    .room.locked .state { background: #a89883; }
+    .room.cleared .state { background: #adc4bd; }
+    .room.claimed .state { background: #edbd70; }
+    .room .sprite { flex: 0 0 auto; width: 58px; height: 70px; background-repeat: no-repeat; background-size: 232px 77.3px; background-position: 0 -3px; image-rendering: auto; }
+    .sprite.rat { background-image: url('assets/rat-idle-strip.png'); }
+    .sprite.goblin { background-image: url('assets/goblin-idle-strip.png'); }
+    .sprite.eye { background-image: url('assets/many-eyed-idle-strip.png'); }
+    .room.animated .sprite { animation: idle 1.45s steps(4) infinite; }
+    .room .unknown { height: 70px; display: grid; place-items: center; color: #aebbc1; font: 35px Georgia, serif; }
+    .room .number { font-size: 11px; line-height: 1.1; font-weight: 800; }
+    .room .number span { color: #bccbc7; font-weight: 500; }
+    .room .short { max-width: 96px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #c3cecd; font-size: 10px; }
+    .room-2 { left: 30px; top: 104px; }.room-3 { left: 144px; top: 104px; }.room-4 { left: 258px; top: 104px; }
+    .room-5 { left: 258px; top: 246px; }.room-6 { left: 30px; top: 366px; }.room-7 { left: 258px; top: 366px; }
+    .list-view { display: none; position: absolute; inset: 0; padding: 43px 14px 15px; overflow-y: auto; background: #101920; }
+    .list-view.open { display: block; }
+    .list-item { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 53px; margin-bottom: 7px; padding: 7px; border: 1px solid #43565c; border-radius: 8px; text-align: left; color: #e1e8e7; background: #1a282e; }
+    .list-item[aria-current="true"] { border-color: #e2bc79; background: #2d332d; }
+    .list-item .mini { width: 38px; height: 38px; flex: none; overflow: hidden; background-repeat: no-repeat; background-size: 152px 51px; background-position: 0 -5px; }
+    .list-item .mini.rat { background-image: url('assets/rat-idle-strip.png'); }
+    .list-item .mini.goblin { background-image: url('assets/goblin-idle-strip.png'); }
+    .list-item .mini.eye { background-image: url('assets/many-eyed-idle-strip.png'); }
+    .list-item .mini.unknown { display: grid; place-items: center; color: #b6c4c5; font-size: 20px; }
+    .list-item small { display: block; margin-top: 2px; color: #a8b8b8; }
+    .splitter { border-top: 1px solid #5c696a; border-bottom: 1px solid #5c696a; background: repeating-linear-gradient(90deg, transparent 0 7px, #778281 7px 9px, transparent 9px 16px), #263339; background-size: 65px 2px, auto; background-position: center; background-repeat: no-repeat; }
+    .detail { display: flex; min-height: 0; flex-direction: column; }
+    .detail-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 15px 17px 7px; }
+    .detail-top { display: flex; justify-content: space-between; align-items: start; gap: 10px; }
+    .detail h2 { margin: 0; font: 18px/1.3 Georgia, serif; color: #f2e5ce; }
+    .detail h2 span { color: #d2b477; }
+    .detail .chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0; }
+    .chip { padding: 3px 7px; border: 1px solid #536668; border-radius: 4px; background: #223239; color: #d2e0de; font-size: 10px; }
+    .chip.ready { border-color: #80a69a; color: #b9ded1; }
+    .chip.blocked { border-color: #a38765; color: #ebcf9f; }
+    .detail p { color: #c2cfce; margin: 7px 0; font-size: 12px; line-height: 1.5; }
+    .detail .relation { color: #aebdb9; font-size: 11px; }
+    .detail .relation button { border: 0; padding: 0; color: #e1c489; background: transparent; font-size: 11px; text-decoration: underline; }
+    .detail-footer { min-height: 70px; display: flex; gap: 8px; align-items: center; padding: 11px 14px; border-top: 1px solid #34434b; background: #162129; }
+    .detail-footer select { flex: 1; min-width: 0; color: #edf2ee; background: #23333b; border: 1px solid #697b7d; border-radius: 6px; padding: 8px; font-size: 12px; }
+    .detail-footer button { padding: 9px 13px; border: 0; border-radius: 6px; background: #e7d6b4; color: #192229; font-size: 12px; font-weight: 750; }
+    .detail-footer button:disabled { background: #7b8380; color: #283037; cursor: not-allowed; }
+    .detail-footer .reason { font-size: 11px; color: #d9b98a; }
+    .toast { position: fixed; z-index: 20; right: 20px; bottom: 20px; max-width: 360px; background: #34433d; border: 1px solid #e4cb94; padding: 11px 14px; border-radius: 8px; color: white; font-size: 12px; }
+    @keyframes idle { to { background-position-x: -232px; } }
+    @keyframes blink { 50% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .room.animated .sprite, .cursor { animation: none; } }
+    @media (max-width: 920px) { .app { grid-template-columns: minmax(0,1fr) 392px; } .sidebar { display: none; } }
+    @media (max-width: 640px) { .app { display: block; } .terminal { display: none; } .panel { width: min(100vw, 392px); margin: auto; border-right: 1px solid #42505a; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Prototype campaign navigation">
+      <div class="brand">Dungeon Master</div>
+      <div class="eyebrow">Campaigns</div>
+      <div class="campaign"><strong>sample-campaign</strong><small>13 sample quests · no GitHub needed</small></div>
+      <div class="sub">○ Shell</div>
+    </aside>
+    <main class="terminal" aria-label="Prototype terminal">
+      <div class="terminal-head"><strong>sample-campaign</strong><span>·</span><span>demo data</span><span class="spacer"></span><button aria-label="Refresh" title="Prototype only">↻</button></div>
+      <div class="terminal-body"><span class="green">$</span> <span class="cursor"></span><br><br><span class="warm">Select a quest and choose a hero to start an expedition.</span></div>
+    </main>
+    <aside class="panel" aria-label="Quest map prototype">
+      <header class="panel-head"><h1>Map</h1><span class="spacer"></span><div class="toggle" role="group" aria-label="View"><button id="map-toggle" aria-pressed="true">Map</button><button id="list-toggle" aria-pressed="false">List</button></div><button class="icon-button" id="help" aria-label="About this prototype">?</button></header>
+      <section class="map-shell" aria-label="Sample quest visualization">
+        <div class="map-surface">
+          <div class="map-topline"><strong>Onboarding flow <span style="color:#a9b6b0">· 1 of 4 cleared</span></strong><button id="all-button">All 13 quests</button></div>
+          <div class="map-world">
+            <div class="hall"><div class="hall-name">#1 Ship the onboarding flow <span>· hall</span></div></div>
+            <svg class="links" viewBox="0 0 392 500" aria-hidden="true">
+              <path class="closed" d="M134 155 H144" /><path class="locked" d="M248 155 H258" /><path class="locked" d="M310 207 V246" /><path class="locked" d="M310 366 V349" />
+              <rect class="door" x="251" y="147" width="8" height="16" rx="2" /><rect class="door" x="306" y="224" width="8" height="12" rx="2" /><rect class="door" x="306" y="352" width="8" height="11" rx="2" />
+            </svg>
+            <button class="room cleared room-2" data-quest="2" aria-label="#2 Design the welcome screen, cleared, trivial effort" aria-pressed="false"><span class="state">✓</span><span class="sprite rat"></span><span class="number">#2 <span>trivial</span></span><span class="short">Welcome screen</span></button>
+            <button class="room animated room-3" data-quest="3" aria-label="#3 Build the signup form, open, moderate effort" aria-pressed="true"><span class="state">!</span><span class="sprite goblin"></span><span class="number">#3 <span>moderate</span></span><span class="short">Signup form</span></button>
+            <button class="room locked room-4" data-quest="4" aria-label="#4 Validate email addresses, locked by #3, moderate effort" aria-pressed="false"><span class="state">▣</span><span class="sprite goblin"></span><span class="number">#4 <span>moderate</span></span><span class="short">Validate emails</span></button>
+            <button class="room locked room-5" data-quest="5" aria-label="#5 Send the welcome email, locked by #4 and #7, large effort" aria-pressed="false"><span class="state">▣</span><span class="sprite eye"></span><span class="number">#5 <span>large</span></span><span class="short">Welcome email</span></button>
+            <button class="room claimed room-6" data-quest="6" aria-label="#6 Login button unresponsive on Safari, assigned to Alice, effort unknown" aria-pressed="false"><span class="state">@</span><span class="unknown">◇</span><span class="number">#6 <span>unknown</span></span><span class="short">Safari login</span></button>
+            <button class="room room-7" data-quest="7" aria-label="#7 Which email provider should we use, open, effort unknown" aria-pressed="false"><span class="state">!</span><span class="unknown">◇</span><span class="number">#7 <span>unknown</span></span><span class="short">Email provider?</span></button>
+          </div>
+        </div>
+        <div class="list-view" id="list-view" aria-label="Quest list alternative"></div>
+      </section>
+      <div class="splitter" aria-hidden="true"></div>
+      <section class="detail" aria-label="Selected quest detail"><div class="detail-scroll" id="detail"></div><div class="detail-footer" id="footer"></div></section>
+    </aside>
+  </div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script>
+    const quests = {
+      2: {title:'Design the welcome screen', state:'Cleared', effort:'Trivial', creature:'rat', description:'Mockups for the first screen a new user sees. Approved in review.', relation:'Part of #1 · PR #21 merged', start:false},
+      3: {title:'Build the signup form', state:'Ready', effort:'Moderate', creature:'goblin', description:'Collect an email and password. Render the form, submit to the signup API, and show useful errors.', relation:'Part of #1 · #2 cleared', start:true},
+      4: {title:'Validate email addresses', state:'Blocked', effort:'Moderate', creature:'goblin', description:'Reject malformed addresses on the client and the server.', relation:'Part of #1 · blocked by #3', start:false, blocker:3},
+      5: {title:'Send the welcome email', state:'Blocked', effort:'Large', creature:'eye', description:'Send the email once after signup. The email provider decision must be made first.', relation:'Part of #1 · blocked by #4 and #7', start:false, blocker:4},
+      6: {title:'Login button unresponsive on Safari', state:'Assigned to Alice', effort:'Unknown', creature:'unknown', description:'The login button does nothing on Safari 17. Alice has an open pull request.', relation:'PR #34 open', start:true},
+      7: {title:'Which email provider should we use?', state:'Ready', effort:'Unknown', creature:'unknown', description:'Compare price, speed, and reliability, then choose a provider for the welcome email.', relation:'Blocking #5', start:true}
+    };
+    let selected = 3;
+    const detail = document.getElementById('detail');
+    const footer = document.getElementById('footer');
+    const list = document.getElementById('list-view');
+    const toast = document.getElementById('toast');
+    function showToast(message) { toast.textContent = message; toast.hidden = false; clearTimeout(showToast.timer); showToast.timer = setTimeout(() => toast.hidden = true, 3300); }
+    function select(number) {
+      selected = number;
+      const q = quests[number];
+      document.querySelectorAll('.room').forEach(el => el.setAttribute('aria-pressed', String(Number(el.dataset.quest) === selected)));
+      detail.innerHTML = `<div class="detail-top"><h2><span>#${number}</span> ${q.title}</h2><button class="icon-button" id="deselect" aria-label="Deselect quest">×</button></div><div class="chips"><span class="chip ${q.state === 'Blocked' ? 'blocked' : 'ready'}">${q.state}</span><span class="chip">${q.effort} effort</span></div><p>${q.description}</p><p class="relation">${q.relation}</p>`;
+      footer.innerHTML = q.start ? `<select aria-label="Hero"><option>Opus</option><option>Sonnet</option></select><button id="start">▶ Open quest</button>` : `<select aria-label="Hero" disabled><option>Opus</option></select><button disabled>▶ Open quest</button><span class="reason">${q.blocker ? `Blocked by #${q.blocker}` : 'Closed'}</span>`;
+      document.getElementById('deselect').addEventListener('click', () => showToast('Select another room to read its quest.'));
+      document.getElementById('start')?.addEventListener('click', () => showToast(`Prototype only: would open #${number} with the selected hero.`));
+      list.innerHTML = Object.entries(quests).map(([id, item]) => `<button class="list-item" data-list-quest="${id}" aria-current="${Number(id) === selected}"><span class="mini ${item.creature}">${item.creature === 'unknown' ? '◇' : ''}</span><span><strong>#${id} ${item.title}</strong><small>${item.state} · ${item.effort.toLowerCase()} effort</small></span></button>`).join('');
+      list.querySelectorAll('[data-list-quest]').forEach(el => el.addEventListener('click', () => select(Number(el.dataset.listQuest))));
+    }
+    document.querySelectorAll('.room').forEach(el => el.addEventListener('click', () => select(Number(el.dataset.quest))));
+    document.getElementById('map-toggle').addEventListener('click', () => { list.classList.remove('open'); document.getElementById('map-toggle').setAttribute('aria-pressed','true'); document.getElementById('list-toggle').setAttribute('aria-pressed','false'); });
+    document.getElementById('list-toggle').addEventListener('click', () => { list.classList.add('open'); document.getElementById('map-toggle').setAttribute('aria-pressed','false'); document.getElementById('list-toggle').setAttribute('aria-pressed','true'); });
+    document.getElementById('help').addEventListener('click', () => showToast('Design prototype using real sample quest titles. Effort tiers are local mock data, not inferred from GitHub.'));
+    document.getElementById('all-button').addEventListener('click', () => showToast('The full 13-quest layout is a later map interaction. This study tests the hall at actual panel width.'));
+    select(3);
+  </script>
+</body>
+</html>
