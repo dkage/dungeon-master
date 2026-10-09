@@ -7,8 +7,9 @@ AI providers, are also in the roadmap).
 Pick an issue, pick a skill, click a button, and an agent starts in a terminal with the right model, flags and context
 already set.
 
-> Status: early development. The Stitch cockpit, first-run sample flow, glossary, appearance controls and local hero
-> settings are in place. Starting an agent from a selected issue is next (M4); the dependency graph follows in M5a.
+> Status: early development. The Stitch cockpit, first-run sample flow, glossary, appearance controls, local hero
+> settings, and quest-to-session launch flow (M4) are complete. M4.5 adds session attention signals; the dependency
+> graph follows in M5a. The 15-creature art roster is a design resource for the future map renderer.
 > See [PLAN_EXPERIENCE.md](PLAN_EXPERIENCE.md) for the current experience and milestone order, [PLAN_SKILLS.md](PLAN_SKILLS.md)
 > for how skills fit in, [release/](release/README.md) for the release plan, and [PLAN_V2.md](PLAN_V2.md) for ideas
 > that are not in v1.
