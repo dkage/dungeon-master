@@ -413,3 +413,14 @@ Still open:
 
 1. No tabs in the centre (the left panel is the session list): agreed?
 2. Rename `party.toml` to a plain name such as `agents.toml`?
+3. **Dungeon pack fonts.** The v4 prototype (`design/stitch-prototype/`) cannot ship its fonts as they are. Every font
+   must ship in the binary with its licence text (§6.5), and the export has the font files but no licences:
+    - **Cinzel** (headings, labels) and **Fira Code** (code): SIL OFL 1.1, no Reserved Font Name. Keep them; add their
+      `OFL.txt` files. Cinzel has only capitals and small capitals, Latin only, so it suits titles, never body text.
+    - **MedievalSharp**: loaded by the pages but never used. Drop it. It is OFL 1.1 with the Reserved Font Name
+      "MedievalSharp", so a subset we make ourselves would have to be renamed.
+    - **Georgia**, the parchment terminal's body text, is a system font that we cannot ship and that is missing on most
+      Linux machines. Pick an OFL serif in its place (candidates: EB Garamond, Crimson Pro, Cormorant) and compare it
+      against the screenshots.
+    - The terminal itself keeps a monospaced Nerd Font stack (§6.5), so only the panel around it gets the parchment
+      serif. Is the prototype's serif-in-terminal look dropped, or moved to a quest briefing view?
