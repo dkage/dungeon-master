@@ -414,7 +414,8 @@ Still open:
 1. No tabs in the centre (the left panel is the session list): agreed?
 2. Rename `party.toml` to a plain name such as `agents.toml`?
 3. **Dungeon pack fonts.** The v4 prototype (`design/stitch-prototype/`) cannot ship its fonts as they are. Every font
-   must ship in the binary with its licence text (§6.5), and the export has the font files but no licences:
+   must ship in the binary with its licence text (§6.5), and the export has the font files but no licences. Settling
+   this is the first step of the UI work (`PLAN_EXPERIENCE.md` §7.2):
     - **Cinzel** (headings, labels) and **Fira Code** (code): SIL OFL 1.1, no Reserved Font Name. Keep them; add their
       `OFL.txt` files. Cinzel has only capitals and small capitals, Latin only, so it suits titles, never body text.
     - **MedievalSharp**: loaded by the pages but never used. Drop it. It is OFL 1.1 with the Reserved Font Name

@@ -200,6 +200,14 @@ levels), one accent, four state colours (open, claimed, locked, cleared) with a 
 type scale, and one monospace stack shared with the terminal theme. Dark is the default look; light follows the system.
 Tokens live in one file; components reference tokens only.
 
+**First step of the UI work: settle the fonts.** Before any token or component, close the font question in `PLAN_UI.md`
+§9 (open question 3), because the type scale and the font tokens depend on it:
+
+1. Render the v4 prototype's parchment panel (`design/stitch-prototype/v4/`) with each OFL serif candidate in place of
+   Georgia: EB Garamond, Crimson Pro and Cormorant.
+2. Compare them side by side with the Stitch screenshot, at the app's real sizes, on macOS and Linux.
+3. Record the choice in `PLAN_UI.md`, and bundle the chosen font, Cinzel and Fira Code with their `OFL.txt` files.
+
 ### 7.3 State language
 
 One set of markers used everywhere (list, map, tabs, sidebar):
