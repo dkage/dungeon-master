@@ -12,7 +12,7 @@ The three existing sheets are the style anchors and count toward the total.
 | Low | Small, bounded change; roughly 2–3 points | `kobold-scout` → `kobold-idle-strip.png`; `cave-beetle` → `beetle-idle-strip.png`; `cave-spider` → `spider-idle-strip.png` |
 | Moderate | Several steps or a few related files; roughly 3–5 points | `goblin-scout` → `goblin-idle-strip.png`; `skeleton-guard` → `skeleton-idle-strip.png`; `crypt-ghoul` → `ghoul-idle-strip.png` |
 | High | Broad change, substantial uncertainty, or many dependent tasks | `orc-raider` → `orc-idle-strip.png`; `stone-troll` → `troll-idle-strip.png`; `dungeon-warlock` → `warlock-idle-strip.png` |
-| Epic | Large initiative or boss-sized parent with a substantial child quest chain | `many-eyed-stone-watcher` → `many-eyed-idle-strip.png`; `crypt-lich` → `lich-idle-strip.png`; `ember-dragon` → `dragon-idle-strip.png` |
+| Large / epic | Large initiative or boss-sized parent with a substantial child quest chain | `many-eyed-stone-watcher` → `many-eyed-idle-strip.png`; `crypt-lich` → `lich-idle-strip.png`; `ember-dragon` → `dragon-idle-strip.png` |
 
 Point ranges are illustrative and should be replaced by the project's chosen
 estimate source. Child count can increase the parent encounter's scale, but
