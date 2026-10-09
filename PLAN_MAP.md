@@ -14,8 +14,8 @@ The parts of the experience we want:
   Blocked-by and parent links are lines between points.
 - Clicking a point highlights it (brighter, its links emphasised) and shows the quest in the lower part of the right
   panel. The split between map and detail can be resized.
-- The bottom of the detail has the launch controls: the hero picker on the left, the recommended spell as the main
-  button on the right, and a "More" menu for the other spells.
+- The bottom of the detail has pinned launch controls: a hero/model picker, a skill picker defaulted to the
+  recommendation (with None available), and Start. The selected skill runs as the session opener.
 
 Constraints:
 
@@ -41,7 +41,7 @@ Constraints:
 │              │                                  │ open · feature · blocked by… │
 │              │                                  │ (markdown body, scrolls)     │
 │              │                                  │                              │
-│ + Add        │                                  │ [Opus ▾]   [/tdd] [More ▾]   │
+│ + Add        │                                  │ [Opus ▾] [/tdd ▾] [▶ Start]  │
 └──────────────┴──────────────────────────────────┴──────────────────────────────┘
 ```
 
@@ -52,17 +52,16 @@ This is better than the stage tabs proposed in `PLAN_EXPERIENCE.md` §3, where t
 the centre. With the map on the right you watch the agents and the map together, which is the point of a cockpit.
 
 - **Right column**: map on top, quest detail below, a draggable splitter between them. Both sizes are remembered per
-  window. The column itself is resizable (default about 38% of the width, minimum 360 px).
+  window. The column itself is resizable (about half the window on a wide desktop, minimum 360 px, while keeping the
+  centre terminal usable).
 - **Map | List toggle** at the top of the map. The list (M3's panel) is the precise, searchable view of the same data,
   and the accessible alternative to the map. Selection is shared: picking in one picks in the other.
 - **Detail footer**, pinned, never scrolls away:
-    - left: **hero picker** (combo), defaulting to the campaign's last-used hero, then the global default;
-    - right: **recommended spell** as the primary button ("Start with /tdd"), then **More** with the other spells
-      grouped
-      Plan / Do / Check, plus a plain **Open** button that starts the hero on the quest without a spell (see
-      `PLAN_UI.md` §5.3).
-    - The button says what will happen: hero, spell and quest. Disabled states say why ("claude not found", "another
-      session is working in this folder").
+    - **hero/model picker** defaults to the campaign's last-used hero, then the global default;
+    - **skill picker** defaults to the recommendation, groups other skills Plan / Do / Check, and offers None for a
+      plain quest session (see `PLAN_UI.md` §5.3);
+    - **Start** launches the chosen hero and invokes the chosen skill as the opener. Disabled states say why ("claude
+      not found", "another session is working in this folder").
 - **Expand the map**: one key (M) or a button makes the map fill the centre temporarily, for large repositories. Escape
   returns. The terminal keeps running.
 - **Narrow screens**: the right column becomes a drawer (as today), with map and detail stacked.
@@ -107,16 +106,16 @@ detail footer. So a locked quest can always be opened and read, it just cannot b
 
 | Quest state          | Can read | Can start | Footer shows                                                  |
 |----------------------|----------|-----------|---------------------------------------------------------------|
-| Open                 | yes      | yes       | hero combo, recommended spell, More                           |
+| Open                 | yes      | yes       | hero/model combo, skill combo, Start                           |
 | Needs you            | yes      | n/a       | "Go to session" instead of Start (the session already exists) |
 | In progress (agent)  | yes      | n/a       | "Go to session"                                               |
 | Assigned (elsewhere) | yes      | yes       | Start, with a note: "assigned to @alice"                      |
-| Locked               | yes      | **no**    | spell buttons greyed out, with "Blocked by #41, #43" as links |
-| Cleared              | yes      | no        | spell buttons greyed out, "Closed"                            |
+| Locked               | yes      | **no**    | Start disabled, with "Blocked by #41, #43" as links           |
+| Cleared              | yes      | no        | Start disabled, "Closed"                                      |
 | Outside scope (stub) | yes      | no        | a short summary and "Show in scope" / "Open on GitHub"        |
 
-- Disabled buttons stay visible, so the user sees what would be offered once the blockers clear. The reason is next to
-  the buttons, not only in a tooltip, and each blocker is a link that selects it on the map, so the user can walk the
+- Disabled launch controls stay visible, so the user sees what would be offered once the blockers clear. The reason is
+  next to Start, not only in a tooltip, and each blocker is a link that selects it on the map, so the user can walk the
   chain to the quest that is actually startable.
 - Double-click on a startable room starts it with the footer's current hero and spell; on any other room it only
   selects.
@@ -209,8 +208,8 @@ repositories, and only behind the same interface.
 
 **A + B + C**, with the right-column layout from §2:
 
-1. Right column: map on top, detail below, resizable splitter, Map | List toggle, pinned footer with hero combo,
-   recommended spell button and More.
+1. Right column: map on top, detail below, resizable splitter, Map | List toggle, pinned footer with hero/model combo,
+   skill combo (recommended by default or None), and Start.
 2. Plain graph with halls for parents, outskirts for unlinked quests, door markers on blocked-by links, out-of-scope
    stubs.
 3. Torchlight skin: dark floor, lit and dark rooms, warm flicker for active sessions.
@@ -226,7 +225,7 @@ Later, with an art direction: E, and only then F.
 
 On a real repository with at least 30 open issues and some blocked-by links: a person can say which quests are
 startable, which are blocked and by what, and which one an agent is working on, within ten seconds and without reading
-the list. Selecting a room and pressing the main button starts the right hero with the right spell on that quest.
+the list. Selecting a room and pressing Start launches the selected hero with the selected skill or None on that quest.
 
 ## 7. Accessibility and tests
 
@@ -249,10 +248,10 @@ then shows a meaningful map within seconds, before any GitHub setup.
 
 - `PLAN_EXPERIENCE.md` §3: replace "stage tabs: map and one tab per expedition" with the right-column layout in §2 of
   this file; the terminal keeps the full centre.
-- `PLAN_EXPERIENCE.md` §3 and §7.5: the primary button moves into the detail footer with the hero combo on the left and
-  the recommended spell on the right, as already planned; add the "More" menu and the plain "Open" button (no spell).
+- `PLAN_EXPERIENCE.md` §3 and §7.5: launch controls move into the detail footer with a hero/model combo, a skill combo
+  defaulted to the recommendation or None, and Start. None gives a plain quest session without a skill.
 - `PLAN_EXPERIENCE.md` §7.4: point to this file for the map design.
-- `PLAN_SKILLS.md` §6: the spell strip becomes the footer's main button plus More, not a separate strip.
+- `PLAN_SKILLS.md` §6: the spell strip becomes the footer's skill combo, not a separate strip.
 - `GLOSSARY.md`: "hall" and "outskirts" are drawing terms, not new vocabulary; if shown at all, they appear as plain
   "group" and "unlinked" in the popover.
 

@@ -57,7 +57,8 @@ Consequences:
 
 ## 3. Our model: quest → suggested spell → hero
 
-Each quest gets a **suggested spell** from simple rules, shown as the primary button. You can always override.
+Each quest gets a **suggested spell** from simple rules, preselected in the detail footer's skill combo. You can
+override it or choose None.
 
 | Quest looks like                 | Suggested spell                                                |
 |----------------------------------|----------------------------------------------------------------|
@@ -112,10 +113,12 @@ Principle: **own as little as possible.** Start with zero forked skills; add one
 
 ## 6. UI
 
-- **Spell strip** (right-bottom): grouped Plan / Do / Check; each card shows name, one-line description, source, and a
-  **manual** badge for user-invoked skills. Disabled with a hint when a skill needs something we can't provide (e.g. a
-  skill that spawns subagents but hero is Haiku? keep simple: no hints in v1).
-- **Per-room primary button**: "Summon *<default hero>* with */<suggested spell>*". A dropdown changes hero or spell.
+- **Skill combo** (pinned quest footer): groups available skills Plan / Do / Check, with name, one-line description,
+  source, and a **manual** badge for user-invoked skills. None starts a plain quest session. Show unavailable skills
+  with a reason when a required source or capability is missing.
+- **Per-room launch**: the hero/model combo defaults to the campaign's last-used hero; the skill combo defaults to the
+  suggested spell or None. Pressing Start invokes the selected skill automatically in the session opener. Changing a
+  combo alone never launches. The Brief preview reflects both selections.
 - **Map page**: for a `wayfinder:map` room, buttons are "Work next ticket" (frontier) and "Chart more".
 - **Free session** still available with no spell.
 - Settings: spellbooks list (add folder / git URL, pin, refresh), and the quest→spell rules table.
@@ -124,10 +127,10 @@ Principle: **own as little as possible.** Start with zero forked skills; add one
 
 Replaces the M5 outline in `PLAN.md`:
 
-- **M5a** Discovery (`.claude/skills`, `~/.claude/skills`, plugin dirs, registered spellbooks), frontmatter parse, spell
-  strip, manual badge.
+- **M5a** Discovery (`.claude/skills`, `~/.claude/skills`, plugin dirs, registered spellbooks), frontmatter parse,
+  skill combo, manual badge.
 - **M5b** Git spellbooks with pinning; tracker-facts + safety injection; launch `/skill <url>`.
-- **M5c** Suggested-spell rules table + per-room primary button.
+- **M5c** Suggested-spell rules table + preselection in the per-room skill combo.
 - **M6** (map) gets the wayfinder mapping from §2 (glyphs, fog, frontier).
 
 ## 8. Open questions

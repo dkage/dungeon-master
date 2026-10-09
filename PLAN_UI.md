@@ -21,7 +21,7 @@ This file describes behaviour in our own terms.
 │ │ Sample [sample]│ │                                  │ feature · open · ready  [Brief]  │
 │ └────────────────┘ │                                  │ (markdown body)                  │
 │                    │                                  │                                  │
-│ ⚙ Settings        │                                  │ [Opus ▾] [Open] [▶ /tdd] [More▾] │
+│ ⚙ Settings        │                                  │ [Opus ▾] [/tdd ▾] [▶ Start]      │
 └────────────────────┴──────────────────────────────────┴──────────────────────────────────┘
 ```
 
@@ -143,26 +143,30 @@ Layout and map behaviour are in `PLAN_MAP.md` §2 and §3. The controls around t
 
 ### 5.3 Detail footer (pinned)
 
-- Left: **hero combo** with the hero's crest or glyph. Defaults to the campaign's last-used hero.
-- Right: the **recommended spell** as the white primary button, labelled with the spell (`▶ /tdd`), then **More**:
-  other spells grouped Plan / Do / Check and any custom buttons (§6.2).
-- Between them, a plain **Open** button (secondary style): starts the selected hero on this quest **without a
-  spell**. The agent gets the quest's briefing and the safety instructions, and the opener only says "read the brief";
-  no skill is invoked, so the user leads the conversation. It is a visible button, not buried in More, because talking
-  the quest through before choosing an approach is a normal way to start.
-- When a quest has no recommended spell (no rule matches, or no spells are installed), **Open** becomes the primary
-  button and the spell buttons collapse into More.
+- **Hero / model combo**: choose a configured hero, whose configuration determines the Claude Code model and launch
+  flags. Show its crest or glyph and model name. Default to the campaign's last-used hero.
+- **Spell / skill combo**: choose one available skill for this quest. Default to the recommended skill when one exists;
+  include **None — open without a skill** as an explicit option. Group other skills Plan / Do / Check and show their
+  source and availability. When no recommendation exists, default to None. The user can override either default.
+- **Start**: one deliberate action launches the selected hero on the selected quest. If a skill is selected, invoke it
+  automatically as the opener when the hero starts, with the quest context; no second manual skill command is needed.
+  If None is selected, start a plain quest session with its briefing and safety instructions, and an opener that only
+  says to read the brief. Choosing a value in either combo does not itself launch anything.
+- Keep both combos and Start visible while the detail body scrolls. At a 392 px panel width, wrap the controls into
+  two compact rows if needed rather than truncating skill names. The **Brief** preview reflects the current hero,
+  skill or None, opener, appended instructions and briefing file.
 - A hero with no quest at all (a free session) is not started from here; that is the campaign card's `+` menu (§2.3).
 
-| Footer action    | Hero | Quest briefing | Skill invoked | Where                    |
-|------------------|------|----------------|---------------|--------------------------|
-| `▶ /tdd` (spell) | yes  | yes            | yes           | footer, primary          |
-| Open             | yes  | yes            | no            | footer, secondary        |
-| Free session     | yes  | no             | no            | campaign card `+` menu   |
-| Shell here       | no   | no             | no            | right panel header, card |
+| Footer action     | Hero | Quest context | Skill invoked | Where                    |
+|-------------------|------|---------------|---------------|--------------------------|
+| Start with skill  | yes  | yes           | yes           | detail footer            |
+| Start with None   | yes  | yes           | no            | detail footer            |
+| Free session      | yes  | no            | no            | campaign card `+` menu   |
+| Shell here        | no   | no            | no            | right panel header, card |
 
-- Disabled states say why next to the buttons, not only in a tooltip. A locked quest keeps its spell buttons
-  visible but greyed out, with "Blocked by #41, #43" as links that select the blockers (rules in `PLAN_MAP.md` §3).
+- Disabled states say why next to Start, not only in a tooltip. A locked or closed quest keeps both combos and Start
+  visible, but Start is disabled; "Blocked by #41, #43" links select the blockers (rules in `PLAN_MAP.md` §3). A quest
+  with an active session offers **Go to session** instead of starting a duplicate.
 
 ## 6. Settings
 
@@ -214,12 +218,12 @@ Three parts, matching `PLAN_SKILLS.md`:
 1. **Sources**: discovered sources (the project's skills folder, the user's, installed plugins) listed read-only with a
    skill count; registered sources (a folder or a git URL pinned to a commit) with enable, order (drag), refresh,
    remove, and **Add source**. Order is precedence when two sources have a skill with the same name.
-2. **Recommendation rules**: which spell becomes the main button for which kind of quest. A table of rows such as
+2. **Recommendation rules**: which spell is preselected in the quest footer for which kind of quest. A table of rows such as
    `label bug → /diagnosing-bugs`, `label research → /research`, `anything else → /implement`, each a combo of the
    discovered spells, with a link that reveals the skill on disk.
-3. **Custom buttons**: the user binds any spell to a named button, optionally with fixed extra text after the spell
-   (`/research` + "focus on security"). Custom buttons appear in **More**, and can be pinned so they also show next to
-   the main button. This is how new skills become new buttons without code.
+3. **Skill presets**: the user binds a skill to a named preset, optionally with fixed extra text after the skill
+   (`/research` + "focus on security"). Presets appear as entries in the skill combo. This is how new skills become
+   launch choices without code.
 
 Milestone: M5b (spells).
 
@@ -380,11 +384,11 @@ bindings; the R1 smoke test opens Settings with ⌘, and pastes into a text fiel
 - **M3.6**: in-page shortcuts (§7.2), campaign `+` with the folder picker, campaign card menus, scratch shell, the
   Settings page with Heroes, Local files and Appearance & words, including the theme and
   palette pickers (§6.5).
-- **M4**: detail footer with hero combo and main button, Brief preview, quest chip in the centre header, Terminal
-  settings.
+- **M4**: detail footer with hero combo, None skill choice and Start, Brief preview, quest chip in the centre header,
+  Terminal settings.
 - **M4.5**: "needs you" state dots, Dock or taskbar badge, Notifications settings.
 - **M5a**: the right-panel map, Map / List, expand, drilling into halls (`PLAN_MAP.md`).
-- **M5b**: Spells settings (sources, recommendation rules, custom buttons) and the More menu contents.
+- **M5b**: Spells settings (sources, recommendation rules, skill presets) and the populated skill combo.
 - **R1** (release): native menus with Settings on ⌘, and the standard Edit menu (§7.1), window state.
 - **Later**: session titles, art for hero crests.
 
@@ -395,7 +399,7 @@ Decided (2026-10-08):
 1. Settings is a **modal** over the whole window (§6).
 2. The app **owns the heroes file**; users edit heroes in Settings and never need the file (§6.1).
 3. The **scratch shell** stays, as `>_` next to the campaigns header (§2.2).
-4. Custom buttons are **global** for now. Per-campaign buttons are a later idea (`PLAN_V2.md`).
+4. Skill presets are **global** for now. Per-campaign presets are a later idea (`PLAN_V2.md`).
 5. A locked quest **cannot be started**: no "start anyway" override (`PLAN_MAP.md` §3).
 
 Still open:
