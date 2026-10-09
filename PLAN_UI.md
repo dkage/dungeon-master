@@ -344,7 +344,7 @@ is mostly data, not a rewrite:
 Milestones: M3.6 applies the Stitch v4 visual foundation to the Svelte cockpit shell, records the Dungeon/Neutral theme
 choice, ships the glossary and font controls, and establishes the right-panel split. Full theme-pack data seams,
 multiple palettes, pack completeness and contrast tests are deferred until a second pack is approved; do not build a
-generic pack framework ahead of that need. M5a fills the reserved map area with the interactive graph. New packs, such
+generic pack framework ahead of that need. M5a fills the reserved map area with the sprite-backed interactive graph. New packs, such
 as a starship pack, are a later initiative in `PLAN_V2.md`.
 
 ## 7. Keyboard and platform conventions
@@ -418,8 +418,8 @@ bindings; the R1 smoke test opens Settings with ⌘, and pastes into a text fiel
 - **M4.5**: "needs you" state dots, Dock or taskbar badge, Notifications settings; Settings navigation and Local
   files section; browser keyboard shortcuts and shortcut help; session terminal settings. Keep native app menus and
   window state in R1.
-- **M5a**: the graph in the map area established in M3.6, Map / List behavior, expand, and drilling into halls
-  (`PLAN_MAP.md`).
+- **M5a**: the sprite-backed graph in the map area established in M3.6; stable per-issue creature assignment from
+  known effort tiers, separate state markers, Map / List behavior, expand, and drilling into halls (`PLAN_MAP.md`).
 - **M5b**: Spells settings (sources, recommendation rules, skill presets) and the populated skill combo.
 - **R1** (release): native menus with Settings on ⌘, and the standard Edit menu (§7.1), window state.
 - **Later**: automatic titles for free sessions, art for hero crests.

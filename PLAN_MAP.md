@@ -1,7 +1,8 @@
 # Map and right panel: design
 
 Design for the map (M5a and M6 in `PLAN_EXPERIENCE.md` §4) and the right-hand panel around it. The right-column
-composition is decided and its shell belongs in M3.6; M5a implements the graph inside the reserved map region.
+composition is decided and its shell belongs in M3.6; M5a implements the graph and sprite-backed rooms inside the
+reserved map region.
 
 The Stitch v4 prototype is the visual reference for the shell. This document specifies map behavior; `PLAN_UI.md`
 specifies the surrounding controls. Where the generated prototype differs from those behavior plans, the plans win.
@@ -10,8 +11,9 @@ specifies the surrounding controls. Where the generated prototype differs from t
 
 The parts of the experience we want:
 
-- Every open quest is a point on a map. Quests being worked in a terminal right now look different (brighter, warmer).
-  Blocked-by and parent links are lines between points.
+- Every open quest is a room on a map. A known effort tier selects an original creature sprite from
+  `design/quest-encounters/CREATURE_ROSTER.md`; creatures being worked in a terminal look different (brighter, warmer).
+  Blocked-by and parent links are lines between rooms.
 - Clicking a point highlights it (brighter, its links emphasised) and shows the quest in the lower part of the right
   panel. The split between map and detail can be resized.
 - The bottom of the detail has pinned launch controls: a hero/model picker, a skill picker defaulted to the
@@ -19,9 +21,10 @@ The parts of the experience we want:
 
 Constraints:
 
-- **No game engine and no sprite pipeline for the MVP.** SVG, CSS and a layout library. Art can come later behind the
-  same interface, and it is not ruled out.
-- The theme comes from **light, shape and a few glyphs**, not from illustrations.
+- **No game engine.** M5a uses Svelte, SVG, CSS, a layout library, and the generated creature sheets in the Dungeon
+  theme. Keep a plain SVG fallback for unknown effort, missing assets, Neutral mode, and reduced motion.
+- Creatures communicate **effort**; light, shape, and glyphs communicate **state**. Never make the creature species
+  carry blocked, active, assigned, or cleared state.
 - Readable first: a user must understand the state of a repository at a glance, in both theme modes.
 - Works with the plain-words mode (`PLAN_M3_7.md` §2.9): the map has a plain rendering too.
 - Fast enough for about 300 quests, accessible by keyboard and screen reader, testable without a browser for the
@@ -141,21 +144,43 @@ The same graph drawn as a dark floor plan where **light carries the state**:
 
 - Background: near-black stone texture made with a CSS gradient and a little noise (an SVG `feTurbulence` filter), no
   image files.
-- Rooms: rounded rectangles with a thin stone border; the room's light is a radial gradient behind it. Open rooms glow
-  cool, active rooms glow warm and **flicker** (a slow, slightly random CSS opacity animation), locked rooms are dark.
+- Rooms: rounded rectangles with a thin stone border; a readable creature sprite sits in the room above or alongside
+  the issue number. The room's light is a radial gradient behind it. Open rooms glow cool, active rooms glow warm and
+  **flicker** (a slow, slightly random CSS opacity animation), locked rooms are dark.
 - Corridors: the links, drawn as soft lines with a faint glow where both ends are lit.
 - Fog: everything outside the selected hall or the startable set can dim into darkness (a mask), toggled by "focus".
 - `prefers-reduced-motion` turns the flicker into a steady glow.
 
-Effort: small to medium, all SVG and CSS. It gives the "dark dungeon crawler" feeling without a single sprite, and it
-degrades well: remove the filters and it is direction A.
+Effort: medium, using SVG and CSS around the sprite sheets. It gives the "dark dungeon crawler" feeling while keeping
+the graph legible; remove the filters and sprites and it degrades to direction A.
 
-### C. Quest markers
+### C. Effort-creature sprites (M5a)
+
+M5a uses the 15 generated sprite sheets as the creature layer inside SVG quest rooms. They are part of the first map
+renderer, not a later portrait pass.
+
+- Resolve an explicit local creature override first, then an explicit estimate or a configured mapping from existing
+  issue labels to the five roster tiers. For a parent without an estimate, child count may raise the parent's tier or
+  room scale. Priority remains a separate urgency marker and never changes effort tier.
+- If no reliable tier is available, use the neutral room fallback; do not guess from the title. Unknown effort must
+  remain obvious in the room and detail.
+- Choose a creature deterministically from the selected tier using the stable issue key described in
+  `design/quest-encounters/CREATURE_ROSTER.md`. Persist the chosen creature ID in user state so content edits and
+  later roster additions do not remap an issue. Never write this assignment to the repository or GitHub.
+- At readable zoom, show the four-frame idle strip in the creature window. With reduced motion, show a fixed frame.
+  Below the readable zoom threshold, simplify rooms to their state mark and number rather than drawing tiny art.
+- In List mode, keep the same selected issue and may show its small creature marker beside the effort label; the list
+  remains fully usable if images fail to load.
+
+The tier definitions, sheet dimensions, style anchors and local assignment rule live in
+`design/quest-encounters/CREATURE_ROSTER.md`. The sheets are original design assets and are never fetched at runtime.
+
+### D. Quest markers
 
 `!`, `?` and grey `!` above rooms (see §3), drawn as text in a bold display face with a small glow. Cheap, strongly
 themed, and readable even at small sizes. Works on top of A or B.
 
-### D. Hero tokens
+### E. Hero tokens
 
 Each running session places its hero's **token** on its room: a small circle with a glyph, ringed in the hero's
 colour. Tokens are generated, not drawn:
@@ -166,18 +191,18 @@ colour. Tokens are generated, not drawn:
 When an expedition starts, the token appears at the room; when it ends, it fades. Several tokens can share a room.
 This makes "which agent is where" visible at a glance and is the closest to "characters" without art.
 
-### E. Portraits and dark digital art (later)
+### F. Portraits and dark digital art (later)
 
 Hand-made or commissioned portraits per hero class, a stone-and-ember UI frame, room illustrations by label. This is
 where a "Diablo-like" look would come from. It needs an art direction, a style guide and licensed or original assets
 (our own, or CC0 packs with their notices). It fits behind the same renderer interface and the same tokens, so it can
 come later without redesign.
 
-### F. Floors, isometric or sprite maps (later)
+### G. Floors, isometric or sprite maps (later)
 
-Milestones as stacked floors (isometric), tile-based rooms, animated sprites walking corridors. The most game-like and
-the most expensive: layout becomes spatial design, not a graph. Only after the plain map has proved useful on real
-repositories, and only behind the same interface.
+Milestones as stacked floors (isometric), tile-based rooms, and animated creatures walking corridors. This is distinct
+from the M5a sprite-backed graph: here layout becomes spatial design, not a graph. Only after the M5a map proves useful
+on real repositories, and only behind the same renderer interface.
 
 ### Comparison
 
@@ -185,10 +210,11 @@ repositories, and only behind the same interface.
 |------------------|--------------|----------------|-------------|------------|
 | A. Plain graph   | small        | none           | high        | MVP (base) |
 | B. Torchlight    | small–medium | strong         | high        | MVP        |
-| C. Quest markers | tiny         | strong         | high        | MVP        |
-| D. Hero tokens   | small        | medium         | high        | M6         |
-| E. Portraits     | large        | very strong    | medium      | later      |
-| F. Isometric     | very large   | very strong    | medium–low  | later      |
+| C. Creature sprites | medium    | very strong    | high        | M5a        |
+| D. Quest markers    | tiny      | strong         | high        | M5a        |
+| E. Hero tokens      | small     | medium         | high        | M6         |
+| F. Portraits        | large     | very strong    | medium      | later      |
+| G. Isometric         | very large| very strong    | medium–low  | later      |
 
 ## 5. How it is built
 
@@ -206,20 +232,20 @@ repositories, and only behind the same interface.
 
 ## 6. Recommended MVP
 
-**A + B + C**, with the right-column layout from §2:
+**A + B + C + D**, with the right-column layout from §2:
 
 1. Right column: map on top, detail below, resizable splitter, Map | List toggle, pinned footer with hero/model combo,
    skill combo (recommended by default or None), and Start.
 2. Plain graph with halls for parents, outskirts for unlinked quests, door markers on blocked-by links, out-of-scope
-   stubs.
-3. Torchlight skin: dark floor, lit and dark rooms, warm flicker for active sessions.
-4. `!`, grey `!` and `?` markers.
-5. Plain-words mode shows skin A with plain state names.
+   stubs, and a readable fallback for unknown effort or missing sprites.
+3. Torchlight skin: dark floor, creature sprites in readable rooms, lit and dark states, warm flicker for active sessions.
+4. `!`, grey `!` and `?` markers; creature identity remains independent of status.
+5. Plain-words and Neutral modes show skin A with plain state names and no reliance on creature art.
 
-Then M6: hero tokens (D), fog and focus, collapse and expand halls, stable-position animation, cleared-room toggle,
+Then M6: hero tokens (E), fog and focus, collapse and expand halls, stable-position animation, cleared-room toggle,
 milestones as a filter (not floors yet).
 
-Later, with an art direction: E, and only then F.
+Later, with an art direction: F, and only then G.
 
 ### Exit test for the MVP
 
@@ -257,9 +283,10 @@ then shows a meaningful map within seconds, before any GitHub setup.
 
 ## 10. Remaining design questions
 
-1. MVP skin: torchlight (B) with markers (C), or start with plain (A) only and add the skin in M6?
-2. Should cleared quests show by default (faint) or be hidden until toggled?
-3. Hero tokens: generated geometric faces, or user-chosen class glyphs?
-4. Do halls (parents as regions) read better than parent links drawn as lines? Worth a quick prototype of both on the
+1. Should cleared quests show by default (faint) or be hidden until toggled?
+2. Hero tokens: generated geometric faces, or user-chosen class glyphs?
+3. Do halls (parents as regions) read better than parent links drawn as lines? Worth a quick prototype of both on the
    sample data.
-5. Is a later art direction (E) a goal for v1, or a v2 item for `PLAN_V2.md`?
+
+Resolved: M5a includes the torchlight skin, state markers, and creature sprites. The 15-sheet roster and its consistent
+art direction are in `design/quest-encounters/`; only walking sprites and isometric floors remain later work.

@@ -44,8 +44,8 @@ Open [roster.html](./roster.html) to compare all strips together by effort tier.
 Each strip is 2172 × 724 RGBA, with four 543 px wide cells. The mockup displays
 each cell inside a 58 × 70 px window. These are **prototype sprites**, not final
 animation masters: inspect the frame edges and baseline at native size before
-shipping. The stone texture has not been verified as mathematically seamless,
-so the mockup avoids a visible repeat.
+using them in the M5a runtime renderer. The stone texture has not been verified
+as mathematically seamless, so the mockup avoids a visible repeat.
 
 `preview-panel.png` is the actual-width map and detail. `preview.png` shows the
 whole cockpit. `preview-list.png` shows the list alternative after selecting a

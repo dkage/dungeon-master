@@ -25,14 +25,18 @@ These choices shaped the milestone order and remain the current direction unless
 The content of each is in `PLAN_EXPERIENCE.md` §4; this is only what is not started.
 
 - **M4.5 Attention**: "needs you" from PTY output recency, tab title and favicon badge, optional OS notification.
-- **M5a Map v1** (`PLAN_MAP.md`, `PLAN_UI.md`): implement the read-only layered graph inside the map region reserved
-  in M3.6; blocked-by and parent edges, click selects, double-click starts. It must not hide blockers outside the scope
-  (`PLAN_M3_7.md` 2.6).
+- **M5a Map v1** (`PLAN_MAP.md`, `PLAN_UI.md`): implement the read-only Svelte/SVG graph inside the map region
+  reserved in M3.6, using the 15 generated sprite sheets as creature art for rooms with known effort tiers. Keep
+  per-issue creature assignments stable in local user state; show state with separate markers; retain a readable
+  fallback for unknown effort or missing art; honor reduced motion. Include blocked-by and parent edges, click selects,
+  double-click starts. It must not hide blockers outside the scope (`PLAN_M3_7.md` 2.6).
 - **M5b Spells** (`PLAN_SKILLS.md`), **M6 Map v2**, **M7 Hooks status**, **M8 Packaging**.
 
 The 15-creature effort roster and style-matched prototype sheets are now in
-`design/quest-encounters/`. They are design assets for the future map renderer;
-M5a should keep issue identity and state readable when sprites are unavailable.
+`design/quest-encounters/`. They are the planned art inputs for the first M5a
+renderer; before runtime use, inspect frame edges and baseline at native size as
+specified in that directory's README. The no-art fallback still needs to keep
+issue identity and state readable.
 
 ## 3. Left over from M3.5
 

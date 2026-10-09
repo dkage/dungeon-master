@@ -9,7 +9,8 @@ already set.
 
 > Status: early development. The Stitch cockpit, first-run sample flow, glossary, appearance controls, local hero
 > settings, and quest-to-session launch flow (M4) are complete. M4.5 adds session attention signals; the dependency
-> graph follows in M5a. The 15-creature art roster is a design resource for the future map renderer.
+> graph with creature sprites follows in M5a. The 15-creature roster and prototype sheets in `design/quest-encounters/` are
+> the planned art inputs for that first renderer.
 > See [PLAN_EXPERIENCE.md](PLAN_EXPERIENCE.md) for the current experience and milestone order, [PLAN_SKILLS.md](PLAN_SKILLS.md)
 > for how skills fit in, [release/](release/README.md) for the release plan, and [PLAN_V2.md](PLAN_V2.md) for ideas
 > that are not in v1.

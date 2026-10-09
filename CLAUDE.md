@@ -6,8 +6,9 @@ webview shell.
 
 Status: M0-M4 done. M3.5 (GitHub budget, scope and the `gh` shim, `PLAN_M3_5.md`) is done except the deferred SQLite
 copy and write queue (phases C and D). M3.6 (Stitch v4 cockpit shell, first run and words; `PLAN_EXPERIENCE.md`) and
-M4 (quest briefing, launch, and session linkage) are done. M4.5 attention signals are next, followed by M5a's graph in
-the reserved map area. The 15-creature roster and shared sprite art direction are in `design/quest-encounters/`;
+M4 (quest briefing, launch, and session linkage) are done. M4.5 attention signals are next, followed by M5a's
+sprite-backed graph in the reserved map area. The 15-creature roster and shared sprite art direction are in
+`design/quest-encounters/`;
 future creature art must follow `design/quest-encounters/ART_DIRECTION.md`. Themed words: `GLOSSARY.md`.
 
 ## Scope and principles
