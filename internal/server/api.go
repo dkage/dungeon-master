@@ -6,10 +6,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/dkage/dungeon-master/internal/campaign"
+	"github.com/dkage/dungeon-master/internal/fsutil"
 	"github.com/dkage/dungeon-master/internal/history"
+	"github.com/dkage/dungeon-master/internal/party"
 	"github.com/dkage/dungeon-master/internal/session"
 )
 
@@ -22,7 +25,12 @@ const (
 
 func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/state", s.handleState)
+	mux.HandleFunc("GET /api/heroes/config", s.handleHeroesConfig)
+	mux.HandleFunc("PUT /api/heroes/config", s.handleSaveHeroesConfig)
+	mux.HandleFunc("POST /api/heroes/adopt-starters", s.handleAdoptStarterHeroes)
 	mux.HandleFunc("GET /api/github", s.handleGitHub)
+	mux.HandleFunc("GET /api/onboarding/suggestions", s.handleSuggestions)
+	mux.HandleFunc("POST /api/onboarding/sample", s.handleSampleCampaign)
 
 	mux.HandleFunc("POST /api/campaigns", s.handleCampaignAdd)
 	mux.HandleFunc("PATCH /api/campaigns/{id}", s.handleCampaignUpdate)
@@ -58,12 +66,30 @@ type sessionJSON struct {
 }
 
 type stateJSON struct {
-	Version   string              `json:"version"`
-	Claude    claudeJSON          `json:"claude"`
-	Defaulted bool                `json:"defaultHeroes"`
-	Heroes    []heroJSON          `json:"heroes"`
-	Campaigns []campaign.Campaign `json:"campaigns"`
-	Sessions  []sessionJSON       `json:"sessions"`
+	Version    string              `json:"version"`
+	Claude     claudeJSON          `json:"claude"`
+	Defaulted  bool                `json:"defaultHeroes"`
+	PartyError string              `json:"partyError,omitempty"`
+	Heroes     []heroJSON          `json:"heroes"`
+	Campaigns  []campaign.Campaign `json:"campaigns"`
+	Sessions   []sessionJSON       `json:"sessions"`
+}
+
+type heroConfigJSON struct {
+	ID    string   `json:"id"`
+	Label string   `json:"label"`
+	Args  []string `json:"args"`
+	Env   []string `json:"env"`
+}
+
+type heroesConfigJSON struct {
+	DefaultHero string           `json:"defaultHero"`
+	Heroes      []heroConfigJSON `json:"heroes"`
+}
+
+type saveHeroesReq struct {
+	DefaultHero string           `json:"defaultHero"`
+	Heroes      []heroConfigJSON `json:"heroes"`
 }
 
 type claudeJSON struct {
@@ -92,18 +118,124 @@ func (s *Server) sessionViews() []sessionJSON {
 }
 
 func (s *Server) handleState(w http.ResponseWriter, _ *http.Request) {
+	s.partyMu.RLock()
+	partyState := s.cfg.Party
+	partyError := s.cfg.PartyError
+	s.partyMu.RUnlock()
 	st := stateJSON{
-		Version:   s.cfg.Version,
-		Claude:    claudeJSON{Found: s.cfg.Claude != "", Path: s.cfg.Claude, Error: s.cfg.ClaudeErr},
-		Defaulted: s.cfg.Party.Defaulted,
-		Heroes:    []heroJSON{},
-		Campaigns: s.cfg.Campaigns.List(),
-		Sessions:  s.sessionViews(),
+		Version:    s.cfg.Version,
+		Claude:     claudeJSON{Found: s.cfg.Claude != "", Path: s.cfg.Claude, Error: s.cfg.ClaudeErr},
+		Defaulted:  partyState.Defaulted,
+		PartyError: partyError,
+		Heroes:     []heroJSON{},
+		Campaigns:  s.cfg.Campaigns.List(),
+		Sessions:   s.sessionViews(),
 	}
-	for _, h := range s.cfg.Party.Heroes {
+	for _, h := range partyState.Heroes {
 		st.Heroes = append(st.Heroes, heroJSON{ID: h.ID, Label: h.Label})
 	}
 	writeJSON(w, http.StatusOK, st)
+}
+
+func (s *Server) handleHeroesConfig(w http.ResponseWriter, _ *http.Request) {
+	s.partyMu.RLock()
+	p := s.cfg.Party
+	s.partyMu.RUnlock()
+	out := heroesConfigJSON{DefaultHero: p.DefaultHero, Heroes: make([]heroConfigJSON, 0, len(p.Heroes))}
+	for _, h := range p.Heroes {
+		masked := make([]string, 0, len(h.Env))
+		for _, entry := range h.Env {
+			key, _, _ := strings.Cut(entry, "=")
+			masked = append(masked, key+"=")
+		}
+		out.Heroes = append(out.Heroes, heroConfigJSON{ID: h.ID, Label: h.Label, Args: h.Args, Env: masked})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleSaveHeroesConfig(w http.ResponseWriter, r *http.Request) {
+	var req saveHeroesReq
+	if !decode(w, r, &req) {
+		return
+	}
+	if len(req.Heroes) == 0 {
+		httpErr(w, http.StatusBadRequest, "at least one hero is required")
+		return
+	}
+	s.partyMu.Lock()
+	defer s.partyMu.Unlock()
+	if s.cfg.PartyPath == "" {
+		httpErr(w, http.StatusServiceUnavailable, "hero settings cannot be saved in this server configuration")
+		return
+	}
+	// An empty value means "keep the saved value" for a key that already
+	// exists. The browser never receives saved environment values.
+	previous := make(map[string]map[string]string, len(s.cfg.Party.Heroes))
+	for _, h := range s.cfg.Party.Heroes {
+		values := make(map[string]string, len(h.Env))
+		for _, entry := range h.Env {
+			key, value, _ := strings.Cut(entry, "=")
+			values[key] = value
+		}
+		previous[h.ID] = values
+	}
+	updated := party.Party{Claude: s.cfg.Party.Claude, DefaultHero: req.DefaultHero, Heroes: make([]party.Hero, 0, len(req.Heroes))}
+	for _, h := range req.Heroes {
+		values := previous[h.ID]
+		env := make([]string, 0, len(h.Env))
+		for _, entry := range h.Env {
+			key, value, _ := strings.Cut(entry, "=")
+			if value == "" {
+				if saved, ok := values[key]; ok {
+					value = saved
+				}
+			}
+			env = append(env, key+"="+value)
+		}
+		updated.Heroes = append(updated.Heroes, party.Hero{ID: h.ID, Label: h.Label, Args: h.Args, Env: env})
+	}
+	data, err := party.Encode(updated)
+	if err != nil {
+		httpErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := fsutil.WriteFileAtomic(s.cfg.PartyPath, data); err != nil {
+		httpErr(w, http.StatusInternalServerError, "could not save hero settings")
+		return
+	}
+	updated.Defaulted = false
+	s.cfg.Party = updated
+	s.cfg.PartyError = ""
+	writeJSON(w, http.StatusOK, map[string]bool{"saved": true})
+}
+
+func (s *Server) handleAdoptStarterHeroes(w http.ResponseWriter, _ *http.Request) {
+	s.partyMu.Lock()
+	defer s.partyMu.Unlock()
+	if !s.cfg.Party.Defaulted {
+		httpErr(w, http.StatusConflict, "starter heroes are no longer active")
+		return
+	}
+	if s.cfg.PartyPath == "" {
+		httpErr(w, http.StatusServiceUnavailable, "hero settings cannot be saved in this server configuration")
+		return
+	}
+	data, err := party.Encode(s.cfg.Party)
+	if err != nil {
+		httpErr(w, http.StatusInternalServerError, "could not prepare starter hero settings")
+		return
+	}
+	if err := fsutil.CreateFileAtomic(s.cfg.PartyPath, data); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			httpErr(w, http.StatusConflict, "hero settings already exist; restart Dungeon Master to reload them")
+			return
+		}
+		httpErr(w, http.StatusInternalServerError, "could not save starter hero settings")
+		return
+	}
+	s.cfg.Party.Defaulted = false
+	s.cfg.PartyError = ""
+	writeJSON(w, http.StatusOK, map[string]bool{"saved": true})
 }
 
 // --- campaigns ---
@@ -151,7 +283,8 @@ func (s *Server) handleCampaignUpdate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCampaignRemove(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if _, ok := s.cfg.Campaigns.Get(id); !ok {
+	camp, ok := s.cfg.Campaigns.Get(id)
+	if !ok {
 		httpErr(w, http.StatusNotFound, "no such campaign")
 		return
 	}
@@ -164,6 +297,14 @@ func (s *Server) handleCampaignRemove(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.cfg.Campaigns.Remove(id); err != nil {
 		httpErr(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	// Only the app-created scratch directory is removed with the sample campaign.
+	// Ordinary campaign directories are never touched when they are unregistered.
+	if camp.Sample && s.cfg.SampleDir != "" && filepath.Clean(camp.Dir) == filepath.Clean(s.cfg.SampleDir) {
+		if err := os.RemoveAll(s.cfg.SampleDir); err != nil {
+			httpErr(w, http.StatusInternalServerError, "campaign removed, but the sample workspace could not be cleaned up")
+			return
+		}
 	}
 	_ = s.cfg.History.RemoveCampaign(id)
 	w.WriteHeader(http.StatusNoContent)
@@ -228,7 +369,9 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		spec = s.shellSpecWithGate()
 	case req.Hero != "" && !req.Shell:
+		s.partyMu.RLock()
 		h, ok := s.cfg.Party.Hero(req.Hero)
+		s.partyMu.RUnlock()
 		if !ok {
 			httpErr(w, http.StatusBadRequest, "unknown hero")
 			return

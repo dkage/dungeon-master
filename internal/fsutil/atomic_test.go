@@ -1,6 +1,7 @@
 package fsutil
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,6 +29,27 @@ func TestWriteFileAtomic(t *testing.T) {
 	entries, _ := os.ReadDir(filepath.Dir(p))
 	if len(entries) != 1 {
 		t.Fatalf("leftovers: %v", entries)
+	}
+}
+
+func TestCreateFileAtomicDoesNotReplaceExistingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "settings.toml")
+	if err := CreateFileAtomic(path, []byte("first\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := CreateFileAtomic(path, []byte("second\n")); !errors.Is(err, os.ErrExist) {
+		t.Fatalf("second create error = %v, want os.ErrExist", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != "first\n" {
+		t.Fatalf("contents %q, error %v", got, err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode %o, want 600", info.Mode().Perm())
 	}
 }
 

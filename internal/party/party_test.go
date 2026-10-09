@@ -52,6 +52,28 @@ func TestParseDefaultsBinary(t *testing.T) {
 	}
 }
 
+func TestEncodeRoundTripsAndPreservesDefaultHero(t *testing.T) {
+	p := Party{
+		Claude:      "/opt/claude",
+		DefaultHero: "quick",
+		Heroes: []Hero{
+			{ID: "opus", Label: "Opus", Args: []string{"--model", "claude-opus-5-5"}},
+			{ID: "quick", Label: "Quick", Args: []string{"--model", "claude-haiku-5-5"}, Env: []string{"MODE=fast"}},
+		},
+	}
+	data, err := Encode(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Claude != p.Claude || got.DefaultHero != p.DefaultHero || len(got.Heroes) != 2 || got.Heroes[1].Env[0] != "MODE=fast" {
+		t.Fatalf("round trip: %+v", got)
+	}
+}
+
 func TestParseRejects(t *testing.T) {
 	cases := map[string]string{
 		"no heroes":       "claude = \"claude\"\n",
@@ -67,6 +89,7 @@ func TestParseRejects(t *testing.T) {
 		"env empty key":   "[heroes.a]\nenv=[\"=v\"]\n",
 		"env newline":     "[heroes.a]\nenv=[\"K=a\\nb\"]\n",
 		"claude newline":  "claude=\"a\\nb\"\n[heroes.a]\nargs=[]\n",
+		"label newline":   "[heroes.a]\nlabel=\"name\\nforged\"\nargs=[]\n",
 		"args wrong type": "[heroes.a]\nargs=\"--model x\"\n",
 	}
 	for name, src := range cases {

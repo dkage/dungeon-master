@@ -31,6 +31,11 @@ function fakeClient(over: Partial<Client> = {}, state: Partial<AppState> = {}): 
     getGithub: vi.fn(async () => githubOk),
     setScope: vi.fn(async (id, scope) => camp(id, { scope })),
     getScopeOptions: vi.fn(async () => scopeOptions),
+    getProjectSuggestions: vi.fn(async () => []),
+    createSampleCampaign: vi.fn(async () => camp('sample', { name: 'Sample (not a real project)', sample: true, demo: true })),
+    adoptStarterHeroes: vi.fn(async () => ({ saved: true })),
+    getHeroesConfig: vi.fn(async () => ({ defaultHero: 'opus', heroes: [{ id: 'opus', label: 'Opus', args: [], env: [] }] })),
+    saveHeroesConfig: vi.fn(async () => ({ saved: true })),
     ...over,
   }
 }
@@ -125,6 +130,64 @@ describe('refresh and selection', () => {
     await expect(s.refresh()).resolves.toBeUndefined()
     expect(s.campaignId).toBe('c1')
     spy.mockRestore()
+  })
+})
+
+describe('onboarding and appearance preferences', () => {
+  it('loads project suggestions and adds a suggested project', async () => {
+    const c = fakeClient({
+      getProjectSuggestions: vi.fn(async () => [{ name: 'Dungeon', dir: '/work/dungeon', repo: 'dkage/dungeon-master' }]),
+    })
+    const s = new AppStore(c)
+    await s.refresh()
+    await s.loadSuggestions()
+    expect(s.suggestions).toEqual([{ name: 'Dungeon', dir: '/work/dungeon', repo: 'dkage/dungeon-master' }])
+    expect(await s.addSuggestedProject(s.suggestions[0])).toBe(true)
+    expect(c.addCampaign).toHaveBeenCalledWith({ dir: '/work/dungeon', name: 'Dungeon' })
+  })
+
+  it('creates and selects the separate sample campaign', async () => {
+    const c = fakeClient()
+    const s = new AppStore(c)
+    await s.refresh()
+    expect(await s.addSampleCampaign()).toBe(true)
+    expect(c.createSampleCampaign).toHaveBeenCalledOnce()
+    expect(s.campaignId).toBe('sample')
+    expect(s.campaign?.sample).toBe(true)
+  })
+
+  it('adopts starter heroes and refreshes the persisted state', async () => {
+    const client = fakeClient({ adoptStarterHeroes: vi.fn(async () => ({ saved: true })) }, { defaultHeroes: false })
+    const s = new AppStore(client)
+    expect(await s.adoptStarterHeroes()).toBe(true)
+    expect(client.adoptStarterHeroes).toHaveBeenCalledOnce()
+    expect(client.getState).toHaveBeenCalledOnce()
+    expect(s.defaultHeroes).toBe(false)
+  })
+
+  it('persists independent sizes, font, word mode and theme', () => {
+    const first = new AppStore(fakeClient())
+    first.updateAppearance({ font: 'eb-garamond', sidebarSize: 17, terminalSize: 11, questsSize: 19, wordMode: 'plain', theme: 'neutral' })
+    const second = new AppStore(fakeClient())
+    expect(second.appearance).toEqual({
+      font: 'eb-garamond', sidebarSize: 17, terminalSize: 11, questsSize: 19, wordMode: 'plain', theme: 'neutral',
+    })
+  })
+
+  it('recovers from invalid appearance data with safe defaults', () => {
+    localStorage.setItem('dungeon.appearance', '{broken')
+    const s = new AppStore(fakeClient())
+    expect(s.appearance).toEqual({
+      font: 'almendra', sidebarSize: 14, terminalSize: 13, questsSize: 14, wordMode: 'hints', theme: 'dungeon',
+    })
+  })
+
+  it('remembers and reopens the first-run guide locally', () => {
+    const s = new AppStore(fakeClient())
+    s.dismissFirstRun()
+    expect(new AppStore(fakeClient()).firstRunDismissed).toBe(true)
+    s.openFirstRun()
+    expect(new AppStore(fakeClient()).firstRunDismissed).toBe(false)
   })
 })
 

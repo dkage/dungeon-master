@@ -3,6 +3,7 @@
   import type { QuestRef } from './api'
   import { STATE_LABEL, labelText, timeAgo } from './quests'
   import { renderMarkdown } from './markdown'
+  import { wordLabel } from './words'
 
   let { store }: { store: AppStore } = $props()
 
@@ -31,7 +32,7 @@
 
 <div class="detail">
   <header class="qhead">
-    <button type="button" class="back" onclick={() => store.closeQuest()}>← Quests</button>
+    <button type="button" class="back" onclick={() => store.closeQuest()}>← {wordLabel('quest', store.appearance.wordMode, true)}</button>
     <button type="button" class="ghost close-drawer" aria-label="Close quests" onclick={() => (store.questsOpen = false)}>×</button>
   </header>
 

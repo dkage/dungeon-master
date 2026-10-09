@@ -7,9 +7,11 @@ AI providers, are also in the roadmap).
 Pick an issue, pick a skill, click a button, and an agent starts in a terminal with the right model, flags and context
 already set.
 
-> Status: early development. Heroes, terminals, campaigns and the GitHub quest list and detail work; starting a hero
-> from a quest is next. See [PLAN.md](PLAN.md) for the v1 plan, [PLAN_SKILLS.md](PLAN_SKILLS.md) for how skills fit in,
-> [release/](release/README.md) for the release plan, and [PLAN_V2.md](PLAN_V2.md) for ideas that are not in v1.
+> Status: early development. The Stitch cockpit, first-run sample flow, glossary, appearance controls and local hero
+> settings are in place. Starting an agent from a selected issue is next (M4); the dependency graph follows in M5a.
+> See [PLAN_EXPERIENCE.md](PLAN_EXPERIENCE.md) for the current experience and milestone order, [PLAN_SKILLS.md](PLAN_SKILLS.md)
+> for how skills fit in, [release/](release/README.md) for the release plan, and [PLAN_V2.md](PLAN_V2.md) for ideas
+> that are not in v1.
 
 - v1 targets Claude Code only; other agents come later.
 - Everything is local: no accounts, no telemetry, and nothing is added to your repositories by default.

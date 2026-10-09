@@ -5,6 +5,7 @@ package server
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dkage/dungeon-master/internal/campaign"
@@ -41,7 +43,9 @@ type Config struct {
 	Assets fs.FS
 
 	// Party is the loaded hero set.
-	Party party.Party
+	Party      party.Party
+	PartyPath  string
+	PartyError string
 	// Claude is the resolved claude binary; empty when it was not found, in
 	// which case ClaudeErr says why and hero launches are refused.
 	Claude    string
@@ -52,6 +56,10 @@ type Config struct {
 	Sessions *session.Manager
 	// BaseEnv is the environment children inherit. Defaults to os.Environ.
 	BaseEnv func() []string
+	// StartDir is the directory from which the user launched `dungeon serve`.
+	StartDir string
+	// SampleDir is the private scratch workspace for the onboarding sample campaign.
+	SampleDir string
 	// Campaigns is the registry of working directories. New creates an
 	// in-memory one when nil.
 	Campaigns *campaign.Registry
@@ -79,11 +87,14 @@ type Gatekeeper struct {
 
 // Server wires the handler, the guard and the listener together.
 type Server struct {
-	cfg  Config
-	http *http.Server
-	ln   net.Listener
-	g    *guard
-	url  string // where this server can be reached, set once it listens
+	cfg       Config
+	http      *http.Server
+	ln        net.Listener
+	g         *guard
+	url       string // where this server can be reached, set once it listens
+	partyMu   sync.RWMutex
+	partyStop context.CancelFunc
+	partyWG   sync.WaitGroup
 
 	// The Gatekeeper answers the shim on its own private socket, never on
 	// the browser-facing port.
@@ -200,6 +211,7 @@ func (s *Server) Listen() (net.Listener, error) {
 		Handler:           s.handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+	s.startPartyWatcher()
 	return ln, nil
 }
 
@@ -208,9 +220,67 @@ func (s *Server) Serve(ln net.Listener) error { return s.http.Serve(ln) }
 
 // Shutdown stops the server gracefully.
 func (s *Server) Shutdown(ctx context.Context) error {
+	if s.partyStop != nil {
+		s.partyStop()
+		s.partyWG.Wait()
+	}
 	s.cfg.Sessions.Shutdown()
 	s.stopGate(ctx)
 	return s.http.Shutdown(ctx)
+}
+
+func (s *Server) startPartyWatcher() {
+	if s.cfg.PartyPath == "" {
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	s.partyStop = cancel
+	s.partyWG.Add(1)
+	go func() {
+		defer s.partyWG.Done()
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		var last [32]byte
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				data, err := os.ReadFile(s.cfg.PartyPath)
+				if errors.Is(err, os.ErrNotExist) {
+					data = nil
+					err = nil
+				}
+				if err != nil {
+					s.partyMu.Lock()
+					s.cfg.PartyError = fmt.Sprintf("%s: %v", s.cfg.PartyPath, err)
+					s.partyMu.Unlock()
+					continue
+				}
+				stamp := sha256.Sum256(data)
+				if stamp == last {
+					continue
+				}
+				var current party.Party
+				if data == nil {
+					current = party.Defaults()
+				} else {
+					current, err = party.Parse(data)
+				}
+				last = stamp
+				if err != nil {
+					s.partyMu.Lock()
+					s.cfg.PartyError = fmt.Sprintf("%s: %v", s.cfg.PartyPath, err)
+					s.partyMu.Unlock()
+					continue
+				}
+				s.partyMu.Lock()
+				s.cfg.Party = current
+				s.cfg.PartyError = ""
+				s.partyMu.Unlock()
+			}
+		}
+	}()
 }
 
 // Handler returns the guarded handler for a listener bound on the given

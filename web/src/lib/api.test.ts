@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ApiError, addCampaign, createSession, deleteSession, getGithub, getQuest, getQuests, getScopeOptions, getState, removeCampaign,
-  setScope, termUrl, updateCampaign,
+  setScope, termUrl, updateCampaign, getProjectSuggestions, createSampleCampaign, adoptStarterHeroes, getHeroesConfig, saveHeroesConfig,
 } from './api'
 
 function mockFetch(status: number, body?: unknown) {
@@ -60,6 +60,42 @@ describe('api', () => {
     expect(JSON.parse(calls[0][1].body as string)).toEqual({ dir: '/p', name: 'P' })
     expect(JSON.parse(calls[1][1].body as string)).toEqual({ demo: true })
     for (const [, init] of calls) expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+  })
+
+  it('loads local onboarding suggestions and creates the separate sample campaign', async () => {
+    const f = mockFetch(200, [{ name: 'App', dir: '/work/app' }])
+    await getProjectSuggestions()
+    expect((f.mock.calls[0] as unknown as [string, RequestInit])[0]).toBe('/api/onboarding/suggestions')
+
+    mockFetch(201, { id: 'sample', sample: true })
+    await createSampleCampaign()
+    const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/onboarding/sample')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe('{}')
+  })
+
+  it('adopts starter heroes through the guarded settings endpoint', async () => {
+    const f = mockFetch(200, { saved: true })
+    await adoptStarterHeroes()
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/heroes/adopt-starters')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe('{}')
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' })
+  })
+
+  it('loads and saves hero settings through the local API', async () => {
+    const config = { defaultHero: 'opus', heroes: [{ id: 'opus', label: 'Opus', args: ['--model', 'm1'], env: ['API_KEY='] }] }
+    const f = mockFetch(200, config)
+    await expect(getHeroesConfig()).resolves.toEqual(config)
+    await saveHeroesConfig(config)
+    const calls = f.mock.calls as unknown as [string, RequestInit][]
+    expect(calls[0][0]).toBe('/api/heroes/config')
+    expect(calls[0][1].method).toBe('GET')
+    expect(calls[1][0]).toBe('/api/heroes/config')
+    expect(calls[1][1].method).toBe('PUT')
+    expect(JSON.parse(calls[1][1].body as string)).toEqual(config)
   })
 
   it('quest calls use GET with escaped ids and an optional refresh flag', async () => {

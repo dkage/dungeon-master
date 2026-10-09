@@ -3,7 +3,7 @@ COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: build run web vet test test-linux test-web test-e2e check clean
+.PHONY: build run run-fresh web vet test test-linux test-web test-e2e check clean
 
 ## build: build the dungeon binary into bin/
 build: web
@@ -12,6 +12,12 @@ build: web
 ## run: build and serve on the default loopback address
 run: build
 	./bin/dungeon serve
+
+## run-fresh: build and serve with an empty, temporary config directory
+run-fresh: build
+	@fresh_dir=$$(mktemp -d "$${TMPDIR:-/tmp}/dungeon-fresh.XXXXXX") && \
+	  trap 'rm -rf "$$fresh_dir"' EXIT INT TERM; \
+	  DUNGEON_HOME="$$fresh_dir" ./bin/dungeon serve
 
 ## web: build the frontend into web/dist (embedded by the Go build)
 web:

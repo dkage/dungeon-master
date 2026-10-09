@@ -39,6 +39,7 @@ function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: b
         heroes: [{ id: 'opus', label: 'Opus' }], campaigns, sessions,
       })
     }
+    if (method === 'GET' && path === '/api/onboarding/suggestions') return json(200, [])
     if (method === 'GET' && path === '/api/github') {
       return json(200, {
         rations: [{ resource: 'graphql', limit: 5000, remaining: 4936, used: 64, resetsAt: '2026-10-08T15:37:00Z', seenAt: '' }],
@@ -91,6 +92,13 @@ function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: b
       campaigns.push(c)
       return json(201, c)
     }
+    if (method === 'POST' && path === '/api/onboarding/sample') {
+      const existing = campaigns.find((c) => c.sample)
+      if (existing) return json(200, existing)
+      const sample = { id: 'sample', name: 'Sample (not a real project)', dir: '/local/sample', remote: 'origin', scope: null, demo: true, sample: true }
+      campaigns.push(sample)
+      return json(201, sample)
+    }
     if (method === 'DELETE' && path.startsWith('/api/campaigns/')) {
       const i = campaigns.findIndex((c) => path.endsWith(String(c.id)))
       if (i < 0) return json(404, { error: 'no such campaign' })
@@ -125,22 +133,23 @@ describe('App', () => {
     render(App)
     await screen.findByRole('button', { name: 'Opus' })
     expect(within(screen.getByRole('navigation', { name: 'Campaigns' })).getByText('acme/demo')).toBeInTheDocument()
-    expect(screen.getByText(/Pick a hero/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Start here' })).toBeInTheDocument()
 
     await fireEvent.click(screen.getByRole('button', { name: 'Opus' }))
     expect(await screen.findByTestId('term-stub')).toHaveTextContent('s1')
     expect(calls.find((c) => c.method === 'POST' && c.path === '/api/sessions')?.body).toEqual({ hero: 'opus', campaign: 'c1' })
     const list = screen.getByRole('list', { name: 'Expeditions in demo' })
     expect(within(list).getByRole('button', { name: /^Opus/ })).toHaveAttribute('aria-current', 'true')
-    expect(screen.queryByText(/Pick a hero/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Start here' })).not.toBeInTheDocument()
   })
 
   it('walks a new user through adding a campaign, then launching', async () => {
     const calls = fakeServer({ campaigns: false })
     render(App)
     expect(await screen.findByRole('button', { name: 'Opus' })).toBeDisabled()
-    expect(screen.getByText(/Add a campaign on the left/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Start here' })).toBeInTheDocument()
 
+    await fireEvent.click(screen.getByRole('button', { name: 'Add project' }))
     await fireEvent.input(screen.getByPlaceholderText('/absolute/path/to/project'), { target: { value: '/work/new' } })
     await fireEvent.input(screen.getByPlaceholderText(/defaults to the folder/), { target: { value: 'Fresh' } })
     await fireEvent.click(screen.getByRole('button', { name: 'Add campaign' }))
@@ -156,6 +165,7 @@ describe('App', () => {
     fakeServer()
     render(App)
     await screen.findByRole('button', { name: 'Opus' })
+    await fireEvent.click(screen.getByRole('button', { name: 'Add project' }))
     await fireEvent.input(screen.getByPlaceholderText('/absolute/path/to/project'), { target: { value: '/dup' } })
     await fireEvent.click(screen.getByRole('button', { name: 'Add campaign' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('already a campaign')
@@ -222,7 +232,7 @@ describe('App', () => {
     await screen.findByRole('button', { name: 'Opus' })
     await fireEvent.click(screen.getByRole('button', { name: 'Remove campaign demo' }))
     await fireEvent.click(screen.getByRole('button', { name: 'Remove?' }))
-    expect(await screen.findByText(/Add a campaign on the left/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Start here' })).toBeInTheDocument()
     expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/campaigns/c1')).toBe(true)
   })
 
@@ -242,18 +252,21 @@ describe('App', () => {
       expect(within(panel).getByText('acme/demo')).toBeInTheDocument()
       expect(calls.some((c) => c.path === '/api/campaigns/c1/quests')).toBe(true)
 
-      await fireEvent.click(within(panel).getByRole('button', { name: /#11 Real blocked issue/ }))
-      expect(await within(panel).findByRole('heading', { name: /#11 Real blocked issue/ })).toBeInTheDocument()
-      expect(within(panel).getByRole('button', { name: /#10 Real first issue/ })).toBeInTheDocument() // the blocker
-      expect(await within(panel).findByRole('heading', { name: 'About #11' })).toBeInTheDocument() // body rendered as markdown
-      expect(within(panel).getByText('markdown').tagName).toBe('STRONG')
-      expect(within(panel).getByText('a comment')).toBeInTheDocument()
+      const browser = within(panel).getByRole('region', { name: 'Quest browser' })
+      await fireEvent.click(within(browser).getByRole('button', { name: /#11 Real blocked issue/ }))
+      const detail = within(panel).getByRole('region', { name: 'Selected issue detail' })
+      expect(await within(detail).findByRole('heading', { name: /#11 Real blocked issue/ })).toBeInTheDocument()
+      expect(within(browser).getByRole('button', { name: /#10 Real first issue/ })).toBeInTheDocument()
+      expect(await within(detail).findByRole('heading', { name: 'About #11' })).toBeInTheDocument() // body rendered as markdown
+      expect(within(detail).getByText('markdown').tagName).toBe('STRONG')
+      expect(within(detail).getByText('a comment')).toBeInTheDocument()
 
       // Follow the blocker, then go back to the list.
-      await fireEvent.click(within(panel).getByRole('button', { name: /#10 Real first issue/ }))
-      expect(await within(panel).findByRole('heading', { name: /#10 Real first issue/ })).toBeInTheDocument()
-      await fireEvent.click(within(panel).getByRole('button', { name: /← Quests/ }))
-      expect(await within(panel).findByLabelText('Filter quests')).toBeInTheDocument()
+      await fireEvent.click(within(detail).getByRole('button', { name: /#10 Real first issue/ }))
+      expect(await within(detail).findByRole('heading', { name: /#10 Real first issue/ })).toBeInTheDocument()
+      await fireEvent.click(within(detail).getByRole('button', { name: /← Quests/ }))
+      expect(within(browser).getByLabelText('Filter quests')).toBeInTheDocument()
+      expect(within(panel).getByText('Select an issue')).toBeInTheDocument()
     })
 
     it('refreshes with the refresh flag', async () => {
@@ -265,20 +278,18 @@ describe('App', () => {
       await waitFor(() => expect(calls.some((c) => c.path === '/api/campaigns/c1/quests?refresh=1')).toBe(true))
     })
 
-    it('guides a campaign without a repository to the demo quests and back', async () => {
+    it('offers the separate sample project for a campaign without a repository', async () => {
       const calls = fakeServer({ noRepo: true })
       render(App)
       const panel = await screen.findByRole('complementary', { name: 'Quests' })
       expect(await within(panel).findByRole('alert')).toHaveTextContent('no GitHub repository')
 
-      await fireEvent.click(within(panel).getByRole('button', { name: 'Load demo quests' }))
+      await fireEvent.click(within(panel).getByRole('button', { name: 'Try the separate sample project' }))
       expect(await within(panel).findByText('Sample quest one')).toBeInTheDocument()
-      expect(within(panel).getByText('demo data')).toBeInTheDocument()
-      expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({ demo: true })
+      expect(within(panel).getByText('sample project')).toBeInTheDocument()
+      expect(calls.find((c) => c.method === 'POST' && c.path === '/api/onboarding/sample')).toBeDefined()
 
-      await fireEvent.click(within(panel).getByRole('button', { name: 'Use real issues' }))
-      expect(await within(panel).findByRole('alert')).toHaveTextContent('no GitHub repository')
-      expect(within(panel).queryByText('Sample quest one')).not.toBeInTheDocument()
+      expect(within(panel).getByText(/separate sample project/)).toBeInTheDocument()
     })
 
     it('shows each campaign\'s own quests when switching, never the previous one\'s', async () => {
@@ -287,6 +298,7 @@ describe('App', () => {
       const panel = await screen.findByRole('complementary', { name: 'Quests' })
       await within(panel).findByText('Real first issue')
 
+      await fireEvent.click(screen.getByRole('button', { name: 'Add project' }))
       await fireEvent.input(screen.getByPlaceholderText('/absolute/path/to/project'), { target: { value: '/work/other' } })
       await fireEvent.click(screen.getByRole('button', { name: 'Add campaign' }))
       // The new campaign has no repo: the real campaign's issues must be gone at once.

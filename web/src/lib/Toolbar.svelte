@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { AppStore } from './store.svelte'
+  import { wordLabel } from './words'
 
   let { store }: { store: AppStore } = $props()
   const campaign = $derived(store.campaign)
+  const activeSession = $derived(store.active)
   const canLaunch = $derived(!store.busy && !!campaign)
 </script>
 
@@ -11,19 +13,20 @@
     {#if campaign}
       <strong>{campaign.name}</strong>
       <span class="repo" class:none={!campaign.repo}>{campaign.repo ?? 'no GitHub repo'}</span>
+      {#if activeSession}<span class="session-title"><span class="session-light" aria-hidden="true"></span>{activeSession.title}</span>{/if}
       <code class="path" title={campaign.dir}>{campaign.dir}</code>
     {:else}
       <span class="hint">No campaign selected</span>
     {/if}
   </div>
 
-  <div class="heroes" role="group" aria-label="Heroes">
+  <div class="heroes" role="group" aria-label={wordLabel('hero', store.appearance.wordMode, true)}>
     {#each store.heroes as hero (hero.id)}
       <button
         type="button"
         class="hero"
         disabled={!canLaunch || !store.claude.found}
-        title={store.claude.found ? `Start ${hero.label}` : 'claude was not found'}
+        title={store.claude.found ? `Start ${hero.label}` : 'Claude Code was not found'}
         onclick={() => store.launch({ hero: hero.id })}
       >
         {hero.label}
@@ -33,7 +36,7 @@
       Shell
     </button>
     <button type="button" class="quests-toggle" aria-pressed={store.questsOpen} onclick={() => (store.questsOpen = !store.questsOpen)}>
-      Quests
+      {wordLabel('quest', store.appearance.wordMode, true)}
     </button>
   </div>
 </header>
@@ -45,8 +48,12 @@
   </p>
 {/if}
 {#if store.defaultHeroes}
-  <p class="notice">
-    Using the built-in heroes. Create <code>party.toml</code> in the Dungeon Master config directory to define your own.
+  <p class="notice starter-heroes">
+    {store.appearance.wordMode === 'plain' ? 'Using the built-in agent setups.' : 'Using the built-in heroes.'}
+    <button type="button" disabled={store.busy} onclick={() => store.adoptStarterHeroes()}>
+      {store.appearance.wordMode === 'plain' ? 'Save these agent setups' : 'Keep these starter heroes'}
+    </button>
+    Settings stay on this computer.
   </p>
 {/if}
 {#if store.error}

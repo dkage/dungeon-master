@@ -6,6 +6,16 @@ export interface Hero {
   label: string
 }
 
+export interface HeroConfig extends Hero {
+  args: string[]
+  env: string[]
+}
+
+export interface HeroesConfig {
+  defaultHero: string
+  heroes: HeroConfig[]
+}
+
 export interface Scope {
   mode: 'labels' | 'assigned' | 'all'
   labels: string[]
@@ -27,8 +37,16 @@ export interface Campaign {
   scope: Scope | null
   /** Shows built-in sample quests instead of GitHub issues. */
   demo: boolean
+  /** Built-in scratch campaign; its workspace lives under the local state directory. */
+  sample?: boolean
   gitRoot?: string
   /** "owner/repo" on github.com, when the remote could be resolved. */
+  repo?: string
+}
+
+export interface ProjectSuggestion {
+  name: string
+  dir: string
   repo?: string
 }
 
@@ -50,6 +68,7 @@ export interface AppState {
   version: string
   claude: { found: boolean; path?: string; error?: string }
   defaultHeroes: boolean
+  partyError?: string
   heroes: Hero[]
   campaigns: Campaign[]
   sessions: SessionInfo[]
@@ -199,6 +218,15 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T 
 }
 
 export const getState = () => call<AppState>('GET', '/api/state') as Promise<AppState>
+export const getProjectSuggestions = () =>
+  call<ProjectSuggestion[]>('GET', '/api/onboarding/suggestions') as Promise<ProjectSuggestion[]>
+export const createSampleCampaign = () =>
+  call<Campaign>('POST', '/api/onboarding/sample', {}) as Promise<Campaign>
+export const adoptStarterHeroes = () =>
+  call<{ saved: boolean }>('POST', '/api/heroes/adopt-starters', {}) as Promise<{ saved: boolean }>
+export const getHeroesConfig = () => call<HeroesConfig>('GET', '/api/heroes/config') as Promise<HeroesConfig>
+export const saveHeroesConfig = (config: HeroesConfig) =>
+  call<{ saved: boolean }>('PUT', '/api/heroes/config', config) as Promise<{ saved: boolean }>
 export const addCampaign = (req: CampaignInput) =>
   call<Campaign>('POST', '/api/campaigns', req) as Promise<Campaign>
 export const updateCampaign = (id: string, patch: CampaignPatch) =>

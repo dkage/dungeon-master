@@ -106,14 +106,18 @@ func TestBuildConfigMissingClaudeIsNotFatal(t *testing.T) {
 	}
 }
 
-func TestBuildConfigInvalidPartyFileIsFatal(t *testing.T) {
+func TestBuildConfigInvalidPartyFileKeepsAppAvailableWithStarterFallback(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("DUNGEON_HOME", home)
 	if err := os.WriteFile(filepath.Join(home, "party.toml"), []byte("[heroes.BAD]\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := buildConfig(context.Background(), "127.0.0.1:0", "tok"); err == nil {
-		t.Fatal("invalid party file accepted")
+	cfg, err := buildConfig(context.Background(), "127.0.0.1:0", "tok")
+	if err != nil {
+		t.Fatalf("invalid local hero file should not prevent startup: %v", err)
+	}
+	if !cfg.Party.Defaulted || cfg.PartyError == "" || len(cfg.Party.Heroes) == 0 {
+		t.Fatalf("invalid file did not preserve a usable starter set and error: %+v", cfg)
 	}
 }
 

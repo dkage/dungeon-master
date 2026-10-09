@@ -45,6 +45,8 @@ type Campaign struct {
 	Scope *Scope `json:"scope"`
 	// Demo shows built-in sample quests instead of GitHub issues.
 	Demo bool `json:"demo"`
+	// Sample marks the built-in, throwaway onboarding campaign.
+	Sample bool `json:"sample,omitempty"`
 	// Derived from git on registration and update; empty when the directory
 	// is not in a repository or the remote is not on github.com.
 	GitRoot string `json:"gitRoot,omitempty"`
@@ -75,6 +77,8 @@ type Input struct {
 	Dir    string
 	Name   string
 	Remote string
+	Demo   bool
+	Sample bool
 }
 
 // Patch changes a campaign; nil fields are left alone.
@@ -95,6 +99,7 @@ type record struct {
 	Labels []string  `json:"labels,omitempty"`
 	Scope  *Scope    `json:"scope,omitempty"`
 	Demo   bool      `json:"demo,omitempty"`
+	Sample bool      `json:"sample,omitempty"`
 	Added  time.Time `json:"added"`
 }
 
@@ -199,7 +204,7 @@ func (r *Registry) Add(ctx context.Context, in Input) (Campaign, error) {
 	if err != nil {
 		return Campaign{}, err
 	}
-	rec := record{ID: id, Name: name, Dir: dir, Remote: remote, Added: time.Now().UTC()}
+	rec := record{ID: id, Name: name, Dir: dir, Remote: remote, Demo: in.Demo, Sample: in.Sample, Added: time.Now().UTC()}
 	d := r.resolve(ctx, rec)
 
 	r.mu.Lock()
@@ -310,7 +315,7 @@ func (r *Registry) view(rec record) Campaign {
 		scope = &sc
 	}
 	return Campaign{
-		ID: rec.ID, Name: rec.Name, Dir: rec.Dir, Remote: rec.Remote, Scope: scope, Demo: rec.Demo,
+		ID: rec.ID, Name: rec.Name, Dir: rec.Dir, Remote: rec.Remote, Scope: scope, Demo: rec.Demo, Sample: rec.Sample,
 		GitRoot: d.gitRoot, Repo: d.repo,
 	}
 }

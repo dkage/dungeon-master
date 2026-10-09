@@ -192,6 +192,125 @@ func TestStateListsHeroesAndClaude(t *testing.T) {
 	}
 }
 
+func TestAdoptStarterHeroesWritesPrivateConfigAndClearsStarterState(t *testing.T) {
+	path := filepath.Join(t.TempDir(), party.FileName)
+	e := startServer(t, func(cfg *Config) {
+		cfg.Party = party.Defaults()
+		cfg.PartyPath = path
+	})
+
+	resp, body := e.req(http.MethodGet, "/api/state", nil, nil)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `"defaultHeroes":true`) {
+		t.Fatalf("initial state: %d %s", resp.StatusCode, body)
+	}
+	resp, body = e.req(http.MethodPost, "/api/heroes/adopt-starters", map[string]any{}, nil)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `"saved":true`) {
+		t.Fatalf("adopt: %d %s", resp.StatusCode, body)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("party.toml mode = %o, want 600", info.Mode().Perm())
+	}
+	persisted, err := party.LoadFile(path)
+	if err != nil || persisted.Defaulted || len(persisted.Heroes) != 3 || persisted.DefaultHero != "opus" {
+		t.Fatalf("persisted party: %+v, err %v", persisted, err)
+	}
+	resp, body = e.req(http.MethodGet, "/api/state", nil, nil)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `"defaultHeroes":false`) {
+		t.Fatalf("updated state: %d %s", resp.StatusCode, body)
+	}
+	resp, _ = e.req(http.MethodPost, "/api/heroes/adopt-starters", map[string]any{}, nil)
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("second adoption status = %d, want 409", resp.StatusCode)
+	}
+}
+
+func TestHeroSettingsMaskSecretsAndSaveChangesAtomically(t *testing.T) {
+	path := filepath.Join(t.TempDir(), party.FileName)
+	e := startServer(t, func(cfg *Config) {
+		cfg.PartyPath = path
+		cfg.Party = party.Party{Claude: "claude", DefaultHero: "opus", Heroes: []party.Hero{{
+			ID: "opus", Label: "Opus", Args: []string{"--model", "m1"}, Env: []string{"API_KEY=private-value"},
+		}}}
+	})
+	resp, body := e.req(http.MethodGet, "/api/heroes/config", nil, nil)
+	if resp.StatusCode != http.StatusOK || strings.Contains(string(body), "private-value") || !strings.Contains(string(body), `"API_KEY="`) {
+		t.Fatalf("hero settings should mask values: %d %s", resp.StatusCode, body)
+	}
+	resp, body = e.req(http.MethodPut, "/api/heroes/config", map[string]any{
+		"defaultHero": "opus",
+		"heroes":      []any{map[string]any{"id": "opus", "label": "Opus Prime", "args": []string{"--model", "m2"}, "env": []string{"API_KEY="}}},
+	}, nil)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("save hero settings: %d %s", resp.StatusCode, body)
+	}
+	persisted, err := party.LoadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if persisted.Heroes[0].Label != "Opus Prime" || persisted.Heroes[0].Args[1] != "m2" || persisted.Heroes[0].Env[0] != "API_KEY=private-value" {
+		t.Fatalf("saved settings lost values: %+v", persisted.Heroes[0])
+	}
+}
+
+func TestPartyWatcherKeepsLastGoodSettingsAndReloadsAfterRepair(t *testing.T) {
+	path := filepath.Join(t.TempDir(), party.FileName)
+	good := party.Party{Claude: "claude", DefaultHero: "safe", Heroes: []party.Hero{{ID: "safe", Label: "Last good"}}}
+	data, err := party.Encode(good)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s := handlerServer(Config{Token: testToken, Party: good, PartyPath: path}, 4444)
+	s.startPartyWatcher()
+	t.Cleanup(func() { s.partyStop(); s.partyWG.Wait() })
+
+	if err := os.WriteFile(path, []byte("[heroes.safe\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	waitFor := func(check func() bool, what string) {
+		t.Helper()
+		deadline := time.Now().Add(3 * time.Second)
+		for time.Now().Before(deadline) {
+			if check() {
+				return
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+		t.Fatalf("timed out waiting for %s", what)
+	}
+	waitFor(func() bool {
+		s.partyMu.RLock()
+		defer s.partyMu.RUnlock()
+		return s.cfg.PartyError != ""
+	}, "malformed party.toml error")
+	s.partyMu.RLock()
+	if got := s.cfg.Party.Heroes[0].Label; got != "Last good" {
+		s.partyMu.RUnlock()
+		t.Fatalf("malformed file replaced last good hero with %q", got)
+	}
+	s.partyMu.RUnlock()
+
+	repaired := party.Party{Claude: "claude", DefaultHero: "new", Heroes: []party.Hero{{ID: "new", Label: "Repaired"}}}
+	data, err = party.Encode(repaired)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(func() bool {
+		s.partyMu.RLock()
+		defer s.partyMu.RUnlock()
+		return s.cfg.PartyError == "" && len(s.cfg.Party.Heroes) == 1 && s.cfg.Party.Heroes[0].Label == "Repaired"
+	}, "repaired hero settings reload")
+}
+
 func TestStateWithoutClaude(t *testing.T) {
 	e := startServer(t, func(c *Config) { c.Claude, c.ClaudeErr = "", "not on PATH" })
 	_, out := e.req("GET", "/api/state", nil, nil)

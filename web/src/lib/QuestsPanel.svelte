@@ -4,6 +4,8 @@
   import QuestDetail from './QuestDetail.svelte'
   import Rations from './Rations.svelte'
   import ScopePicker from './ScopePicker.svelte'
+  import Term from './Term.svelte'
+  import { wordLabel } from './words'
 
   let { store }: { store: AppStore } = $props()
 
@@ -29,18 +31,17 @@
     types = types.includes(name) ? types.filter((t) => t !== name) : [...types, name]
   }
   const demo = $derived(store.campaign?.demo === true)
+  const sample = $derived(store.campaign?.sample === true)
 </script>
 
-<aside class="quests" class:open={store.questsOpen} aria-label="Quests">
-  {#if store.questNumber !== null}
-    <QuestDetail {store} />
-  {:else}
+<aside class="quests" class:open={store.questsOpen} aria-label={wordLabel('quest', store.appearance.wordMode, true)}>
+  <section class="quest-browser" aria-label="Quest browser">
     <header class="qhead">
       <div class="qtitle">
-        <h2>Quests</h2>
+        <h2><Term word="quest" mode={store.appearance.wordMode} /></h2>
         {#if result}
           <span class="source" class:demo={result.source === 'demo'}>
-            {result.source === 'demo' ? 'demo data' : result.repo}
+            {sample ? 'sample project' : result.source === 'demo' ? 'sample data' : result.repo}
           </span>
         {/if}
       </div>
@@ -49,7 +50,7 @@
         <button
           type="button"
           class="ghost"
-          aria-label="Refresh quests"
+          aria-label={`Refresh ${wordLabel('quest', store.appearance.wordMode, true).toLowerCase()}`}
           disabled={store.questsLoading || !store.campaign}
           onclick={() => store.loadQuests(true)}
         >
@@ -80,11 +81,10 @@
         Showing the newest {openShown} of {result.totalOpen.toLocaleString()} open issues. Narrow the scope to see the rest.
       </p>
     {/if}
-    {#if demo}
-      <p class="banner">
-        Showing sample quests.
-        <button type="button" class="link" onclick={() => store.setDemo(false)}>Use real issues</button>
-      </p>
+    {#if sample}
+      <p class="banner">This is a separate sample project. Its issues are local examples and do not come from GitHub.</p>
+    {:else if demo}
+      <p class="banner">Showing sample issues for this project.</p>
     {/if}
     {#if !demo && result?.stale}
       <p class="banner warn" role="status">{result.warning ? `${result.warning} ` : ''}Showing saved data.</p>
@@ -98,11 +98,11 @@
         <p>{err.message}</p>
         <div class="actions">
           {#if err.code === 'no_repo'}
-            <button type="button" onclick={() => store.setDemo(true)}>Load demo quests</button>
+            <button type="button" onclick={() => store.addSampleCampaign()}>Try the separate sample project</button>
           {:else}
             <button type="button" onclick={() => store.loadQuests(true)}>Try again</button>
             {#if err.code === 'no_token' || err.code === 'github_unauthorized' || err.code === 'repo_not_found'}
-              <button type="button" class="secondary" onclick={() => store.setDemo(true)}>Load demo quests</button>
+              <button type="button" class="secondary" onclick={() => store.addSampleCampaign()}>Try the separate sample project</button>
             {/if}
           {/if}
         </div>
@@ -110,10 +110,10 @@
     {:else if !store.campaign}
       <p class="hint pad">Select a campaign to see its quests.</p>
     {:else if !result && store.questsLoading}
-      <p class="hint pad" role="status">Loading quests…</p>
+      <p class="hint pad" role="status">Loading {wordLabel('quest', store.appearance.wordMode, true).toLowerCase()}…</p>
     {:else if result}
       <div class="filters">
-        <input type="search" placeholder="Filter by title, label or #number" aria-label="Filter quests" bind:value={text} />
+        <input type="search" placeholder="Filter by title, label or #number" aria-label={`Filter ${wordLabel('quest', store.appearance.wordMode, true).toLowerCase()}`} bind:value={text} />
         <label class="check"><input type="checkbox" bind:checked={hideCleared} /> Hide cleared</label>
       </div>
       {#if chips.length > 1}
@@ -132,7 +132,7 @@
         </div>
       {/if}
       {#if tally}
-        <p class="tally" aria-label="Quest counts">
+        <p class="tally" aria-label={`${wordLabel('quest', store.appearance.wordMode, true)} counts`}>
           <span class="s open">{tally.open} open</span>
           <span class="s claimed">{tally.claimed} in progress</span>
           <span class="s locked">{tally.locked} locked</span>
@@ -143,12 +143,12 @@
       {#if result.quests.length === 0}
         <p class="hint pad">No issues in this repository yet.</p>
       {:else if rows.length === 0}
-        <p class="hint pad">No quests match.</p>
+        <p class="hint pad">No {store.appearance.wordMode === 'plain' ? 'issues' : 'quests'} match.</p>
       {:else}
         <ul class="qlist">
           {#each rows as { quest: q, depth } (q.number)}
             <li class="qitem {q.state}" style={`--depth:${depth}`}>
-              <button type="button" class="qbtn" onclick={() => store.selectQuest(q.number)}>
+              <button type="button" class="qbtn" class:selected={store.questNumber === q.number} aria-current={store.questNumber === q.number ? 'true' : undefined} onclick={() => store.selectQuest(q.number)}>
                 <span class="state {q.state}" title={STATE_LABEL[q.state]}>
                   <span class="sr">{STATE_LABEL[q.state]}:</span>
                 </span>
@@ -177,5 +177,17 @@
         </ul>
       {/if}
     {/if}
+  </section>
+
+  {#if store.questNumber !== null}
+    <section class="quest-detail-slot" aria-label="Selected issue detail">
+      <QuestDetail {store} />
+    </section>
+  {:else}
+    <section class="quest-detail-slot detail-empty" aria-label="Issue details">
+      <p class="kicker">Quest detail</p>
+      <h2>Select an issue</h2>
+      <p>Choose an issue above to read its description, blockers, and related work.</p>
+    </section>
   {/if}
 </aside>

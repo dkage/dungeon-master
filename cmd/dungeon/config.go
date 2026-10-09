@@ -76,9 +76,12 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 	if err != nil {
 		return server.Config{}, err
 	}
-	p, err := party.LoadFile(filepath.Join(dir, party.FileName))
+	partyPath := filepath.Join(dir, party.FileName)
+	p, err := party.LoadFile(partyPath)
+	partyError := ""
 	if err != nil {
-		return server.Config{}, err
+		partyError = err.Error()
+		p = party.Defaults()
 	}
 	campaigns, err := campaign.Open(ctx, filepath.Join(dir, "campaigns.json"), nil)
 	if err != nil {
@@ -116,12 +119,15 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 		Demo: demo.New(),
 	})
 	cfg := server.Config{
-		Addr:    addr,
-		Token:   token,
-		Version: version,
-		Assets:  web.Assets(),
-		Party:   p,
-		Shell:   os.Getenv("SHELL"),
+		Addr:       addr,
+		Token:      token,
+		Version:    version,
+		Assets:     web.Assets(),
+		SampleDir:  filepath.Join(dir, "sample-workspace"),
+		Party:      p,
+		PartyPath:  partyPath,
+		PartyError: partyError,
+		Shell:      os.Getenv("SHELL"),
 
 		Campaigns: campaigns,
 		History:   hist,
@@ -130,6 +136,7 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 		Quartermaster: qm,
 		Gatekeeper:    gate,
 	}
+	cfg.StartDir, _ = os.Getwd()
 	if path, err := launcher.Resolve(ctx, p.Claude); err != nil {
 		cfg.ClaudeErr = err.Error()
 	} else {

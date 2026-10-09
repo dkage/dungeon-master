@@ -143,8 +143,10 @@ the top jumps to the sample campaign.
 
 ### 5.3 Starter heroes
 
-- When `party.toml` is missing, heroes carry a small "starter" tag and the notice becomes an action: **Create party.toml
-  from these**. It writes the file (0600, atomic) and opens the path, then the notice disappears.
+- When `party.toml` is missing, built-in heroes carry a small "starter" tag and the notice offers **Keep these starter
+  heroes**. This explicitly writes the local file (0600, atomically); the heroes then appear in Settings for editing and
+  the starter notice disappears. The user does not need to open or edit the file directly; Settings owns it as described
+  in `PLAN_UI.md` §6.1.
 - A malformed `party.toml` shows its error with the line and keeps the last good party running.
 - File changes reload without a restart.
 - The default hero is a stored setting (first hero until changed) and is what "Start with" uses.
@@ -271,8 +273,9 @@ Written as rules; each is cheap to check in review.
 1. **Fresh-state runs.** `make run-fresh` serves with a throwaway `DUNGEON_HOME`. Every milestone's exit test runs
    there, because a developer's own state hides empty states and first-run problems.
 2. **First-run browser test.** Playwright against the real binary with an empty config directory and the fake `claude`
-   stub: Start-here appears, the sample campaign loads, a quest can be started, the session tab is titled with the
-   quest, the sample badge is visible. This test is part of `make test-e2e`.
+   stub: Start-here appears, the sample campaign loads, a quest can be selected and a session can be started inside the
+   sample workspace, and the sample badge is visible. Quest-bound session titles belong to M4. This test is part of
+   `make test-e2e`.
 3. **Screenshot walkthrough per milestone.** Capture the key screens (empty, first run, quest selected, session running,
    map) and look at them before calling the milestone done. Store them in the gitignored `_probe/`.
 4. **Unexplained-word check.** A unit test walks `words.ts` and fails if a term lacks a plain meaning or if its

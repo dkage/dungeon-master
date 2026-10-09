@@ -5,9 +5,9 @@ an agent CLI in a PTY with its model, flags and context already set. Go server w
 webview shell.
 
 Status: M0-M3 done. M3.5 (GitHub budget, scope and the `gh` shim, `PLAN_M3_5.md`) is done except the deferred SQLite
-copy and write queue (phases C and D). M3.6 (Stitch v4 cockpit shell, first run and words; `PLAN_EXPERIENCE.md`) is in
-progress: implement the shell and right-panel map/detail split before polishing onboarding. M4 adds quest launch and
-its pinned detail controls; M5a fills the reserved map area with the graph. Themed words: `GLOSSARY.md`.
+copy and write queue (phases C and D). M3.6 (Stitch v4 cockpit shell, first run and words; `PLAN_EXPERIENCE.md`) is
+done. M4 adds quest launch and its pinned detail controls; M5a fills the reserved map area with the graph. Themed
+words: `GLOSSARY.md`.
 
 ## Scope and principles
 
