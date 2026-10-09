@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dungeon Master — parchment font comparison</title>
+  <style>
+    @font-face { font-family: "Study Cinzel"; src: url("fonts/Cinzel.ttf") format("truetype"); font-style: normal; font-weight: 400 900; font-display: swap; }
+    @font-face { font-family: "Study Fira Code"; src: url("fonts/FiraCode.ttf") format("truetype"); font-style: normal; font-weight: 300 700; font-display: swap; }
+    @font-face { font-family: "Study EB Garamond"; src: url("fonts/EBGaramond.ttf") format("truetype"); font-style: normal; font-weight: 400 800; font-display: swap; }
+    @font-face { font-family: "Study EB Garamond"; src: url("fonts/EBGaramond-Italic.ttf") format("truetype"); font-style: italic; font-weight: 400 800; font-display: swap; }
+    @font-face { font-family: "Study Crimson Pro"; src: url("fonts/CrimsonPro.ttf") format("truetype"); font-style: normal; font-weight: 200 900; font-display: swap; }
+    @font-face { font-family: "Study Crimson Pro"; src: url("fonts/CrimsonPro-Italic.ttf") format("truetype"); font-style: italic; font-weight: 200 900; font-display: swap; }
+    @font-face { font-family: "Study Cormorant"; src: url("fonts/Cormorant.ttf") format("truetype"); font-style: normal; font-weight: 300 700; font-display: swap; }
+    @font-face { font-family: "Study Cormorant"; src: url("fonts/Cormorant-Italic.ttf") format("truetype"); font-style: italic; font-weight: 300 700; font-display: swap; }
+    @font-face { font-family: "Study Alegreya"; src: url("fonts/Alegreya.ttf") format("truetype"); font-style: normal; font-weight: 400 900; font-display: swap; }
+    @font-face { font-family: "Study Alegreya"; src: url("fonts/Alegreya-Italic.ttf") format("truetype"); font-style: italic; font-weight: 400 900; font-display: swap; }
+    @font-face { font-family: "Study Cardo"; src: url("fonts/Cardo.ttf") format("truetype"); font-style: normal; font-weight: 400 700; font-display: swap; }
+    @font-face { font-family: "Study Cardo"; src: url("fonts/Cardo-Italic.ttf") format("truetype"); font-style: italic; font-weight: 400 700; font-display: swap; }
+    @font-face { font-family: "Study Almendra"; src: url("fonts/Almendra.ttf") format("truetype"); font-style: normal; font-weight: 400 700; font-display: swap; }
+    @font-face { font-family: "Study Almendra"; src: url("fonts/Almendra-Italic.ttf") format("truetype"); font-style: italic; font-weight: 400 700; font-display: swap; }
+
+    :root { color-scheme: dark; --sample-size: 14px; --ink: #24150c; --gold: #ddbc81; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; color: #eadcca; background: radial-gradient(ellipse at 50% -20%, #451317, #17090b 55%, #0d0607); font: 14px/1.5 system-ui, sans-serif; }
+    button, select { font: inherit; }
+    button { cursor: pointer; }
+    .top { max-width: 1780px; margin: auto; padding: 27px clamp(16px, 3vw, 48px) 17px; }
+    .eyebrow { color: #d6a45e; font: 600 11px "Study Fira Code", monospace; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 5px 0 8px; color: #f0d9ad; font: 700 clamp(23px, 2.6vw, 36px)/1.2 "Study Cinzel", Georgia, serif; }
+    .intro { max-width: 90ch; margin: 0; color: #c8b4a2; }
+    .controls { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; max-width: 1780px; margin: 0 auto 12px; padding: 0 clamp(16px, 3vw, 48px); }
+    .control-group { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+    label { display: grid; gap: 3px; color: #d1b18a; font-size: 12px; }
+    select, .view { min-height: 36px; padding: 6px 11px; border: 1px solid #895b3e; border-radius: 5px; background: #250d0e; color: #f3e5d4; }
+    .size-buttons { display: inline-flex; gap: 3px; padding: 2px; border: 1px solid #895b3e; border-radius: 5px; }
+    .size-buttons button { min-height: 30px; min-width: 50px; border: 0; border-radius: 3px; color: #e4cbb0; background: transparent; }
+    .size-buttons button[aria-pressed="true"], .view[aria-pressed="true"] { color: #27120b; background: #e4bd7a; }
+    .selection { align-self: center; color: #e6bd7d; font-size: 13px; }
+    .gallery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; max-width: 1780px; margin: auto; padding: 8px clamp(16px, 3vw, 48px) 40px; }
+    .gallery.focus { grid-template-columns: minmax(0, 680px); justify-content: center; }
+    .gallery.focus .card:not(.active) { display: none; }
+    .card { min-width: 0; border: 1px solid #75432d; border-radius: 9px; overflow: hidden; background: #210c0d; box-shadow: 0 9px 26px #070203aa; }
+    .card.active { outline: 2px solid #e4bd7a; outline-offset: 2px; }
+    .card-head { display: flex; gap: 8px; align-items: center; justify-content: space-between; min-height: 69px; padding: 10px 13px; background: linear-gradient(#4a1216, #26090d); }
+    .card-head h2 { margin: 0; color: #ffdfaa; font: 700 16px "Study Cinzel", Georgia, serif; }
+    .card-head small { display: block; color: #c7a794; }
+    .card-head button { flex: none; padding: 6px 9px; border: 1px solid #a27449; border-radius: 4px; color: #f1d5af; background: #361318; font-size: 12px; }
+    .card.active .card-head button { color: #281309; background: #e4bd7a; }
+    .parchment { min-height: 620px; margin: 11px; padding: 27px 22px 22px; border: 3px solid #784a27; border-radius: 5px; background: linear-gradient(#fff0ca55, #bf7d2a1a), url("../stitch-prototype/assets/images/97785ef87771.png") center / 100% 100%, #e7d2a9; box-shadow: inset 0 0 24px #5f321e77, 0 0 0 1px #e4b86d88; color: var(--ink); font-family: var(--face), Georgia, serif; font-size: var(--sample-size); line-height: 1.48; }
+    .parchment h3 { margin: 0 0 7px; color: #6d220c; font: 700 16px/1.25 "Study Cinzel", Georgia, serif; letter-spacing: .025em; }
+    .meta { margin: 0 0 14px; color: #67472b; font: 600 10.5px "Study Fira Code", monospace; }
+    .rule { height: 1px; margin: 14px 0; background: #7e4c2877; }
+    .parchment p { margin: 0 0 13px; }
+    .parchment .label { margin-bottom: 4px; color: #6a2818; font: 700 10px "Study Cinzel", Georgia, serif; letter-spacing: .045em; text-transform: uppercase; }
+    .parchment .quote { margin: 15px 0; padding: 10px 12px; border-left: 3px solid #7a3e21; background: #f1d9ad77; font-style: italic; font-weight: 600; }
+    .parchment code { padding: 1px 4px; border: 1px solid #a2724e; border-radius: 3px; background: #9e6c392b; color: #642411; font: 600 .84em "Study Fira Code", monospace; }
+    .parchment ul { margin: 4px 0 15px; padding-left: 20px; }
+    .parchment li { padding-left: 2px; margin-bottom: 5px; }
+    .accent-test { color: #513c2b; }
+    .card-foot { margin: 0; padding: 0 13px 13px; color: #b99d86; font-size: 12px; }
+    .note { max-width: 1780px; margin: auto; padding: 0 clamp(16px, 3vw, 48px) 30px; color: #baa998; }
+    @media (max-width: 1050px) { .gallery:not(.focus) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 680px) { .gallery:not(.focus) { grid-template-columns: minmax(0, 1fr); } .parchment { min-height: 0; } }
+    @media (prefers-reduced-motion: no-preference) { .card { transition: outline-color .15s, transform .15s; } .card:hover { transform: translateY(-2px); } }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="eyebrow">Dungeon Master · type study 01</div>
+    <h1>Choose the parchment serif</h1>
+    <p class="intro">A mesma descrição de tarefa aparece em sete fontes, em português brasileiro. Cinzel nos títulos e Fira Code nos trechos de código ficam iguais para destacar a fonte de leitura. Georgia reproduz a referência do Stitch; as outras seis são fontes abertas que podem acompanhar o aplicativo.</p>
+  </header>
+  <div class="controls">
+    <div class="control-group">
+      <label>Reading size
+        <span class="size-buttons" role="group" aria-label="Reading size">
+          <button type="button" data-size="12.5" aria-pressed="false">12.5</button>
+          <button type="button" data-size="14" aria-pressed="true">14</button>
+          <button type="button" data-size="16" aria-pressed="false">16</button>
+        </span>
+      </label>
+      <button class="view" type="button" id="view" aria-pressed="false">Focus on selected</button>
+    </div>
+    <div class="selection" role="status" aria-live="polite" id="selection">Selected: none</div>
+  </div>
+  <main class="gallery" id="gallery">
+    <article class="card" data-font="Georgia" style="--face: Georgia">
+      <div class="card-head"><div><h2>Georgia</h2><small>Stitch / system reference</small></div><button type="button" class="pick">Select</button></div>
+      <div class="parchment"></div>
+      <p class="card-foot">A familiar, sturdy baseline. Availability and rendering vary by operating system.</p>
+    </article>
+    <article class="card" data-font="EB Garamond" style="--face: 'Study EB Garamond'">
+      <div class="card-head"><div><h2>EB Garamond</h2><small>Literary · Latin Extended · OFL 1.1</small></div><button type="button" class="pick">Select</button></div>
+      <div class="parchment"></div>
+      <p class="card-foot">A classical book face with fine detail and a compact, elegant texture.</p>
+    </article>
+    <article class="card" data-font="Crimson Pro" style="--face: 'Study Crimson Pro'">
+      <div class="card-head"><div><h2>Crimson Pro</h2><small>Bookish · Latin Extended · OFL 1.1</small></div><button type="button" class="pick">Select</button></div>
+      <div class="parchment"></div>
+      <p class="card-foot">A solid reading face that keeps the parchment character at UI sizes.</p>
+    </article>
+    <article class="card" data-font="Cormorant" style="--face: 'Study Cormorant'">
+      <div class="card-head"><div><h2>Cormorant</h2><small>Calligraphic · Latin Extended · OFL 1.1</small></div><button type="button" class="pick">Select</button></div>
+      <div class="parchment"></div>
+      <p class="card-foot">A dramatic, delicate face with pronounced strokes and a compact x-height.</p>
+    </article>
+    <article class="card" data-font="Alegreya" style="--face: 'Study Alegreya'">
+      <div class="card-head"><div><h2>Alegreya</h2><small>Literary · Latin Extended · OFL 1.1</small></div><button type="button" class="pick">Select</button></div>
+      <div class="parchment"></div>
+      <p class="card-foot">Calligraphic movement with a sturdy text color, designed for sustained reading.</p>
+    </article>
+    <article class="card" data-font="Cardo" style="--face: 'Study Cardo'">
+      <div class="card-head"><div><h2>Cardo</h2><small>Medievalist · Latin Extended · OFL 1.1</small></div><button type="button" class="pick">Select</button></div>
+      <div class="parchment"></div>
+      <p class="card-foot">A historically minded text face; it also carries specialist scholarly and medieval glyphs.</p>
+    </article>
+    <article class="card" data-font="Almendra" style="--face: 'Study Almendra'">
+      <div class="card-head"><div><h2>Almendra</h2><small>Medieval calligraphic · Latin Extended · OFL 1.1</small></div><button type="button" class="pick">Select</button></div>
+      <div class="parchment"></div>
+      <p class="card-foot">The strongest medieval character in this set; compare carefully at 14–16 px for paragraph use.</p>
+    </article>
+  </main>
+  <p class="note">Compare 12,5 px para a densidade do protótipo Stitch, depois 14 e 16 px para uma leitura mais confortável. A amostra verifica á, à, â, ã, é, ê, í, ó, ô, õ, ú e ç em maiúsculas e minúsculas. O terminal PTY continua monoespaçado; esta fonte serifada é para narrativas e resumos de tarefas.</p>
+  <template id="sample"><h3>Resumo da tarefa</h3><div class="meta">#3 · FORMULÁRIO DE CADASTRO · PRONTA · 14:32</div><div class="rule"></div><p class="label">O que fazer</p><p>Crie um formulário responsivo para cadastrar a pessoa usuária. Envie o e-mail e a senha à API, valide os campos e mostre uma explicação clara quando houver algum problema. A página deve funcionar com teclado e leitor de tela.</p><p>Antes de começar, confira a descrição da tarefa e a questão bloqueadora <strong>#2 Desenhar a tela de boas-vindas</strong>. Preserve o comportamento atual e evite alterações fora do fluxo de cadastro.</p><div class="quote">“Vou examinar o contrato da API e preparar um teste específico para o fluxo de inscrição.”</div><p class="label">Critérios de aceite</p><ul><li>Um cadastro válido segue para a próxima etapa.</li><li>Um endereço inválido mostra uma mensagem junto ao campo.</li><li>A alteração mantém todos os testes existentes.</li></ul><p>Abra <code>CadastroForm.test.tsx</code> e confira os casos de <code>e-mail</code>, <code>senha</code> e resposta <code>409</code>.</p><div class="rule"></div><p class="accent-test"><strong>Vogais acentuadas e cedilha:</strong> á à â ã · é ê · í · ó ô õ · ú · ç · Á À Â Ã · É Ê · Í · Ó Ô Õ · Ú · Ç</p><p class="accent-test"><strong>Palavras:</strong> ação · página · usuário · órgão · você · útil · português · maçã · açúcar · bênção</p></template>
+  <script>
+    const gallery = document.getElementById('gallery');
+    const selection = document.getElementById('selection');
+    const template = document.getElementById('sample');
+    document.querySelectorAll('.parchment').forEach(el => el.append(template.content.cloneNode(true)));
+    document.querySelectorAll('.pick').forEach(button => button.addEventListener('click', () => {
+      document.querySelectorAll('.card').forEach(card => card.classList.remove('active'));
+      const card = button.closest('.card');
+      card.classList.add('active');
+      selection.textContent = `Selected: ${card.dataset.font}`;
+      button.textContent = 'Selected';
+      document.querySelectorAll('.pick').forEach(other => { if (other !== button) other.textContent = 'Select'; });
+    }));
+    document.querySelectorAll('[data-size]').forEach(button => button.addEventListener('click', () => {
+      document.documentElement.style.setProperty('--sample-size', `${button.dataset.size}px`);
+      document.querySelectorAll('[data-size]').forEach(other => other.setAttribute('aria-pressed', String(other === button)));
+    }));
+    document.getElementById('view').addEventListener('click', event => {
+      if (!document.querySelector('.card.active')) document.querySelector('.pick').click();
+      const isFocused = gallery.classList.toggle('focus');
+      event.currentTarget.setAttribute('aria-pressed', String(isFocused));
+      event.currentTarget.textContent = isFocused ? 'Show all four' : 'Focus on selected';
+    });
+  </script>
+</body>
+</html>
