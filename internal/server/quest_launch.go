@@ -22,16 +22,17 @@ type launchPreviewRequest struct {
 
 type launchPreviewJSON struct {
 	briefing.Result
-	CanStart     bool     `json:"canStart"`
-	Reason       string   `json:"reason,omitempty"`
-	Hero         string   `json:"hero,omitempty"`
-	HeroLabel    string   `json:"heroLabel,omitempty"`
-	Directory    string   `json:"directory,omitempty"`
-	BriefingID   string   `json:"briefingId,omitempty"`
-	BriefingFile string   `json:"briefingFile,omitempty"`
-	Opener       string   `json:"opener,omitempty"`
-	SystemPrompt string   `json:"systemPrompt,omitempty"`
-	Command      []string `json:"command,omitempty"`
+	CanStart        bool         `json:"canStart"`
+	Reason          string       `json:"reason,omitempty"`
+	Hero            string       `json:"hero,omitempty"`
+	HeroLabel       string       `json:"heroLabel,omitempty"`
+	Directory       string       `json:"directory,omitempty"`
+	BriefingID      string       `json:"briefingId,omitempty"`
+	BriefingFile    string       `json:"briefingFile,omitempty"`
+	Opener          string       `json:"opener,omitempty"`
+	SystemPrompt    string       `json:"systemPrompt,omitempty"`
+	Command         []string     `json:"command,omitempty"`
+	ExistingSession *sessionJSON `json:"existingSession,omitempty"`
 }
 
 // handleQuestLaunchPreview assembles and saves the exact context that Start
@@ -67,6 +68,12 @@ func (s *Server) handleQuestLaunchPreview(w http.ResponseWriter, r *http.Request
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
+	if existing := s.activeQuestSessionFor(c); existing != nil {
+		out.ExistingSession = existing
+		out.Reason = existing.Title + " is already working in this Git working tree."
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
 	s.partyMu.RLock()
 	h, ok := s.cfg.Party.Hero(req.Hero)
 	s.partyMu.RUnlock()
@@ -89,6 +96,45 @@ func (s *Server) handleQuestLaunchPreview(w http.ResponseWriter, r *http.Request
 	out.Directory, out.BriefingID, out.BriefingFile = c.Dir, plan.id, plan.path
 	out.Opener, out.SystemPrompt, out.Command = plan.opener, plan.systemPrompt, plan.command
 	writeJSON(w, http.StatusOK, out)
+}
+
+// activeQuestSessionFor finds the running quest session for the campaign's
+// Git working tree. Campaigns added from subdirectories share GitRoot.
+func (s *Server) activeQuestSessionFor(c campaign.Campaign) *sessionJSON {
+	tree := c.GitRoot
+	if tree == "" {
+		tree = c.Dir
+	}
+	tree = filepath.Clean(tree)
+	for _, rec := range s.cfg.History.List() {
+		if rec.Quest <= 0 || rec.Kind != "hero" || rec.Ended != nil || rec.Lost {
+			continue
+		}
+		live, ok := s.cfg.Sessions.Get(rec.ID)
+		if !ok {
+			continue
+		}
+		if exited, _ := live.Exited(); exited {
+			continue
+		}
+		other, ok := s.cfg.Campaigns.Get(rec.Campaign)
+		if !ok {
+			continue
+		}
+		otherTree := other.GitRoot
+		if otherTree == "" {
+			otherTree = other.Dir
+		}
+		if filepath.Clean(otherTree) != tree {
+			continue
+		}
+		found := sessionJSON{
+			ID: rec.ID, Kind: rec.Kind, Hero: rec.Hero, Quest: rec.Quest, Title: rec.Title,
+			Campaign: rec.Campaign, Dir: rec.Dir, Created: rec.Created,
+		}
+		return &found
+	}
+	return nil
 }
 
 type questLaunchPlan struct {

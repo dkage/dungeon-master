@@ -24,6 +24,7 @@ type Record struct {
 	Campaign string     `json:"campaign"`
 	Kind     string     `json:"kind"` // "hero" or "shell"
 	Hero     string     `json:"hero,omitempty"`
+	Quest    int        `json:"quest,omitempty"`
 	Title    string     `json:"title"`
 	Dir      string     `json:"dir"`
 	Created  time.Time  `json:"created"`

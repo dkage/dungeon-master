@@ -437,8 +437,23 @@ func TestQuestPreviewAndStartUseTheSamePrivateBriefing(t *testing.T) {
 	sj := e.create(map[string]any{
 		"hero": "opus", "quest": 42, "briefingId": preview.BriefingID,
 	})
-	if sj.Title != "#42 Fix signup validation" || sj.Dir != e.dir {
+	if sj.Title != "#42 Fix signup validation" || sj.Dir != e.dir || sj.Quest != 42 {
 		t.Fatalf("quest session metadata: %+v", sj)
+	}
+	previewResp, previewOut := e.req(http.MethodPost, "/api/campaigns/"+e.campaign+"/quests/42/launch-preview", map[string]any{"hero": "opus"}, nil)
+	var activePreview struct {
+		CanStart        bool        `json:"canStart"`
+		ExistingSession sessionJSON `json:"existingSession"`
+	}
+	if err := json.Unmarshal(previewOut, &activePreview); err != nil {
+		t.Fatal(err)
+	}
+	if previewResp.StatusCode != http.StatusOK || activePreview.CanStart || activePreview.ExistingSession.ID != sj.ID {
+		t.Fatalf("active quest preview: %d %s", previewResp.StatusCode, previewOut)
+	}
+	duplicateResp, duplicateOut := e.req(http.MethodPost, "/api/sessions", map[string]any{"campaign": e.campaign, "hero": "opus", "quest": 42}, nil)
+	if duplicateResp.StatusCode != http.StatusConflict || !strings.Contains(string(duplicateOut), "#42 Fix signup validation") {
+		t.Fatalf("duplicate worktree launch: %d %s", duplicateResp.StatusCode, duplicateOut)
 	}
 	c, _, err := e.dial(sj.ID, nil)
 	if err != nil {

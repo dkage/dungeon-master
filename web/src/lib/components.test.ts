@@ -66,6 +66,18 @@ describe('Toolbar', () => {
     expect(launch).toHaveBeenLastCalledWith({ shell: true })
   })
 
+  it('shows a centre quest chip for a linked session and opens that issue', async () => {
+    const s = store((st) => {
+      st.sessions = [sess('linked', 'c1', { quest: 12, title: '#12 Fix the map' })]
+      st.activeId = 'linked'
+    })
+    const select = vi.spyOn(s, 'selectQuest').mockResolvedValue()
+    render(Toolbar, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: '#12' }))
+    expect(s.questsOpen).toBe(true)
+    expect(select).toHaveBeenCalledWith(12)
+  })
+
   it('disables everything without a campaign', () => {
     render(Toolbar, { store: store((s) => { s.campaigns = []; s.campaignId = null }) })
     expect(screen.getByText('No campaign selected')).toBeInTheDocument()

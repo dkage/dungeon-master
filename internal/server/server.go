@@ -90,14 +90,15 @@ type Gatekeeper struct {
 
 // Server wires the handler, the guard and the listener together.
 type Server struct {
-	cfg       Config
-	http      *http.Server
-	ln        net.Listener
-	g         *guard
-	url       string // where this server can be reached, set once it listens
-	partyMu   sync.RWMutex
-	partyStop context.CancelFunc
-	partyWG   sync.WaitGroup
+	cfg           Config
+	http          *http.Server
+	ln            net.Listener
+	g             *guard
+	url           string // where this server can be reached, set once it listens
+	partyMu       sync.RWMutex
+	questLaunchMu sync.Mutex
+	partyStop     context.CancelFunc
+	partyWG       sync.WaitGroup
 
 	// The Gatekeeper answers the shim on its own private socket, never on
 	// the browser-facing port.

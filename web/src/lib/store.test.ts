@@ -21,7 +21,7 @@ const baseState: AppState = {
 function fakeClient(over: Partial<Client> = {}, state: Partial<AppState> = {}): Client {
   return {
     getState: vi.fn(async () => ({ ...baseState, ...state })),
-    createSession: vi.fn(async (req) => sess('s1', req.campaign, { kind: req.shell ? 'shell' : 'hero' })),
+    createSession: vi.fn(async (req) => sess('s1', req.campaign, { kind: req.shell ? 'shell' : 'hero', quest: req.quest })),
     deleteSession: vi.fn(async () => undefined),
     addCampaign: vi.fn(async (i) => camp('cnew', { dir: i.dir, name: i.name ?? 'new' })),
     updateCampaign: vi.fn(async (id, p) => camp(id, { name: p.name ?? 'C' })),
@@ -290,6 +290,26 @@ describe('sessions', () => {
     expect(await s.launchQuest(9, 'opus', preview?.briefingId)).toBe(true)
     expect(c.createSession).toHaveBeenCalledWith({ campaign: 'c1', hero: 'opus', quest: 9, briefingId: 'preview-1' })
     expect(s.activeId).toBe('s1')
+    expect(s.sessions[0].quest).toBe(9)
+    expect(s.questNumber).toBe(9)
+    expect(s.questsOpen).toBe(true)
+  })
+
+  it('restores the selected issue from a quest session and finds worktree conflicts', async () => {
+    const linked = sess('linked', 'c1', { quest: 9, title: '#9 Evaluate rate limits' })
+    const c = fakeClient({}, {
+      campaigns: [camp('c1', { gitRoot: '/repo' }), camp('c2', { gitRoot: '/repo' })],
+      sessions: [linked],
+    })
+    const s = new AppStore(c)
+    await s.refresh()
+    expect(s.questSessionForCampaign('c2')?.id).toBe('linked')
+    await s.selectSession('linked')
+    expect(s.campaignId).toBe('c1')
+    expect(s.activeId).toBe('linked')
+    expect(s.questsOpen).toBe(true)
+    expect(s.questNumber).toBe(9)
+    expect(s.detail?.number).toBe(9)
   })
 
   it('launch shows the server error and clears busy', async () => {

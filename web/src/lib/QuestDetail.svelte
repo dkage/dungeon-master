@@ -12,6 +12,7 @@
   const d = $derived(store.detail)
   const body = $derived(d ? renderMarkdown(d.body) : '')
   const safeUrl = $derived(d && /^https:\/\//i.test(d.url) && !store.campaign?.demo ? d.url : '')
+  const existingQuestSession = $derived(store.campaignId ? store.questSessionForCampaign(store.campaignId) : undefined)
   let briefDialog = $state<HTMLDialogElement>()
   let launchPreview = $state<LaunchPreview | null>(null)
   let selectedHero = $state('')
@@ -161,10 +162,13 @@
         {#if store.heroes.length === 0}<option value="">No heroes configured</option>{/if}
         {#each store.heroes as h (h.id)}<option value={h.id}>{h.label}</option>{/each}
       </select>
-      <button type="button" class="launch-button" onclick={openBrief} disabled={!d || !selectedHero || previewBusy || store.busy}>
+      <button type="button" class="launch-button" onclick={openBrief} disabled={!d || !selectedHero || previewBusy || store.busy || !!existingQuestSession}>
         {previewBusy ? 'Preparing…' : 'Review launch'}
       </button>
-      {#if d.state === 'locked'}<p class="launch-note">Resolve the blockers before starting this issue.</p>
+      {#if existingQuestSession}
+        <p class="launch-note">{existingQuestSession.title} is already running in this working tree.</p>
+        <button type="button" class="go-session" onclick={() => store.goToSession(existingQuestSession.id)}>Go to session</button>
+      {:else if d.state === 'locked'}<p class="launch-note">Resolve the blockers before starting this issue.</p>
       {:else if d.state === 'cleared'}<p class="launch-note">Closed issues cannot be started.</p>
       {:else if !store.claude.found}<p class="launch-note">Claude Code is unavailable. Check Settings.</p>{/if}
     </footer>
@@ -176,6 +180,7 @@
       {#if launchPreview}
         <p class="brief-summary">Prepared from {launchPreview.commentsShown} of {launchPreview.commentsTotal} comments{launchPreview.truncated ? ' · some context was shortened' : ''}.</p>
         {#if launchPreview.reason}<p class="launch-note" role="status">{launchPreview.reason}</p>{/if}
+        {#if launchPreview.existingSession}<button type="button" class="go-session" onclick={() => store.goToSession(launchPreview!.existingSession!.id)}>Go to {launchPreview.existingSession.title}</button>{/if}
         <dl class="plan-meta">
           {#if launchPreview.directory}<dt>Working directory</dt><dd>{launchPreview.directory}</dd>{/if}
           {#if launchPreview.briefingFile}<dt>Private briefing</dt><dd>{launchPreview.briefingFile}</dd>{/if}
@@ -186,7 +191,9 @@
         <pre class="brief-content">{launchPreview.content}</pre>
         <footer class="dialog-actions">
           <button type="button" class="cancel" onclick={closeBrief}>Cancel</button>
-          <button type="button" class="launch-button" onclick={startQuest} disabled={!launchPreview.canStart || store.busy}>{store.busy ? 'Starting…' : 'Start expedition'}</button>
+          {#if launchPreview.existingSession}
+            <button type="button" class="launch-button" onclick={() => store.goToSession(launchPreview!.existingSession!.id)}>Go to session</button>
+          {:else}<button type="button" class="launch-button" onclick={startQuest} disabled={!launchPreview.canStart || store.busy}>{store.busy ? 'Starting…' : 'Start expedition'}</button>{/if}
         </footer>
       {/if}
     </dialog>
@@ -199,6 +206,7 @@
   .launch-footer select { min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: var(--bg); color: var(--text); font: inherit; }
   .launch-button { border: 1px solid #a34c39; border-radius: 7px; padding: 7px 12px; background: linear-gradient(#8b3025, #5d1718); color: #f4dfbd; font: inherit; cursor: pointer; }
   .launch-button:disabled { opacity: .5; cursor: not-allowed; }
+  .go-session { border: 1px solid var(--accent); border-radius: 7px; padding: 6px 10px; background: transparent; color: var(--accent); cursor: pointer; }
   .launch-note { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 11px; }
   .brief-dialog { width: min(820px, calc(100vw - 32px)); max-height: min(88vh, 880px); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 24px 80px #0009; overflow: auto; }
   .brief-dialog::backdrop { background: #0009; backdrop-filter: blur(3px); }

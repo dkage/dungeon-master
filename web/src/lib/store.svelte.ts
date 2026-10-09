@@ -143,6 +143,22 @@ export class AppStore {
     return this.sessions.filter((s) => s.campaign === campaignId)
   }
 
+  questSessionForCampaign(campaignId: string): SessionInfo | undefined {
+    const campaign = this.campaigns.find((c) => c.id === campaignId)
+    if (!campaign) return
+    const tree = campaign.gitRoot || campaign.dir
+    return this.sessions.find((s) => {
+      if (!s.quest || s.exited || s.lost) return false
+      const other = this.campaigns.find((c) => c.id === s.campaign)
+      return (other?.gitRoot || other?.dir) === tree
+    })
+  }
+
+  async goToSession(id: string) {
+    if (!this.sessions.some((s) => s.id === id)) await this.refresh()
+    await this.selectSession(id)
+  }
+
   private fail(e: unknown): string {
     if ((e as { status?: number }).status === 401) this.unauthorised = true
     return message(e)
@@ -408,13 +424,18 @@ export class AppStore {
     if (changed) void this.loadQuests()
   }
 
-  selectSession(id: string) {
+  async selectSession(id: string) {
     const s = this.sessions.find((x) => x.id === id)
     if (!s) return
     const changed = s.campaign !== this.campaignId
     this.pickCampaign(s.campaign)
     this.activeId = id
     if (changed) void this.loadQuests()
+    const session = this.sessions.find((x) => x.id === id)
+    if (session?.quest) {
+      this.questsOpen = true
+      await this.selectQuest(session.quest)
+    }
   }
 
   async addCampaign(input: CampaignInput): Promise<boolean> {
@@ -503,6 +524,8 @@ export class AppStore {
       const sess = await this.client.createSession({ campaign: campaign.id, hero, quest: number, briefingId })
       this.sessions = [...this.sessions, sess]
       this.activeId = sess.id
+      this.questNumber = number
+      this.questsOpen = true
       this.error = null
       return true
     } catch (e) {

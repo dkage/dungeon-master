@@ -14,6 +14,7 @@
       <strong>{campaign.name}</strong>
       <span class="repo" class:none={!campaign.repo}>{campaign.repo ?? 'no GitHub repo'}</span>
       {#if activeSession}<span class="session-title"><span class="session-light" aria-hidden="true"></span>{activeSession.title}</span>{/if}
+      {#if activeSession?.quest}<button type="button" class="quest-session-chip" title={`Select issue #${activeSession.quest}`} onclick={() => { store.questsOpen = true; void store.selectQuest(activeSession.quest!) }}>#{activeSession.quest}</button>{/if}
       <code class="path" title={campaign.dir}>{campaign.dir}</code>
     {:else}
       <span class="hint">No campaign selected</span>

@@ -54,6 +54,8 @@ export interface SessionInfo {
   id: string
   kind: 'hero' | 'shell'
   hero?: string
+  /** GitHub issue number for a quest session; absent for free sessions. */
+  quest?: number
   title: string
   campaign: string
   dir: string
@@ -109,6 +111,7 @@ export interface LaunchPreview {
   opener?: string
   systemPrompt?: string
   command?: string[]
+  existingSession?: SessionInfo
 }
 
 export type QuestState = 'open' | 'locked' | 'claimed' | 'cleared'

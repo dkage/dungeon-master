@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -59,6 +60,7 @@ type sessionJSON struct {
 	ID       string    `json:"id"`
 	Kind     string    `json:"kind"` // "hero" or "shell"
 	Hero     string    `json:"hero,omitempty"`
+	Quest    int       `json:"quest,omitempty"`
 	Title    string    `json:"title"`
 	Campaign string    `json:"campaign"`
 	Dir      string    `json:"dir"`
@@ -111,7 +113,7 @@ func (s *Server) sessionViews() []sessionJSON {
 	out := make([]sessionJSON, 0, len(recs))
 	for _, r := range recs {
 		v := sessionJSON{
-			ID: r.ID, Kind: r.Kind, Hero: r.Hero, Title: r.Title, Campaign: r.Campaign,
+			ID: r.ID, Kind: r.Kind, Hero: r.Hero, Quest: r.Quest, Title: r.Title, Campaign: r.Campaign,
 			Dir: r.Dir, Created: r.Created, Lost: r.Lost,
 			Exited: r.Ended != nil, ExitCode: r.ExitCode,
 		}
@@ -374,12 +376,19 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, http.StatusBadRequest, "a quest session requires a hero")
 		return
 	}
+	if req.Quest > 0 {
+		// Serialize the check and spawn so two browser requests cannot race
+		// past the one-active-quest-session-per-worktree rule.
+		s.questLaunchMu.Lock()
+		defer s.questLaunchMu.Unlock()
+	}
 	cols, rows := req.Cols, req.Rows
 	if cols <= 0 || rows <= 0 || cols > 1000 || rows > 1000 {
 		cols, rows = defCols, defRows
 	}
 
 	var spec session.Spec
+	questNumber := 0
 	switch {
 	case req.Shell && req.Hero == "":
 		if s.cfg.Shell == "" {
@@ -417,6 +426,10 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 				httpErrCode(w, http.StatusConflict, "quest_not_startable", reason)
 				return
 			}
+			if existing := s.activeQuestSessionFor(camp); existing != nil {
+				httpErrCode(w, http.StatusConflict, "quest_session_active", fmt.Sprintf("%s is already working in this Git working tree.", existing.Title))
+				return
+			}
 			plan, err := s.questLaunchPlan(camp, d, h, req.BriefingID)
 			if err != nil {
 				if req.BriefingID != "" {
@@ -431,6 +444,8 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 				AddDirs: []string{filepath.Dir(plan.path)},
 			})
 			spec.Meta["title"] = fmt.Sprintf("#%d %s", d.Number, d.Title)
+			spec.Meta["quest"] = strconv.Itoa(d.Number)
+			questNumber = d.Number
 		} else {
 			spec = s.heroSpecWithGate(h, req.Opener)
 		}
@@ -447,7 +462,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	rec := history.Record{
 		ID: sess.ID, Campaign: camp.ID, Kind: spec.Meta["kind"], Hero: spec.Meta["hero"],
-		Title: spec.Meta["title"], Dir: camp.Dir, Created: sess.Created.UTC(),
+		Quest: questNumber, Title: spec.Meta["title"], Dir: camp.Dir, Created: sess.Created.UTC(),
 	}
 	if err := s.cfg.History.Add(rec); err != nil {
 		s.cfg.Sessions.Remove(sess.ID)

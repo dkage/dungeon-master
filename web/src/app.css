@@ -382,6 +382,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .toolbar .where strong { color: #f1dfbd; font: 700 14px 'Cinzel', var(--reading-font, serif); letter-spacing: .04em; }
 .toolbar .repo { color: #bea98e; }
 .toolbar .path { color: #907d6b; }
+.quest-session-chip { border: 1px solid #a34c39; border-radius: 10px; padding: 2px 8px; background: #401419; color: #f0c477; cursor: pointer; font: 600 12px ui-monospace, monospace; }
 .session-title { display: inline-flex; align-items: center; gap: 7px; max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 10px; border: 1px solid #80533a; border-radius: 5px; background: linear-gradient(180deg, #f0dfbb, #d9c49b); color: #311b15; font: 600 12px 'Cinzel', var(--reading-font, serif); }
 .session-light { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #9f2528; box-shadow: 0 0 7px #a92b2b; }
 .hero, .shell, .quests-toggle {
