@@ -1,5 +1,7 @@
 # Quest encounters: right-panel study
 
+This is the first prototype (v1). The current visual baseline is `design/stitch-prototype/`.
+
 Open `index.html` in a browser. This is a standalone, interactive design study at a
 392 px right-panel width, alongside a quiet terminal and the sample campaign.
 It does not change the app or its quest data.
@@ -32,12 +34,12 @@ generators. It mirrors the demo source's titles and relationships; its
 
 ## Assets
 
-| File | Purpose |
-| --- | --- |
-| `assets/rat-idle-strip.png` | Four transparent rat poses |
-| `assets/goblin-idle-strip.png` | Four transparent goblin poses |
+| File                              | Purpose                                                 |
+|-----------------------------------|---------------------------------------------------------|
+| `assets/rat-idle-strip.png`       | Four transparent rat poses                              |
+| `assets/goblin-idle-strip.png`    | Four transparent goblin poses                           |
 | `assets/many-eyed-idle-strip.png` | Four transparent poses of an original floating creature |
-| `assets/stone-floor.png` | Dark stone texture under a heavy CSS shade |
+| `assets/stone-floor.png`          | Dark stone texture under a heavy CSS shade              |
 
 The three strips are 2172 × 724 RGBA, with four 543 px wide cells. The mockup
 displays each cell inside a 58 × 70 px window. The first frame of every creature

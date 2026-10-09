@@ -6,6 +6,10 @@ the plain-words mode in `PLAN_M3_7.md` §2.9.
 
 This file describes behaviour in our own terms.
 
+The look is set by the prototype in `design/stitch-prototype/` (v4, the Dungeon pack's default theme, §6.5). The
+first prototype, `design/quest-encounters/`, is kept for its art direction notes. Where a prototype and this file
+disagree on behaviour, this file wins.
+
 ## 1. Window anatomy
 
 ```
@@ -157,12 +161,12 @@ Layout and map behaviour are in `PLAN_MAP.md` §2 and §3. The controls around t
   skill or None, opener, appended instructions and briefing file.
 - A hero with no quest at all (a free session) is not started from here; that is the campaign card's `+` menu (§2.3).
 
-| Footer action     | Hero | Quest context | Skill invoked | Where                    |
-|-------------------|------|---------------|---------------|--------------------------|
-| Start with skill  | yes  | yes           | yes           | detail footer            |
-| Start with None   | yes  | yes           | no            | detail footer            |
-| Free session      | yes  | no            | no            | campaign card `+` menu   |
-| Shell here        | no   | no            | no            | right panel header, card |
+| Footer action    | Hero | Quest context | Skill invoked | Where                    |
+|------------------|------|---------------|---------------|--------------------------|
+| Start with skill | yes  | yes           | yes           | detail footer            |
+| Start with None  | yes  | yes           | no            | detail footer            |
+| Free session     | yes  | no            | no            | campaign card `+` menu   |
+| Shell here       | no   | no            | no            | right panel header, card |
 
 - Disabled states say why next to Start, not only in a tooltip. A locked or closed quest keeps both combos and Start
   visible, but Start is disabled; "Blocked by #41, #43" links select the blockers (rules in `PLAN_MAP.md` §3). A quest
@@ -218,9 +222,9 @@ Three parts, matching `PLAN_SKILLS.md`:
 1. **Sources**: discovered sources (the project's skills folder, the user's, installed plugins) listed read-only with a
    skill count; registered sources (a folder or a git URL pinned to a commit) with enable, order (drag), refresh,
    remove, and **Add source**. Order is precedence when two sources have a skill with the same name.
-2. **Recommendation rules**: which spell is preselected in the quest footer for which kind of quest. A table of rows such as
-   `label bug → /diagnosing-bugs`, `label research → /research`, `anything else → /implement`, each a combo of the
-   discovered spells, with a link that reveals the skill on disk.
+2. **Recommendation rules**: which spell is preselected in the quest footer for which kind of quest. A table of rows
+   such as `label bug → /diagnosing-bugs`, `label research → /research`, `anything else → /implement`, each a combo
+   of the discovered spells, with a link that reveals the skill on disk.
 3. **Skill presets**: the user binds a skill to a named preset, optionally with fixed extra text after the skill
    (`/research` + "focus on security"). Presets appear as entries in the skill combo. This is how new skills become
    launch choices without code.
@@ -315,6 +319,9 @@ is mostly data, not a rewrite:
   text, so a choice can be made without closing Settings.
 - A starting dark palette exists from earlier design work (a dark, green-tinted palette with measured contrast and an
   IBM Plex Sans/Mono plus Libre Baskerville pairing). It is input to the design round, not a decision.
+- **The Dungeon pack's visual baseline is the v4 prototype** in `design/stitch-prototype/` (gothic, Diablo-like:
+  framed dark-red panels, a parchment terminal, Cinzel and Fira Code). Its colours, fonts and textures become the
+  pack's tokens and assets; its generated HTML is a reference, never copied into `web/`.
 
 Milestones: M3.6 ships the seams (words table with keys and the Neutral pack, icons by meaning, tokens), the Theme and
 Palette combos, the Dungeon and Neutral packs, and the completeness and contrast tests. The map skin choice per pack
