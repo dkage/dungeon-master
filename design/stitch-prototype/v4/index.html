@@ -727,7 +727,7 @@
       overflow: auto;
       background-image: 
         radial-gradient(circle at 50% 50%, rgba(20, 6, 8, 0.72) 0%, rgba(8, 2, 3, 0.94) 100%),
-        url('../assets/images/55bd72569546.png');
+        url('../assets/images/stone-floor.png');
       background-size: 550px;
       background-repeat: repeat;
     }
@@ -958,7 +958,7 @@
     .room-node.cleared .room-badge { background: #26593a; color: #e1ffe8; border-color: #46a165; }
     .room-node.assigned .room-badge { background: #8f581e; color: #fff3db; border-color: #df973b; }
 
-    /* Creature Sprites (rat ../assets/images/bcb65137ba29.png, goblin ../assets/images/0de927d22f2d.png, eye ../assets/images/6e6f91fe335c.png) */
+    /* Creature Sprites (rat ../assets/images/rat-idle-strip.png, goblin ../assets/images/goblin-idle-strip.png, eye ../assets/images/many-eyed-idle-strip.png) */
     .creature-viewport {
       width: 58px;
       height: 64px;
@@ -970,13 +970,13 @@
       margin-top: 2px;
     }
     .creature-viewport.rat {
-      background-image: url('../assets/images/3fa739975e42.png');
+      background-image: url('../assets/images/rat-idle-strip.png');
     }
     .creature-viewport.goblin {
-      background-image: url('../assets/images/fd9bc34b2786.png');
+      background-image: url('../assets/images/goblin-idle-strip.png');
     }
     .creature-viewport.eye {
-      background-image: url('../assets/images/20064ba6d969.png');
+      background-image: url('../assets/images/many-eyed-idle-strip.png');
     }
     .creature-viewport.unknown-diamond {
       display: grid;
@@ -1102,9 +1102,9 @@
       border: 1px solid #56201d;
       flex-shrink: 0;
     }
-    .list-item-thumb.rat { background-image: url('../assets/images/3fa739975e42.png'); }
-    .list-item-thumb.goblin { background-image: url('../assets/images/fd9bc34b2786.png'); }
-    .list-item-thumb.eye { background-image: url('../assets/images/20064ba6d969.png'); }
+    .list-item-thumb.rat { background-image: url('../assets/images/rat-idle-strip.png'); }
+    .list-item-thumb.goblin { background-image: url('../assets/images/goblin-idle-strip.png'); }
+    .list-item-thumb.eye { background-image: url('../assets/images/many-eyed-idle-strip.png'); }
     .list-item-thumb.unknown {
       display: grid;
       place-items: center;
@@ -2008,7 +2008,7 @@
 <path class="corridor-path locked" d="M197 356 V300 H313 V286"></path>
 <rect class="corridor-door" height="11" rx="2" width="8" x="309" y="286"></rect>
 </svg>
-<!-- Room 2: Design the welcome screen (Cleared, Rat ../assets/images/bcb65137ba29.png) -->
+<!-- Room 2: Design the welcome screen (Cleared, Rat ../assets/images/rat-idle-strip.png) -->
 <button aria-label="Quest 2, Cleared, Trivial effort rat" aria-pressed="false" class="room-node cleared node-pos-2" data-quest="2">
 <span class="room-badge">✓</span>
 <div class="creature-viewport rat animated-sprite"></div>
@@ -2017,7 +2017,7 @@
 <div class="room-title-snippet">Welcome screen</div>
 </div>
 </button>
-<!-- Room 3: Build the signup form (Active & Selected, Goblin ../assets/images/0de927d22f2d.png) -->
+<!-- Room 3: Build the signup form (Active & Selected, Goblin ../assets/images/goblin-idle-strip.png) -->
 <button aria-label="Quest 3, Ready, Moderate effort goblin" aria-pressed="true" class="room-node ready animated selected node-pos-3" data-quest="3">
 <span class="room-badge">!</span>
 <div class="creature-viewport goblin animated-sprite"></div>
@@ -2026,7 +2026,7 @@
 <div class="room-title-snippet">Signup form</div>
 </div>
 </button>
-<!-- Room 4: Validate email addresses (Blocked by #3, Goblin ../assets/images/0de927d22f2d.png) -->
+<!-- Room 4: Validate email addresses (Blocked by #3, Goblin ../assets/images/goblin-idle-strip.png) -->
 <button aria-label="Quest 4, Blocked by 3, Moderate effort goblin" aria-pressed="false" class="room-node locked node-pos-4" data-quest="4">
 <span class="room-badge">▣</span>
 <div class="creature-viewport goblin animated-sprite"></div>
@@ -2035,7 +2035,7 @@
 <div class="room-title-snippet">Validate emails</div>
 </div>
 </button>
-<!-- Room 5: Send the welcome email (Blocked by #4 & #7, Large Many-eyed Watcher ../assets/images/6e6f91fe335c.png) -->
+<!-- Room 5: Send the welcome email (Blocked by #4 & #7, Large Many-eyed Watcher ../assets/images/many-eyed-idle-strip.png) -->
 <button aria-label="Quest 5, Blocked by 4 and 7, Large effort many eyed creature" aria-pressed="false" class="room-node locked node-pos-5" data-quest="5">
 <span class="room-badge">▣</span>
 <div class="creature-viewport eye animated-sprite"></div>
