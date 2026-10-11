@@ -55,45 +55,88 @@ Each is one sheet of four idle frames, transparent, 2172 × 724 px (cells 543 ×
   a CSS comment ("inspired by"), and nothing renders them. Delete them and their manifest entries unless there is a
   licence.
 
+## How to use the prompts
+
+Paste the **painted prefix** or the **SVG prefix** first, then the item's prompt. Attach the three style-reference
+creatures (`rat`, `goblin`, `many-eyed` strips) to every painted request, and check the result next to them at native
+size. Most image models cannot output a true transparent background: ask for a flat pure-magenta (#FF00FF) background
+and remove it afterwards, or use a model that exports transparency. For SVG, ask a text model to write the code
+directly; no image model is needed.
+
+**Painted prefix:**
+> Original gothic dungeon-crawler illustration for a desktop app, matching the attached reference creatures: crisp dark
+> silhouette, restrained painterly pixel-art influence, cool blue ambient and rim light from the upper left, small warm
+> amber highlights, muted stone, wood and iron. Three-quarter front view, one subject, centred, on a flat pure-magenta
+> background. No text, letters, logos, UI, people, gore, cast shadow or ground plane beyond a small footing. Not
+> derived from any existing game or franchise. Square, 512 × 512.
+
+**SVG prefix:**
+> Write one standalone SVG file. Use the given `viewBox`, no `width` or `height`, no embedded raster, no text, no
+> gradients or filters. Draw with paths only, using `fill="currentColor"` or `stroke="currentColor"`, stroke width 1.5
+> or more, round joins, simple enough to read at 14 px. Return only the SVG code.
+
 ## To make: painted, PNG with transparent background
 
-- [ ] `dungeon-1-burrow.png`, 512 × 512: smallest dungeon, a cave mouth or burrow. Shown at about 128 to 160 px on the
-  world map.
-- [ ] `dungeon-2-crypt.png`, 512 × 512: a crypt entrance with steps and a sealed door.
-- [ ] `dungeon-3-tower.png`, 512 × 512: a ruined watchtower or chapel.
-- [ ] `dungeon-4-fortress.png`, 512 × 512: a fortress gate with walls.
-- [ ] `dungeon-5-citadel.png`, 512 × 512: the largest, a citadel or castle with a dragon's-lair feel.
-- [ ] `tavern.png`, 512 × 512: a tavern with lit windows and a notice board with pinned notes (no readable text).
+- [ ] `dungeon-1-burrow.png`, 512 × 512: smallest dungeon, shown at about 128 to 160 px on the world map.
+  > Subject: a small burrow or cave mouth in a mossy rock mound, a few stones around it, a faint warm glow inside. The
+  > smallest and least threatening of five dungeon sizes.
+- [ ] `dungeon-2-crypt.png`, 512 × 512:
+  > Subject: a crypt entrance cut into a hillside: short stone steps down to a sealed iron-banded door under a carved
+  > arch, two small unlit braziers. Slightly larger and grimmer than a burrow.
+- [ ] `dungeon-3-tower.png`, 512 × 512:
+  > Subject: a ruined stone watchtower with a broken top, one lit arrow-slit window, ivy and fallen stones at the base.
+- [ ] `dungeon-4-fortress.png`, 512 × 512:
+  > Subject: a fortress gatehouse with two squat towers and a short wall, a closed portcullis, torches on the wall and
+  > a banner torn at the edges.
+- [ ] `dungeon-5-citadel.png`, 512 × 512: the largest, a ladder step above the fortress.
+  > Subject: a tall citadel of many spires on a rocky crag, ember-red light in the windows and wisps of smoke, an
+  > ominous dragon's-lair feel. The most imposing of the five.
+- [ ] `tavern.png`, 512 × 512:
+  > Subject: a cosy, slightly worn timber-and-stone tavern with warm lit windows, a hanging sign (blank, no text), and
+  > a notice board beside the door with several pinned paper notes (no readable text). Warmer and friendlier than the
+  > dungeons, with the same lighting style.
 
-The tier follows the dungeon's size and danger, so the five read as a ladder from small to grand. Each is one static
-frame, centred, small footing only (no ground plane or cast shadow beyond the sprite), the base of the building at the
-bottom edge, 16 px of transparent margin. A flicker of torchlight is done in code.
+The five dungeons must read as a ladder from small to grand when placed side by side; generate them in one session so
+the scale and style stay consistent. A flicker of torchlight is done in code.
 
 ## To make: backgrounds, tileable, opaque
 
-- [ ] `world-floor.jpg`, 1024 × 1024, seamless, JPG quality 85: dark worn stone or parchment, very low contrast, with a
-  faint hint of old paths. The world map's backdrop; nodes must stay readable on it.
-- [ ] `tavern-floor.jpg`, 1024 × 1024, seamless, JPG quality 85: dark wooden planks, warm and low contrast. Optional;
-  the stone floor can be reused.
+- [ ] `world-floor.jpg`, 1024 × 1024, seamless, JPG quality 85:
+  > Seamless tileable texture, 1024 × 1024: dark worn stone with a very faint hint of old paths and cracks, low
+  > contrast, nearly black-blue, no focal point, no text. Light and detail must be even across the whole image so it
+  > tiles without visible seams. Cool blue ambient, a trace of warm tone. Same material family as the attached stone
+  > floor.
+- [ ] `tavern-floor.jpg`, 1024 × 1024, seamless, JPG quality 85: optional; the stone floor can be reused.
+  > Seamless tileable texture, 1024 × 1024: dark wooden floor planks, warm brown, low contrast, a little wear, no
+  > focal point, no text, even light so it tiles without seams.
 
 ## To make: SVG, vector
 
 Rules: `viewBox` as given, no fixed width or height, `fill` or `stroke` set to `currentColor`, no embedded raster, no
-text, stroke 1.5 or heavier so they stay clear at 12 to 16 px.
+text, stroke 1.5 or heavier so they stay clear at 12 to 16 px. Each prompt follows the **SVG prefix**.
 
-- [ ] `gate-closed.svg`, 24 × 40: a small portcullis on a blocked-by line, next to the blocked room.
-- [ ] `gate-open.svg`, 24 × 40: the same gate raised, once the blocker is closed.
-- [ ] `badge-ready.svg`, 24 × 24: `!` mark.
-- [ ] `badge-needs-you.svg`, 24 × 24: `?` mark.
-- [ ] `badge-assigned.svg`, 24 × 24: `@` mark.
-- [ ] `badge-locked.svg`, 24 × 24: padlock.
-- [ ] `badge-closed.svg`, 24 × 24: `×` mark.
-- [ ] `badge-cleared.svg`, 24 × 24: check mark.
-- [ ] `badge-running.svg`, 24 × 24: a small torch or a hero's helm; a session is working here.
-- [ ] `stub-diamond.svg`, 64 × 64: hollow diamond for a quest outside the scope or with unknown effort.
-- [ ] `boss-frame.svg`, 240 × 280, designed for 9-slice scaling: an ornate room frame for the last quest of a blocker
-  chain. Corners fixed, edges stretch. Optional.
-- [ ] `priority-gem.svg`, 16 × 16: a small jewel for urgent priority. Optional.
+- [ ] `gate-closed.svg`, `viewBox="0 0 24 40"`:
+  > A small portcullis seen from the front: two stone posts, a row of vertical iron bars with pointed ends lowered
+  > fully, a crossbar. Reads as "blocked".
+- [ ] `gate-open.svg`, `viewBox="0 0 24 40"`:
+  > The same portcullis and posts as the closed gate, with the bars raised to the top third, leaving the opening
+  > empty. Reads as "open".
+- [ ] `badge-ready.svg`, `viewBox="0 0 24 24"`: > A bold exclamation mark, centred, thick stroke.
+- [ ] `badge-needs-you.svg`, `viewBox="0 0 24 24"`: > A bold question mark, centred, thick stroke.
+- [ ] `badge-assigned.svg`, `viewBox="0 0 24 24"`: > An at-sign, centred, thick stroke.
+- [ ] `badge-locked.svg`, `viewBox="0 0 24 24"`: > A closed padlock: rounded body, a shackle, a small keyhole.
+- [ ] `badge-closed.svg`, `viewBox="0 0 24 24"`: > A bold multiplication cross (×), centred, thick stroke.
+- [ ] `badge-cleared.svg`, `viewBox="0 0 24 24"`: > A bold check mark, centred, thick stroke.
+- [ ] `badge-running.svg`, `viewBox="0 0 24 24"`:
+  > A hand torch: a short handle and a flame with one inner tongue. Reads as "someone is working here".
+- [ ] `stub-diamond.svg`, `viewBox="0 0 64 64"`:
+  > A hollow diamond (a square rotated 45°) with a thick outline and nothing inside, centred with a small margin.
+- [ ] `boss-frame.svg`, `viewBox="0 0 240 280"`, optional, for 9-slice scaling:
+  > A rectangular room frame, outline only: an ornate border with a small spike or crest at each corner and a small
+  > crown notch at the top centre. The corners are 40 × 40 units and the straight edges between them are plain, so the
+  > frame can stretch. The inside is empty.
+- [ ] `priority-gem.svg`, `viewBox="0 0 16 16"`, optional:
+  > A small faceted gem seen from the front, a flat-top cut with a few facet lines.
 
 ## Not needed
 
