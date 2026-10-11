@@ -118,6 +118,9 @@ built separately, never by the portable build.
   call the real `claude`, `gh` or the network in automated tests; real-CLI checks are manual probes in the gitignored
   `_probe/`.
 - Never build a command line through a shell; exec argv directly.
+- **GitHub issues have a shape.** Every issue you create uses the `issue-shape` skill (`.claude/skills/issue-shape`;
+  contract in `docs/design/issue-shape.md`): an effort label, sub-issues for epics, blocked-by links in order, neutral
+  wording.
 - Module path is `github.com/dkage/dungeon-master`. The product name "Dungeon Master" is provisional: it appears in
   prose and UI text only, while the binary, config directory and `DUNGEON_HOME` keep the short `dungeon` name so a later
   rename stays cheap.
