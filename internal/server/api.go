@@ -32,6 +32,7 @@ const (
 
 func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/state", s.handleState)
+	mux.HandleFunc("GET /api/sessions", s.handleSessions)
 	mux.HandleFunc("GET /api/heroes/config", s.handleHeroesConfig)
 	mux.HandleFunc("PUT /api/heroes/config", s.handleSaveHeroesConfig)
 	mux.HandleFunc("POST /api/heroes/adopt-starters", s.handleAdoptStarterHeroes)
@@ -130,6 +131,12 @@ func (s *Server) sessionViews() []sessionJSON {
 		out = append(out, v)
 	}
 	return out
+}
+
+// handleSessions is the cheap list the browser polls to see which sessions are
+// working or waiting; it touches no campaigns, quests or GitHub.
+func (s *Server) handleSessions(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, s.sessionViews())
 }
 
 func (s *Server) handleState(w http.ResponseWriter, _ *http.Request) {

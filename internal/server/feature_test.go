@@ -598,7 +598,7 @@ func TestSessionAPIRequiresAuthAndJSON(t *testing.T) {
 	e := startServer(t, nil)
 	noAuth := func(r *http.Request) { r.Header.Del("Authorization") }
 	for _, tc := range []struct{ method, path string }{
-		{"GET", "/api/state"}, {"POST", "/api/sessions"}, {"DELETE", "/api/sessions/s1"},
+		{"GET", "/api/state"}, {"GET", "/api/sessions"}, {"POST", "/api/sessions"}, {"DELETE", "/api/sessions/s1"},
 	} {
 		if resp, _ := e.req(tc.method, tc.path, map[string]any{}, noAuth); resp.StatusCode != http.StatusUnauthorized {
 			t.Errorf("%s %s without auth: %d", tc.method, tc.path, resp.StatusCode)
