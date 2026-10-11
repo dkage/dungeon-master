@@ -343,22 +343,27 @@ then shows a meaningful map within seconds, before any GitHub setup.
   "hall" and "outskirts" are drawing terms, not new vocabulary; if shown at all, they appear as plain "group" and
   "other epics" in the popover.
 
-## 10. Remaining design questions
+## 10. Decisions and remaining questions
 
 Decided: cleared quests and dungeons are shown greyed with a green check; "hide cleared" is optional (§3, Levels).
 
-1. Hero tokens: generated geometric faces, or user-chosen class glyphs?
-2. Do halls (parents as regions) read better than parent links drawn as lines? Worth a quick prototype of both on the
-   sample data.
-3. A quest in the scope whose parent epic is not: the Tavern (simplest, recommended for v1, with "part of #N, not in
-   scope" in the detail), or a dashed stub dungeon holding only its in-scope children?
-4. Danger by blocker chain (proposal): the last quest of a chain is the boss, drawn in the boss frame. The creature
-   still follows effort; the frame carries position. At the world level, a dungeon's art tier follows its size and
-   longest chain.
-5. A very large world map (many epics): the first version lays out all nodes; grouping by milestone is for later.
-6. Where is a hall's own creature drawn: in its header, or not at all? An epic's effort label is shown as a word either way.
-7. Priority needs its own source (a `priority:*` label, or a Projects field). It is a small jewel on the room and never
-   changes the effort tier.
+Decided (the author delegated these; revisit any of them after seeing the map on a real repository):
+
+1. **Hero tokens (M6):** generated geometric faces from the hero id, with no art to commission. A user-chosen class
+   glyph can come later as an option.
+2. **Halls:** parents drawn as regions that hold their children, as in the v4 prototype. Lines are only for blocked-by.
+3. **A quest in scope whose parent epic is not:** it goes in the Tavern, and its detail says "part of #N, not in scope".
+   A dashed stub dungeon is not built in v1.
+4. **Boss:** the last quest of a dungeon's longest blocker chain, when that chain has three or more quests, gets the
+   boss frame. The creature still follows effort; the frame carries position. At the world level, a dungeon's art tier
+   follows its size and its longest chain.
+5. **A very large world map:** the first version lays out every node; grouping by milestone is for later.
+6. **A hall's own creature:** not drawn. The hall's header shows its title, progress and effort word. The creature
+   belongs to quests that are rooms.
+7. **Priority:** a `priority:low`, `priority:normal`, `priority:high` or `priority:urgent` label, mapped per campaign
+   like effort. Only high (amber) and urgent (red) draw the small jewel on the room. It never changes the effort tier.
+8. **Epic hint labels:** `epic` and `initiative` are hints only; the sub-issue links decide what an epic is
+   (`docs/design/issue-shape.md`).
 
 Decided: the epic itself can be started like any quest (what a session on an epic opens with is part of the briefing
 work). A dungeon with many quests scrolls vertically inside the map. The map reads from the local SQLite copy once it
