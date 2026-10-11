@@ -174,8 +174,8 @@ detail footer. So a locked quest can always be opened and read, it just cannot b
 
 ### Room anatomy (from the v4 prototype)
 
-- Top to bottom: creature (or the hollow diamond when effort is unknown), then `#N` with the effort word (Trivial,
-  Moderate, Large, Unknown), then the short title.
+- Top to bottom: creature (or the hollow diamond when effort is unknown), then `#N` with the effort word (Trivial, Low,
+  Moderate, High, Extreme, Unknown), then the short title.
 - A round **state badge** sits on the top-right corner: `✓` cleared, `!` open, a small lock or box for locked, `@`
   assigned elsewhere, `×` closed, `?` needs you. The prototype also puts `!` on the quest that has a running session;
   that is a prototype shortcut. A running quest shows the hero token and warm light from §3 States, so state and
