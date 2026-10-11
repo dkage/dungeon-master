@@ -9,12 +9,12 @@ verified: 2026-10-11
 
 # Dungeon Master: experience plan
 
-How the app should feel from the first launch to the hundredth quest. Extends `PLAN.md` (it changes milestone order and
-adds acceptance rules, it does not replace the architecture), `PLAN_SKILLS.md` and `release/PLAN_RELEASE.md`. Status of
+How the app should feel from the first launch to the hundredth quest. Extends `docs/architecture.md` (it changes milestone order and
+adds acceptance rules, it does not replace the architecture), `docs/design/skills.md` and `release/PLAN_RELEASE.md`. Status of
 the work lives in `CLAUDE.md`, not here.
 
 Written against the tree as of 2026-10-08, updated after M3 (quests list and detail) landed. The first new milestone is
-M3.6. (`PLAN_M3_5.md` is a separate plan, about GitHub limits and scope; see §4 for how the two fit.)
+M3.6. (`docs/design/github-budget.md` is a separate plan, about GitHub limits and scope; see §4 for how the two fit.)
 
 ## 1. Where we are (verified)
 
@@ -45,10 +45,10 @@ What is missing or weak for someone opening it for the first time:
 | **Starter heroes are a permanent banner**, not an action. The user is told to create a file by hand.                                                                                                    | `Toolbar.svelte` notice               |
 | **A quest and a session are not connected yet.** Starting a hero ignores the selected quest (that is M4).                                                                                               | `store.launch`                        |
 | **No visual identity.** One generic palette, no tokens, nothing RPG anywhere, including the places that should carry it (empty states, state markers, the map).                                         | `app.css`                             |
-| **The map does not exist, and it is scheduled last** (M6, "can slip"). It is the one thing that makes the app different from a plain launcher.                                                          | `PLAN.md` §11                         |
+| **The map does not exist, and it is scheduled last** (M6, "can slip"). It is the one thing that makes the app different from a plain launcher.                                                          | `docs/architecture.md` §11                         |
 | **No attention signal.** A dot for running or exited. Nothing tells you an agent is waiting for you while you are in another tab.                                                                       | `Sidebar.svelte`                      |
 | **Silent limits in the quest list.** At most 300 open issues and the 50 most recently updated closed ones are fetched, and the panel does not say so. A large repository looks complete when it is not. | `internal/quests/github/client.go`    |
-| **Docs drift** remains in `PLAN.md` (stale status line, old state names, old sync design); see the docs audit list kept with the milestone notes.                                                       | `PLAN.md` §2, §4, §6, §12, §13        |
+| **Docs drift** remains in `docs/architecture.md` (stale status line, old state names, old sync design); see the docs audit list kept with the milestone notes.                                                       | `docs/architecture.md` §2, §4, §6, §12, §13        |
 | **Dev state hides first-run problems.** Every developer run uses an existing config directory, so empty states are never seen.                                                                          | `make run`                            |
 
 ## 2. Lessons we carry into the design
@@ -105,7 +105,7 @@ M0 to M4 are done. New or moved work is marked.
 
 | Milestone                                   | Content                                                                                                                                                                      | Exit test (a person does this on a fresh config directory)                                                                                                                                     |
 |---------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **M3** (done)                               | Quests list and detail, GitHub source, demo source, sanitised markdown                                                                                                       | Met. Follow-ups carried into M3.6 (the scope part of the truncation fix is Phase B of `PLAN_M3_5.md`): say when the list is truncated, and stop offering sample quests inside a real campaign. |
+| **M3** (done)                               | Quests list and detail, GitHub source, demo source, sanitised markdown                                                                                                       | Met. Follow-ups carried into M3.6 (the scope part of the truncation fix is Phase B of `docs/design/github-budget.md`): say when the list is truncated, and stop offering sample quests inside a real campaign. |
 | **M3.6 Stitch shell, first run and words** (done) | Implement the Stitch v4 cockpit structure and visual foundation in Svelte; fit onboarding, sample campaign, repo suggestions, glossary and `Term`, starter heroes action, empty states, appearance settings, `make run-fresh`, and the first-run browser test into that shell. Reserve the right-panel map/detail split with existing list/detail behavior; do not build the graph yet. | Met from a fresh config; the Stitch shell has a clear place for the future map and quest launch controls. |
 | **M4 Launch from a quest** (done)           | Briefing, pinned detail-footer hero/model and skill controls, primary "Start with" button, session titles from quests, quest chip, one-session-per-tree gate; neutral GitHub write-back stays opt-in and off | Met from a fresh config; see GitHub M4 parent issue #19 and `make check` / `make test-e2e`.                                                        |
 | **M4.5 Attention** (pulled forward from M7) | "Needs you" signal from PTY output recency (hooks replace it in M7), tab title and favicon badge, optional OS notification                                                   | Start two sessions, switch away, and know which one stopped to ask something without looking.                                                                                                  |
@@ -155,7 +155,7 @@ the top jumps to the sample campaign.
 - When `party.toml` is missing, built-in heroes carry a small "starter" tag and the notice offers **Keep these starter
   heroes**. This explicitly writes the local file (0600, atomically); the heroes then appear in Settings for editing and
   the starter notice disappears. The user does not need to open or edit the file directly; Settings owns it as described
-  in `PLAN_UI.md` §6.1.
+  in `docs/design/ui.md` §6.1.
 - A malformed `party.toml` shows its error with the line and keeps the last good party running.
 - File changes reload without a restart.
 - The default hero is a stored setting (first hero until changed) and is what "Start with" uses.
@@ -213,7 +213,7 @@ type scale, and one monospace stack shared with the terminal theme. Dark is the 
 Tokens live in one file; components reference tokens only.
 
 **First step of the UI work: implement the settled font choice.** The comparison is in
-`design/font-study/`; `PLAN_UI.md` §6.5 records the decision. Appearance & words offers Almendra (default), EB Garamond,
+`design/font-study/`; `docs/design/ui.md` §6.5 records the decision. Appearance & words offers Almendra (default), EB Garamond,
 and Alegreya for the campaign and quest panels, plus an independent size control for each panel including the terminal.
 The terminal keeps its monospaced Nerd Font stack. Keep Cinzel for display headings and Fira Code for code samples.
 Bundle the font files used by the app with their matching SIL Open Font License texts, and retain Portuguese accents in
@@ -269,7 +269,7 @@ Written as rules; each is cheap to check in review.
 - **Scope fences.** Not in v1 and not to be built "just in case": a task store of our own, a database server, a workflow
   or pipeline engine, registries or versioned bundles of hero setups, containers or sandboxes, a memory or knowledge
   store, autonomy beyond "you press the button", scoring, achievements or levels, headless runs with result screens.
-- **Own as little as possible.** Skills come from a pinned external source (as in `PLAN_SKILLS.md`); issue relationships
+- **Own as little as possible.** Skills come from a pinned external source (as in `docs/design/skills.md`); issue relationships
   come from GitHub; status comes from Claude's hooks.
 - **Data honesty.** Three kinds of data (yours, sample, starter) each have their own look and removal path. Nothing
   system-owned appears in a list of user-owned things without a tag.
@@ -304,7 +304,7 @@ Written as rules; each is cheap to check in review.
    allowed, or sessions disabled for the sample?
 4. **Windows in v1?** It decides the PTY approach and the release matrix before M8.
 5. **Does an unattended mode** (non-interactive `claude -p` for research tickets) belong in v1, v2, or never? It is the
-   one feature that conflicts with "the terminal is the product", so it stays in `PLAN_V2.md` until decided.
+   one feature that conflicts with "the terminal is the product", so it stays in `docs/ideas.md` until decided.
 
 ## 11. Definition of done for the experience
 

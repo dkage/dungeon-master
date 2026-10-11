@@ -15,7 +15,7 @@ future UI work; they are not part of the app's runtime bundle.
 ## Using these materials
 
 - Start with `stitch-prototype/` for the current overall composition and
-  `PLAN_UI.md`, `PLAN_MAP.md`, and `GLOSSARY.md` for product behavior and
+  `docs/design/ui.md`, `docs/design/map.md`, and `GLOSSARY.md` for product behavior and
   terminology.
 - Use `font-study/` when evaluating the three serif choices, including their
   Portuguese glyph coverage. Its font binaries are study assets; copy only the

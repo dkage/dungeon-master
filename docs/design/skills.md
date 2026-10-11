@@ -9,7 +9,7 @@ verified: 2026-10-11
 
 # Dungeon Master — skills plan
 
-How skills ("spells") fit into Dungeon Master. Extends §7 of `PLAN.md` (M5). v1 = Claude Code only.
+How skills ("spells") fit into Dungeon Master. Extends §7 of `docs/architecture.md` (M5). v1 = Claude Code only.
 
 ## 1. What this builds on
 
@@ -59,7 +59,7 @@ That is nearly our dungeon model for free:
 Consequences:
 
 - **We don't invent a claim mechanism.** The skill assigns the ticket; the app just reads the assignee. For wayfinder
-  tickets, the optional "in-progress" label from `PLAN.md` §6 is unnecessary.
+  tickets, the optional "in-progress" label from `docs/architecture.md` §6 is unnecessary.
 - The app is a **viewer + launcher**; the skill does the GitHub writing. This fits "invisible to the team": only an
   explicit `/wayfinder` run writes `wayfinder:*` labels and comments.
 - Parsing the map body (fog, decisions) is best-effort markdown parsing; if a section is missing, just don't draw fog.
@@ -86,7 +86,7 @@ Rules live in a small **local** table (state dir), editable in the UI, later (v2
 
 Launching: `claude <hero args> "/<skill> <issue-url>"`. Because these skills fetch their own context from the tracker,
 the app **skips the long briefing** for them: the opener is the slash command + URL, and the tracker facts go in a short
-`--append-system-prompt` (§4). The briefing file (`PLAN.md` §8) is still used for plain issues with no skill.
+`--append-system-prompt` (§4). The briefing file (`docs/architecture.md` §8) is still used for plain issues with no skill.
 
 To verify early (M1): that a slash command passed as the positional prompt runs the user-invoked skill in the
 interactive TUI, and that `--append-system-prompt` can be combined with it.
@@ -134,7 +134,7 @@ Principle: **own as little as possible.** Start with zero forked skills; add one
 
 ## 7. Milestone changes
 
-Replaces the M5 outline in `PLAN.md`. The order against the other milestones is in `PLAN_EXPERIENCE.md` §4.
+Replaces the M5 outline in `docs/architecture.md`. The order against the other milestones is in `docs/design/experience.md` §4.
 
 - **M5a** Discovery (`.claude/skills`, `~/.claude/skills`, plugin dirs, registered spellbooks), frontmatter parse,
   skill combo, manual badge.
@@ -150,5 +150,5 @@ Replaces the M5 outline in `PLAN.md`. The order against the other milestones is 
    probably.)
 4. Do we want a "skills only" mode without GitHub (e.g. plain terminal + spells in a folder with no remote)? Falls out
    for free: the quest list is empty.
-5. Other agents later (`PLAN_V2.md`): Claude-native skills don't exist in Codex/agy, so for them we'd paste the skill
+5. Other agents later (`docs/ideas.md`): Claude-native skills don't exist in Codex/agy, so for them we'd paste the skill
    body into a briefing. Keep the spell model agent-independent; only the *delivery* is Claude-specific.

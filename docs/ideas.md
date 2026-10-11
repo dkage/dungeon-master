@@ -9,7 +9,7 @@ verified: 2026-10-11
 
 # Dungeon Master — plan v2 (parking lot)
 
-Brainstorm only. Nothing here is in v1 (see `PLAN.md`: Claude only, GitHub issues read-mostly, one expedition per
+Brainstorm only. Nothing here is in v1 (see `docs/architecture.md`: Claude only, GitHub issues read-mostly, one expedition per
 working tree). Add ideas freely; promote to a real plan when v1 is stable.
 
 ## More agents
@@ -71,7 +71,7 @@ working tree). Add ideas freely; promote to a real plan when v1 is stable.
 - Label/type → spell presets (bug → debug spell).
 - Git spellbooks with pinning; spell editor.
 - Prompt presets catalog per campaign.
-- Per-campaign custom spell buttons (v1 has global custom buttons only, `PLAN_UI.md` §6.2).
+- Per-campaign custom spell buttons (v1 has global custom buttons only, `docs/design/ui.md` §6.2).
 
 ## Release / distribution
 
@@ -83,11 +83,11 @@ working tree). Add ideas freely; promote to a real plan when v1 is stable.
 
 ## Theme packs (initiative)
 
-v1 ships the Dungeon and Neutral packs and the seams for more (`PLAN_UI.md` §6.5). Later:
+v1 ships the Dungeon and Neutral packs and the seams for more (`docs/design/ui.md` §6.5). Later:
 
 - New packs, such as a starship pack (sectors, missions, crew, a star-chart map skin, its own icons and palettes).
 - Per-pack component variants (framed panels, button shapes) through named variants and tokens, not forked components.
-- Richer map skins per pack (art, portraits, animated tokens; `PLAN_MAP.md` directions E and F).
+- Richer map skins per pack (art, portraits, animated tokens; `docs/design/map.md` directions E and F).
 - User-installable packs: data only (words, tokens, sanitised SVGs), no scripts or arbitrary CSS.
 - A pack gallery with previews.
 

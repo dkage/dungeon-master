@@ -77,4 +77,4 @@ objects or text.
 The three silhouettes work at selected-room scale. At a full 300-quest zoom-out,
 the renderer should fall back to small room shapes and state marks; reveal the
 creatures when zoomed into a hall or selecting a quest. Keep the plain SVG graph
-as the underlying renderer, as planned in `PLAN_MAP.md`.
+as the underlying renderer, as planned in `docs/design/map.md`.

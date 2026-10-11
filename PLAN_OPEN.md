@@ -24,18 +24,18 @@ These choices shaped the milestone order and remain the current direction unless
 |---|------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
 | 1 | Roadmap import before M4?                                                          | Deferred until the Quartermaster has a real write caller             |
 | 2 | Should sessions receive `GH_TOKEN` and `GITHUB_TOKEN` from the app's own env?      | Keep inheriting; document the issues-only token (done in README)      |
-| 3 | Does the scope picker live inside the Start-here checklist (M3.6)?                 | Yes, one first-run path (`PLAN_M3_7.md` 2.5)                          |
-| 4 | Does the plain-words switch ship with the hover help in M3.6 or right after?       | With it; both are about the same words (`PLAN_M3_7.md` 2.9)           |
-| 5 | Is the milestone order from `PLAN_EXPERIENCE.md` §4 confirmed (map before spells)? | Yes, it is the reason to pick this app over a plain launcher          |
+| 3 | Does the scope picker live inside the Start-here checklist (M3.6)?                 | Yes, one first-run path (`docs/design/review-findings.md` 2.5)                          |
+| 4 | Does the plain-words switch ship with the hover help in M3.6 or right after?       | With it; both are about the same words (`docs/design/review-findings.md` 2.9)           |
+| 5 | Is the milestone order from `docs/design/experience.md` §4 confirmed (map before spells)? | Yes, it is the reason to pick this app over a plain launcher          |
 | 6 | Plain-words rules: are the six plumbing names internal only?                       | Yes; applied to notices, still to check the rest of the UI            |
 
 ## 2. Next milestones, in order
 
-The content of each is in `PLAN_EXPERIENCE.md` §4; this is only what is not started.
+The content of each is in `docs/design/experience.md` §4; this is only what is not started.
 
 - **M4.5 Attention** is issue #23 and **M5a Map v1** is issue #28, each with child issues. The map's design stays in
-  `PLAN_MAP.md` until the issues close.
-- **M5b Spells** (`PLAN_SKILLS.md`), **M6 Map v2**, **M7 Hooks status**, **M8 Packaging**.
+  `docs/design/map.md` until the issues close.
+- **M5b Spells** (`docs/design/skills.md`), **M6 Map v2**, **M7 Hooks status**, **M8 Packaging**.
 
 The 15-creature effort roster and style-matched prototype sheets are now in
 `design/quest-encounters/`. They are the planned art inputs for the first M5a
@@ -46,14 +46,14 @@ issue identity and state readable.
 ## 3. Left over from M3.5
 
 - **Chronicle** (SQLite copy of tracked issues) and **Caravan** (paced bulk writes): build only when a feature needs
-  offline use or a large import. Design is kept in `PLAN_M3_5.md` §5.
+  offline use or a large import. Design is kept in `docs/design/github-budget.md` §5.
 - **Camp against the real GitHub**: refusal and recovery have only run against the fake. Needs a manual probe that is
   safe to run (read-only calls with a tiny budget), recorded in the gitignored `_probe/`.
-- **Pins as a scope mode**: local, no footprint on GitHub. Listed in `PLAN_V2.md`; build when someone cannot add a
+- **Pins as a scope mode**: local, no footprint on GitHub. Listed in `docs/ideas.md`; build when someone cannot add a
   label.
 - **Gatekeeper limits to measure**: how an agent behaves on exit 75 (does it stop, as the rule asks, or retry?). Try it
   with a real Claude session by hand.
-- **Rate-limit chip placement**: it is a line in the quest panel; `PLAN_UI.md` may move it. Follow that plan.
+- **Rate-limit chip placement**: it is a line in the quest panel; `docs/design/ui.md` may move it. Follow that plan.
 
 ## 4. Windows and release
 
@@ -73,8 +73,8 @@ Windows 10 1803 is the minimum (README). Nothing has run on Windows yet.
 
 ## 6. Documentation to reconcile
 
-Done on 2026-10-11: `PLAN.md`, `PLAN_SKILLS.md`, `PLAN_V2.md`, `GLOSSARY.md`, `release/PLAN_RELEASE.md` and the
-`CLAUDE.md` vocabulary line. Still open from `PLAN_M3_7.md` §1:
+Done on 2026-10-11: `docs/architecture.md`, `docs/design/skills.md`, `docs/ideas.md`, `GLOSSARY.md`, `release/PLAN_RELEASE.md` and the
+`CLAUDE.md` vocabulary line. Still open from `docs/design/review-findings.md` §1:
 
 - Move status words ("in progress", "deferred") out of the plans into the `CLAUDE.md` line, and give each plan a header
   saying whether it is current, built or superseded, so no agent acts on a stale one.
@@ -87,6 +87,6 @@ Done on 2026-10-11: `PLAN.md`, `PLAN_SKILLS.md`, `PLAN_V2.md`, `GLOSSARY.md`, `r
   formatter's test directory.
 - The demo issues #1 to #6 in `dkage/dungeon-master` are all marked "[demo]"; close them when no longer needed.
 - `.claude/skills/formatting-markdown/` has uncommitted changes from another session; commit or drop them there.
-- Wide table rows in `GLOSSARY.md` and `PLAN_M3_5.md` cannot be wrapped; shorten the cells.
+- Wide table rows in `GLOSSARY.md` and `docs/design/github-budget.md` cannot be wrapped; shorten the cells.
 - `CLAUDE.md` still says "Commit only when asked"; the standing rule in this project is to commit each step and push to
   `master`. Update the line so a new session does not hesitate.

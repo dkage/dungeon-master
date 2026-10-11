@@ -9,11 +9,11 @@ verified: 2026-10-11
 
 # Map and right panel: design
 
-Design for the map (M5a and M6 in `PLAN_EXPERIENCE.md` §4) and the right-hand panel around it. The right-column
+Design for the map (M5a and M6 in `docs/design/experience.md` §4) and the right-hand panel around it. The right-column
 composition is decided and its shell belongs in M3.6; M5a implements the graph and sprite-backed rooms inside the
 reserved map region.
 
-The Stitch v4 prototype is the visual reference for the shell. This document specifies map behavior; `PLAN_UI.md`
+The Stitch v4 prototype is the visual reference for the shell. This document specifies map behavior; `docs/design/ui.md`
 specifies the surrounding controls. Where the generated prototype differs from those behavior plans, the plans win.
 
 ## 1. What we want
@@ -35,7 +35,7 @@ Constraints:
 - Creatures communicate **effort**; light, shape, and glyphs communicate **state**. Never make the creature species
   carry blocked, active, assigned, or cleared state.
 - Readable first: a user must understand the state of a repository at a glance, in both theme modes.
-- Works with the plain-words mode (`PLAN_M3_7.md` §2.9): the map has a plain rendering too.
+- Works with the plain-words mode (`docs/design/review-findings.md` §9): the map has a plain rendering too.
 - Fast enough for about 300 quests, accessible by keyboard and screen reader, testable without a browser for the
   layout logic.
 
@@ -57,7 +57,7 @@ Constraints:
 └──────────────┴──────────────────────────────────┴──────────────────────────────┘
 ```
 
-The controls around the map (header, detail, footer, settings, shortcuts) are specified in `PLAN_UI.md`; this section
+The controls around the map (header, detail, footer, settings, shortcuts) are specified in `docs/design/ui.md`; this section
 keeps only the layout decision.
 
 This keeps the selected terminal visible while the user reads the map and quest detail, matching the Stitch cockpit
@@ -71,7 +71,7 @@ and keeping the three regions in stable roles.
 - **Detail footer**, pinned, never scrolls away:
     - **hero/model picker** defaults to the campaign's last-used hero, then the global default;
     - **skill picker** defaults to the recommendation, groups other skills Plan / Do / Check, and offers None for a
-      plain quest session (see `PLAN_UI.md` §5.3);
+      plain quest session (see `docs/design/ui.md` §5.3);
     - **Start** launches the chosen hero and invokes the chosen skill as the opener. Disabled states say why ("claude
       not found", "another session is working in this folder").
 - **Expand the map**: one key (M) or a button makes the map fill the centre temporarily, for large repositories. Escape
@@ -82,7 +82,7 @@ and keeping the three regions in stable roles.
 
 ### States
 
-The state language from `PLAN_EXPERIENCE.md` §7.3, made visual. Colour is never the only signal; each state has a
+The state language from `docs/design/experience.md` §7.3, made visual. Colour is never the only signal; each state has a
 shape or glyph too.
 
 | Quest state          | Light                    | Glyph    | Meaning                                   |
@@ -281,12 +281,12 @@ then shows a meaningful map within seconds, before any GitHub setup.
 
 ## 9. Plan alignment
 
-- `PLAN_EXPERIENCE.md` §3 and §4: implement the Stitch cockpit shell in M3.6 and reserve the right-column map/detail
+- `docs/design/experience.md` §3 and §4: implement the Stitch cockpit shell in M3.6 and reserve the right-column map/detail
   split there; M5a implements the graph. The terminal remains in the full-height centre.
-- `PLAN_EXPERIENCE.md` §3 and §7.5: launch controls move into the detail footer with a hero/model combo, a skill combo
+- `docs/design/experience.md` §3 and §7.5: launch controls move into the detail footer with a hero/model combo, a skill combo
   defaulted to the recommendation or None, and Start. None gives a plain quest session without a skill.
-- `PLAN_EXPERIENCE.md` §7.4: point to this file for the map design.
-- `PLAN_SKILLS.md` §6: the spell strip becomes the footer's skill combo, not a separate strip.
+- `docs/design/experience.md` §7.4: point to this file for the map design.
+- `docs/design/skills.md` §6: the spell strip becomes the footer's skill combo, not a separate strip.
 - `GLOSSARY.md`: "hall" and "outskirts" are drawing terms, not new vocabulary; if shown at all, they appear as plain
   "group" and "unlinked" in the popover.
 

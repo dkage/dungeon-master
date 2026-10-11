@@ -3,7 +3,7 @@ status: partial
 milestone: M0-M8 master plan
 github_issues: []
 tracking: none
-next: keep; built through M4; remaining sections are history, order of work is in PLAN_EXPERIENCE.md
+next: keep; built through M4; remaining sections are history, order of work is in docs/design/experience.md
 verified: 2026-10-11
 ---
 
@@ -12,7 +12,7 @@ verified: 2026-10-11
 A desktop cockpit for a human "Dungeon Master" who runs a party of CLI coding agents (Claude in v1; Codex and agy later)
 against **GitHub issues**. One button = one agent CLI launched in a PTY with its model, flags and context already set.
 
-Current status lives in `CLAUDE.md`. Order of upcoming work: `PLAN_EXPERIENCE.md` §4.
+Current status lives in `CLAUDE.md`. Order of upcoming work: `docs/design/experience.md` §4.
 
 ## Design principle: invisible to the team
 
@@ -37,7 +37,7 @@ for them is built now: no adapter registry, no typed-prompt fallback, no per-age
 - **Agent library**: a local file of named heroes (model, flags, env); the UI generates one launch button per hero.
 - **One-button launch**: click spawns a PTY running the agent CLI with its arguments and a one-line opener.
 - **Briefing**: the opener points at a file assembled fresh per expedition from the issue.
-- **Skills as buttons**: discovered skills become selectable spells (see `PLAN_SKILLS.md`).
+- **Skills as buttons**: discovered skills become selectable spells (see `docs/design/skills.md`).
 - **Terminal**: Go PTY ↔ websocket ↔ xterm.js with scrollback replay and live status.
 - **Shell**: a pure-Go server embeds the SPA; an optional cgo webview wraps it in a native window.
 - **Release**: GoReleaser for portable binaries plus per-OS native packaging jobs.
@@ -200,7 +200,7 @@ only and never stored, logged or sent to the browser. No OAuth app or hosted ser
 
 Today: GraphQL, a 60 s in-memory cache with throttled refresh, shared in-flight fetches and a stale fallback; scope is
 part of the query. Every request goes through the Quartermaster, which paces them and pauses when GitHub asks. The
-design, and the SQLite copy that is built only when a feature needs it, are in `PLAN_M3_5.md`.
+design, and the SQLite copy that is built only when a feature needs it, are in `docs/design/github-budget.md`.
 
 - Fetch: issues, labels, assignees, milestone, comments (lazy, on open), linked PRs
   (`closedByPullRequestsReferences`) and relationships.
@@ -231,7 +231,7 @@ upstream), private repos, SSO-protected orgs.
 
 ## 7. Skills → spells → buttons
 
-> Detailed skills plan: `PLAN_SKILLS.md` (supersedes the M5 outline in §11).
+> Detailed skills plan: `docs/design/skills.md` (supersedes the M5 outline in §11).
 
 Discovery (read-only scan, re-scanned on file change):
 
@@ -352,7 +352,7 @@ Claude hooks → working/idle/needs-input, native notifications.
 Webview shell, macOS .app/.dmg, GoReleaser, draft→publish release workflow, Linux AppImage, first alpha tag.
 
 M1 → M4 is the first usable version; M6 can slip. The M-numbers above are history; the order of upcoming work is in
-`PLAN_EXPERIENCE.md` §4.
+`docs/design/experience.md` §4.
 
 ---
 
@@ -374,9 +374,9 @@ M1 → M4 is the first usable version; M6 can slip. The M-numbers above are hist
 ## 13. Decisions I made that you may want to change
 
 1. Name/module: `github.com/dkage/dungeon-master`; binary and config directory keep the short name `dungeon`.
-2. Layout: see `PLAN_EXPERIENCE.md` §3 (stage tabs, one primary Start button).
+2. Layout: see `docs/design/experience.md` §3 (stage tabs, one primary Start button).
 3. Auth via `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token` — no OAuth app.
-4. Polling, not webhooks; cache and sync design in `PLAN_M3_5.md`.
+4. Polling, not webhooks; cache and sync design in `docs/design/github-budget.md`.
 5. v1 is Claude-only; hero = a Claude config (model + flags), no adapter field yet.
 6. Spells are discovered from standard skill dirs automatically (no manual registration needed for the common case).
 7. macOS: unsigned + ad-hoc, arm64 only, for the first alpha.
@@ -388,7 +388,7 @@ M1 → M4 is the first usable version; M6 can slip. The M-numbers above are hist
 
 ## 14. Later plan (not in v1): more agents
 
-Broader parking lot: see `PLAN_V2.md`.
+Broader parking lot: see `docs/ideas.md`.
 
 Separate plan once v1 is stable. Known work, so v1 doesn't paint us into a corner:
 

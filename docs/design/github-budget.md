@@ -10,7 +10,7 @@ verified: 2026-10-11
 # M3.5: GitHub budget and scope
 
 Status: phases A, B and E done; C and D deferred. Comes after M3 (quests list and detail). It runs in parallel with M3.6
-(first run and words, in `PLAN_EXPERIENCE.md`) and finishes before M4. Names for the themed concepts are in
+(first run and words, in `docs/design/experience.md`) and finishes before M4. Names for the themed concepts are in
 `GLOSSARY.md`; Go packages keep plain names.
 
 Two problems, one cause: Dungeon Master reads GitHub as its database, and GitHub is a rate-limited service shared with
@@ -30,7 +30,7 @@ every other tool on the same token (the `gh` CLI, scripts, agents).
 | 3 | Pacing defaults: **3 s** between writes (plus jitter), **15 per rolling minute**, **150 per rolling hour**, keep **20%** of the hourly read budget for interactive use. About a quarter of GitHub's limits. |
 | 4 | Agent guard: **both** a rule in the agent's instructions and a `gh` shim for sessions the app starts.                                                                                                       |
 | 5 | Order: see "Phases". Changed after a review (below); **the part after phase B is awaiting confirmation**.                                                                                                   |
-| 6 | Token: `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`, as now. A fine-grained token limited to issues is documented as the safer option. **No GitHub Apps** for now (kept in `PLAN_V2.md`).                  |
+| 6 | Token: `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`, as now. A fine-grained token limited to issues is documented as the safer option. **No GitHub Apps** for now (kept in `docs/ideas.md`).                  |
 | 7 | Issue reads and writes use **GraphQL**; **REST only for the free change probe**.                                                                                                                            |
 
 ### Review of the first order, and what changed
@@ -39,7 +39,7 @@ The first version built five phases (budget, scope, SQLite copy, paced write que
 that plan made these points, which are right:
 
 - It is a lot of infrastructure before the core loop (pick a quest, start an agent) works.
-- Bulk writes from the app are a v2 idea; `PLAN.md` says write-back is small and opt-in. The app makes **no** writes
+- Bulk writes from the app are a v2 idea; `docs/architecture.md` says write-back is small and opt-in. The app makes **no** writes
   today, so a write queue has nothing to queue yet.
 - The one real defect is M3's label filter running after a 300-issue cut. That is phase B and is small.
 

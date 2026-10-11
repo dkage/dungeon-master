@@ -10,8 +10,8 @@ verified: 2026-10-11
 # Screens and controls
 
 Every screen of the cockpit, region by region: what is on it, what each control does, and which milestone builds it.
-Principles come from `PLAN_EXPERIENCE.md`; the map itself is designed in `PLAN_MAP.md`; words follow `GLOSSARY.md` and
-the plain-words mode in `PLAN_M3_7.md` §2.9.
+Principles come from `docs/design/experience.md`; the map itself is designed in `docs/design/map.md`; words follow `GLOSSARY.md` and
+the plain-words mode in `docs/design/review-findings.md` §9.
 
 This file describes behaviour in our own terms.
 
@@ -46,7 +46,7 @@ Settings open as a modal over the whole window (§6).
 ### 2.1 Search
 
 A filter box at the top. Typing filters campaigns and expeditions in place. Ctrl/Cmd+K opens the command palette
-(`PLAN_EXPERIENCE.md` §7.5) for jumping to a quest by number or title, which the filter box does not do.
+(`docs/design/experience.md` §7.5) for jumping to a quest by number or title, which the filter box does not do.
 
 ### 2.2 Campaigns header
 
@@ -105,7 +105,7 @@ Rules:
   `{path}` or `{cancelled: true}`, and has a long timeout because a person is choosing. Commands are run as argv,
   never through a shell, and the prompt text is fixed.
 - When no picker is available (a headless Linux box, a missing `zenity`), the dialog falls back to the typed path field
-  with suggestions (`PLAN_EXPERIENCE.md` §5.1). The typed field also stays available behind "Type a path instead".
+  with suggestions (`docs/design/experience.md` §5.1). The typed field also stays available behind "Type a path instead".
 - After a folder is picked, a short confirm step shows what was found: the git root (and that the folder is a subfolder
   of it, if so), `owner/repo`, an editable name, and, for a GitHub repository, the scope question from M3.5 (which
   issues to show). A folder without git or GitHub is allowed: heroes and shells work, the quest panel says why it is
@@ -137,7 +137,7 @@ the left panel is the session list, so tabs would be a second copy of it.
 
 ## 5. Right panel
 
-Layout and map behaviour are in `PLAN_MAP.md` §2 and §3. The controls around them:
+Layout and map behaviour are in `docs/design/map.md` §2 and §3. The controls around them:
 
 ### 5.1 Map header
 
@@ -184,7 +184,7 @@ Layout and map behaviour are in `PLAN_MAP.md` §2 and §3. The controls around t
 | Shell here       | no   | no            | no            | right panel header, card |
 
 - Disabled states say why next to Start, not only in a tooltip. A locked or closed quest keeps both combos and Start
-  visible, but Start is disabled; "Blocked by #41, #43" links select the blockers (rules in `PLAN_MAP.md` §3). A quest
+  visible, but Start is disabled; "Blocked by #41, #43" links select the blockers (rules in `docs/design/map.md` §3). A quest
   with an active session offers **Go to session** instead of starting a duplicate.
 
 ## 6. Settings
@@ -232,7 +232,7 @@ Milestone: M3.6 for the table and dialog, because the starter heroes become edit
 
 ### 6.2 Spells and buttons
 
-Three parts, matching `PLAN_SKILLS.md`:
+Three parts, matching `docs/design/skills.md`:
 
 1. **Sources**: discovered sources (the project's skills folder, the user's, installed plugins) listed read-only with a
    skill count; registered sources (a folder or a git URL pinned to a commit) with enable, order (drag), refresh,
@@ -256,7 +256,7 @@ and **Create from defaults**, **Open in editor** and **Reveal**:
 Milestone: M4.5 usability follow-up. Hero editing remains in M3.6 Settings; this section is for direct file status and
 file actions.
 
-The same pattern as the starter-heroes action in `PLAN_EXPERIENCE.md` §5.3, applied to every file.
+The same pattern as the starter-heroes action in `docs/design/experience.md` §5.3, applied to every file.
 
 ### 6.4 Other sections
 
@@ -291,8 +291,8 @@ everything about how the app looks and what things are called, while nothing abo
 - safety and error text, which is plain in every pack;
 - accessibility: every pack passes the same contrast, focus and reduced-motion rules.
 
-**The Neutral pack is the plain mode.** The plain-words mode (`PLAN_M3_7.md` §2.9) becomes simply the Neutral pack:
-standard IT words (project, issue, agent, skill, session), the plain graph map (direction A in `PLAN_MAP.md`), standard
+**The Neutral pack is the plain mode.** The plain-words mode (`docs/design/review-findings.md` §9) becomes simply the Neutral pack:
+standard IT words (project, issue, agent, skill, session), the plain graph map (direction A in `docs/design/map.md`), standard
 icons and calm palettes. "Themed with hints" stays a separate switch that works for every themed pack: on first sight a
 themed word shows its plain name, and the hover popover always gives the plain meaning.
 
@@ -317,7 +317,7 @@ is mostly data, not a rewrite:
 1. **Words** come from one table keyed by neutral keys (`entity.campaign`, `state.locked`, ...). Each pack provides a
    value for every key; the Neutral pack is the plain meaning. A unit test fails when a pack misses a key, so packs
    stay complete. Sentences use templates over keys, with singular and plural.
-2. **Map skins** implement the one renderer interface in `PLAN_MAP.md` §5. A pack names its skin; the layout model is
+2. **Map skins** implement the one renderer interface in `docs/design/map.md` §5. A pack names its skin; the layout model is
    shared by all skins.
 3. **Icons** are referenced by meaning (`icon.quest`, `icon.locked`, `icon.hero`), never by file. Each pack maps
    meanings to its own SVGs; the Neutral pack uses a standard icon set.
@@ -354,7 +354,7 @@ Milestones: M3.6 applies the Stitch v4 visual foundation to the Svelte cockpit s
 choice, ships the glossary and font controls, and establishes the right-panel split. Full theme-pack data seams,
 multiple palettes, pack completeness and contrast tests are deferred until a second pack is approved; do not build a
 generic pack framework ahead of that need. M5a fills the reserved map area with the sprite-backed interactive graph. New packs, such
-as a starship pack, are a later initiative in `PLAN_V2.md`.
+as a starship pack, are a later initiative in `docs/ideas.md`.
 
 ## 7. Keyboard and platform conventions
 
@@ -420,7 +420,7 @@ bindings; the R1 smoke test opens Settings with ⌘, and pastes into a text fiel
 
 - **M3.6 (shipped)**: Stitch v4 cockpit shell and right-panel list/detail split; onboarding and sample campaign;
   glossary, starter heroes and hero settings; Dungeon/Neutral appearance choice, three bundled reading fonts, and
-  independent panel font sizes. This is the scope in `PLAN_EXPERIENCE.md` §4 and the M3.6 acceptance issue.
+  independent panel font sizes. This is the scope in `docs/design/experience.md` §4 and the M3.6 acceptance issue.
 - **M4**: detail footer with hero combo, None skill choice and Start; Brief preview; quest chip in the centre header;
   quest session titles; campaign action menu and free-session/shell actions. The operating-system folder picker is a
   follow-up after the typed path and repository suggestions already available in first run.
@@ -428,7 +428,7 @@ bindings; the R1 smoke test opens Settings with ⌘, and pastes into a text fiel
   files section; browser keyboard shortcuts and shortcut help; session terminal settings. Keep native app menus and
   window state in R1.
 - **M5a**: the sprite-backed graph in the map area established in M3.6; stable per-issue creature assignment from
-  known effort tiers, separate state markers, Map / List behavior, expand, and drilling into halls (`PLAN_MAP.md`).
+  known effort tiers, separate state markers, Map / List behavior, expand, and drilling into halls (`docs/design/map.md`).
 - **M5b**: Spells settings (sources, recommendation rules, skill presets) and the populated skill combo.
 - **R1** (release): native menus with Settings on ⌘, and the standard Edit menu (§7.1), window state.
 - **Later**: automatic titles for free sessions, art for hero crests.
@@ -442,10 +442,10 @@ Decided (2026-10-08; updated 2026-10-09):
 1. Settings is a **modal** over the whole window (§6).
 2. The app **owns the heroes file**; users edit heroes in Settings and never need the file (§6.1).
 3. The **scratch shell** stays, as `>_` next to the campaigns header (§2.2).
-4. Skill presets are **global** for now. Per-campaign presets are a later idea (`PLAN_V2.md`).
-5. A locked quest **cannot be started**: no "start anyway" override (`PLAN_MAP.md` §3).
+4. Skill presets are **global** for now. Per-campaign presets are a later idea (`docs/ideas.md`).
+5. A locked quest **cannot be started**: no "start anyway" override (`docs/design/map.md` §3).
 6. The terminal stays in the centre while the right panel holds the map/list and quest detail; no centre stage tabs
-   (`PLAN_EXPERIENCE.md` §3, `PLAN_MAP.md` §2).
+   (`docs/design/experience.md` §3, `docs/design/map.md` §2).
 
 Still open:
 

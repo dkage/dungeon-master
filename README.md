@@ -11,8 +11,8 @@ already set.
 > settings, and quest-to-session launch flow (M4) are complete. M4.5 adds session attention signals; the dependency
 > graph with creature sprites follows in M5a. The 15-creature roster and prototype sheets in `design/quest-encounters/` are
 > the planned art inputs for that first renderer.
-> See [PLAN_EXPERIENCE.md](PLAN_EXPERIENCE.md) for the current experience and milestone order, [PLAN_SKILLS.md](PLAN_SKILLS.md)
-> for how skills fit in, [release/](release/README.md) for the release plan, and [PLAN_V2.md](PLAN_V2.md) for ideas
+> See [docs/design/experience.md](docs/design/experience.md) for the current experience and milestone order, [docs/design/skills.md](docs/design/skills.md)
+> for how skills fit in, [release/](release/README.md) for the release plan, and [docs/ideas.md](docs/ideas.md) for ideas
 > that are not in v1.
 
 - v1 targets Claude Code only; other agents come later.
@@ -136,7 +136,7 @@ stops while GitHub has asked for a pause, so a loop cannot get you locked out. I
 cannot stop a command that calls `gh` by absolute path, another client such as `curl`, or `gh api`. For stronger
 protection, give agents a [fine-grained token](https://github.com/settings/personal-access-tokens) limited to issues,
 and start heroes without `--dangerously-skip-permissions`. Sessions inherit `GH_TOKEN` from the environment the app
-started in; the Gatekeeper rule and its limits are described in [PLAN_M3_5.md](PLAN_M3_5.md).
+started in; the Gatekeeper rule and its limits are described in [docs/design/github-budget.md](docs/design/github-budget.md).
 
 ## Acknowledgements
 
