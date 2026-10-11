@@ -3,8 +3,7 @@
 A desktop cockpit for a human "Dungeon Master" who runs a party of CLI coding agents (Claude in v1; Codex and agy later)
 against **GitHub issues**. One button = one agent CLI launched in a PTY with its model, flags and context already set.
 
-Status: plan only. The repo currently holds a GoLand hello-world (`main.go`, `go.mod` = `module dungeon`, go 1.26) — to
-be replaced.
+Current status lives in `CLAUDE.md`. Order of upcoming work: `PLAN_EXPERIENCE.md` §4.
 
 ## Design principle: invisible to the team
 
@@ -44,7 +43,7 @@ for them is built now: no adapter registry, no typed-prompt fallback, no per-age
 | **Campaign**   | A working directory registered in the app, usually a git repo or a subfolder of one (monorepo). Issues come from the git root's remote; the agent runs in the registered folder. Optional label filter per campaign | local registry (state dir) + `git rev-parse --show-toplevel` / `git remote` → `owner/repo` |
 | **Quest**      | A GitHub issue                                                                                                                                                                                                      | GitHub                                                                                     |
 | **Dungeon**    | The visual graph of a campaign's quests (rooms = issues, doors/corridors = "blocked by"/sub-issue links)                                                                                                            | derived                                                                                    |
-| **Room state** | Unexplored (open, unclaimed) · Locked (has open blocker) · Occupied (a session holds it) · Cleared (closed / PR merged) · Trapped (session failed / needs input)                                                    | derived from issue state, labels, blockers, linked PR, live sessions                       |
+| **Room state** | Open (unclaimed, unblocked) · In progress (assigned) · Locked (has open blocker) · Cleared (closed / PR merged). Session-driven "occupied" and "needs you" arrive with M4 and M4.5                              | derived from issue state, labels, blockers, linked PR, live sessions                       |
 | **Hero**       | A registered agent: adapter + model + flags + env. One button each                                                                                                                                                  | `party.toml` (local, uncommitted)                                                          |
 | **Party**      | The set of heroes                                                                                                                                                                                                   | `party.toml`                                                                               |
 | **Expedition** | A live PTY session: one hero on one quest (or a free shell)                                                                                                                                                         | runtime                                                                                    |
@@ -129,7 +128,7 @@ Key runtime pieces:
 - Terminal state/detection: `github.com/charmbracelet/x/vt` (headless VT emulator to read the screen for "waiting for
   input" detection)
 - Config: `github.com/BurntSushi/toml`; file watching: `github.com/fsnotify/fsnotify`
-- GitHub: `github.com/google/go-github` (REST) + a tiny GraphQL call for Projects v2 (or `github.com/shurcooL/githubv4`)
+- GitHub: a hand-written GraphQL client over the Quartermaster's transport (`internal/quartermaster`)
 - Native window: `github.com/webview/webview_go` (cgo)
 - Frontend: Svelte 5 + Vite + TypeScript, `@xterm/xterm` (+ fit/webgl addons), `marked` + `dompurify` for issue markdown
   (issue bodies are untrusted — always sanitize), optionally shadcn-svelte/Tailwind
@@ -185,29 +184,26 @@ args = ["--model", "claude-haiku-5-5"]
 
 ### Auth
 
-Prefer reusing the user's existing login: run `gh auth token` (fallback: `GITHUB_TOKEN`, then a token pasted into
-settings, stored in the OS keychain via `99designs/keyring`). Never write the token to the config file or logs. No OAuth
-app / hosted service needed.
+Credentials come from `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token`, in that order. They are used for GitHub requests
+only and never stored, logged or sent to the browser. No OAuth app or hosted service.
 
 ### Sync (local app, so no webhooks)
 
-- Poll per campaign with conditional requests (`ETag` / `If-None-Match`, `since=`), ~30–60 s while the window is
-  focused, back off when idle, manual refresh button.
-- Cache to a local store (start with a JSON file per campaign; move to SQLite via `modernc.org/sqlite` — pure Go, keeps
-  the cgo-free binary — only if needed).
-- Fetch: issues, labels, assignees, milestone, comments (lazy, on open), linked PRs (timeline /
-  `closedByPullRequestsReferences`), and relationships.
-- **Relationships**: GitHub now has native sub-issues and issue dependencies ("blocked by / blocking"). Verify the exact
-  REST/GraphQL endpoints and availability for the target repos before building; fall back to parsing `Blocked by #12` /
-  task lists in the body if absent.
+Today: GraphQL, a 60 s in-memory cache with throttled refresh, shared in-flight fetches and a stale fallback; scope is
+part of the query. Every request goes through the Quartermaster, which paces them and pauses when GitHub asks. The
+design, and the SQLite copy that is built only when a feature needs it, are in `PLAN_M3_5.md`.
+
+- Fetch: issues, labels, assignees, milestone, comments (lazy, on open), linked PRs
+  (`closedByPullRequestsReferences`) and relationships.
+- **Relationships**: native sub-issues and blocked-by edges come from the same GraphQL query (verified in M3). The
+  body-parsing fallback was not needed and is not built.
 - **Projects v2** (optional): read the Status field via GraphQL to place rooms in columns/floors. Requires `project`
   token scope — make it opt-in.
 
 ### Quest state (derived, never stored)
 
-`Cleared` if closed (completed) or its PR merged · `Locked` if any blocker is open · `Occupied` if a live expedition
-holds it locally or a Torch label/comment from someone else is fresh · `Trapped` if an expedition exited non-zero or is
-waiting for input · else `Unexplored`.
+`Cleared` if closed (completed) or its PR merged · `Locked` if any blocker is open · `In progress` if assigned · else
+`Open`. A live local session adds "occupied" (M4) and "needs you" (M4.5) on top of these.
 
 ### Write-back (small, explicit, undoable)
 
@@ -307,7 +303,7 @@ Detailed plan: `release/PLAN_RELEASE.md` (index: `release/README.md`). Summary:
 ## 11. Milestones (v1 = Claude only)
 
 **M0 — Skeleton**
-Replace the hello-world. `go.mod`, folder layout, `dungeon serve` with an embedded placeholder SPA, token + Origin
+`go.mod`, folder layout, `dungeon serve` with an embedded placeholder SPA, token + Origin
 checks, Makefile, CI (vet/test).
 
 **M1 — Hero buttons & terminal (core loop)**
@@ -346,7 +342,8 @@ Claude hooks → working/idle/needs-input, native notifications.
 **M8 — Packaging & release**
 Webview shell, macOS .app/.dmg, GoReleaser, draft→publish release workflow, Linux AppImage, first alpha tag.
 
-M1 → M4 is the first usable version; M6 can slip.
+M1 → M4 is the first usable version; M6 can slip. The M-numbers above are history; the order of upcoming work is in
+`PLAN_EXPERIENCE.md` §4.
 
 ---
 
@@ -354,8 +351,6 @@ M1 → M4 is the first usable version; M6 can slip.
 
 - **Claude CLI flags change.** Keep hero `args` opaque and user-editable; ship templates as docs. Verify `--model` IDs,
   `--permission-mode` and hook settings against the installed version.
-- **GitHub relationships API** (sub-issues / dependencies): confirm endpoints and availability on your plan/repos in M3
-  before designing the map around them.
 - **GUI PATH on macOS**: launched from Finder, the app lacks your shell PATH → resolve via a login shell
   (`$SHELL -lic 'echo $PATH'`) once at startup, or agents installed via nvm/asdf/homebrew won't be found.
 - **Localhost control surface** is a real attack surface (see §4.3) — treat as a release blocker, not polish.
@@ -369,10 +364,10 @@ M1 → M4 is the first usable version; M6 can slip.
 
 ## 13. Decisions I made that you may want to change
 
-1. Name/module: `dungeon` (matches the directory).
-2. Layout: lists left, terminal centre, map + quest detail + spells/heroes right.
-3. Auth via `gh auth token` — no OAuth app.
-4. Polling, not webhooks; JSON cache first, SQLite later.
+1. Name/module: `github.com/dkage/dungeon-master`; binary and config directory keep the short name `dungeon`.
+2. Layout: see `PLAN_EXPERIENCE.md` §3 (stage tabs, one primary Start button).
+3. Auth via `GH_TOKEN`, `GITHUB_TOKEN` or `gh auth token` — no OAuth app.
+4. Polling, not webhooks; cache and sync design in `PLAN_M3_5.md`.
 5. v1 is Claude-only; hero = a Claude config (model + flags), no adapter field yet.
 6. Spells are discovered from standard skill dirs automatically (no manual registration needed for the common case).
 7. macOS: unsigned + ad-hoc, arm64 only, for the first alpha.

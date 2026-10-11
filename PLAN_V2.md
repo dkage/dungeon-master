@@ -16,7 +16,7 @@ working tree). Add ideas freely; promote to a real plan when v1 is stable.
 
 ## Quest sources
 
-- Local markdown source (offline repos, no GitHub remote). Only if the quest model proves stable; `QuestSource`
+- Local markdown source (offline repos, no GitHub remote). Only if the quest model proves stable; `Source`
   interface should already allow it.
 - Other trackers (Linear, Jira) as further sources.
 - Issues/PRs from forks and upstream together.

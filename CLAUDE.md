@@ -51,7 +51,7 @@ future creature art must follow `design/quest-encounters/ART_DIRECTION.md`. Them
 
 Campaign = registered working directory (issues come from the git root's remote). Quest = GitHub issue. Hero = a
 registered Claude configuration. Spell = skill. Expedition = live session. Briefing = generated context file. Dungeon
-(the map) = the room graph of quests. Keep these terms out of GitHub-facing text and out of Go identifiers where a
+(the map) = the map of a campaign's quests. Keep these terms out of GitHub-facing text and out of Go identifiers where a
 neutral name is clearer.
 
 ## Layout

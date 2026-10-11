@@ -24,12 +24,8 @@ These choices shaped the milestone order and remain the current direction unless
 
 The content of each is in `PLAN_EXPERIENCE.md` §4; this is only what is not started.
 
-- **M4.5 Attention**: "needs you" from PTY output recency, tab title and favicon badge, optional OS notification.
-- **M5a Map v1** (`PLAN_MAP.md`, `PLAN_UI.md`): implement the read-only Svelte/SVG graph inside the map region
-  reserved in M3.6, using the 15 generated sprite sheets as creature art for rooms with known effort tiers. Keep
-  per-issue creature assignments stable in local user state; show state with separate markers; retain a readable
-  fallback for unknown effort or missing art; honor reduced motion. Include blocked-by and parent edges, click selects,
-  double-click starts. It must not hide blockers outside the scope (`PLAN_M3_7.md` 2.6).
+- **M4.5 Attention** is issue #23 and **M5a Map v1** is issue #28, each with child issues. The map's design stays in
+  `PLAN_MAP.md` until the issues close.
 - **M5b Spells** (`PLAN_SKILLS.md`), **M6 Map v2**, **M7 Hooks status**, **M8 Packaging**.
 
 The 15-creature effort roster and style-matched prototype sheets are now in
@@ -68,11 +64,9 @@ Windows 10 1803 is the minimum (README). Nothing has run on Windows yet.
 
 ## 6. Documentation to reconcile
 
-`PLAN_M3_7.md` §1 has the checklist; none of it is done. In short:
+Done on 2026-10-11: `PLAN.md`, `PLAN_SKILLS.md`, `PLAN_V2.md`, `GLOSSARY.md`, `release/PLAN_RELEASE.md` and the
+`CLAUDE.md` vocabulary line. Still open from `PLAN_M3_7.md` §1:
 
-- `PLAN.md` still has an old status line, old room-state names, `go-github`, a keychain auth plan and the old sync
-  design; §11 and §13 are out of date.
-- `PLAN_SKILLS.md`, `PLAN_V2.md` (`QuestSource`) and `release/PLAN_RELEASE.md` have stale references.
 - Move status words ("in progress", "deferred") out of the plans into the `CLAUDE.md` line, and give each plan a header
   saying whether it is current, built or superseded, so no agent acts on a stale one.
 - Optional: a small `make docs-check` (line length, banned phrases, links, glossary against `words.ts`).

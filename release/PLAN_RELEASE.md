@@ -4,7 +4,7 @@ How Dungeon Master is versioned, built, packaged, verified and distributed. Ever
 directory; the only exceptions are files GitHub forces elsewhere (`.github/workflows/`) and thin `Makefile` entry points
 that delegate here.
 
-Status: planned, nothing implemented. Aligns with milestone M8 in `../PLAN.md`, but the first pieces land much earlier
+Aligns with milestone M8 in `../PLAN.md`, but the first pieces land much earlier
 (see §10).
 
 ## 1. Goals

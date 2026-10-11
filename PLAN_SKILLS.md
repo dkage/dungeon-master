@@ -42,7 +42,7 @@ That is nearly our dungeon model for free:
 | Child ticket                 | Room; type label → room glyph (research = library, prototype = workshop, grilling = council, task = trap/chore) |
 | Blocked by                   | Locked door                                                                                                     |
 | Frontier                     | Lit rooms you can enter now                                                                                     |
-| Assigned                     | Occupied (someone is in it)                                                                                     |
+| Assigned                     | In progress (someone is in it)                                                                                   |
 | Closed + in Decisions so far | Explored path                                                                                                   |
 | *Not yet specified*          | **Fog of war** (literal)                                                                                        |
 | *Out of scope*               | Sealed rooms                                                                                                    |
@@ -125,7 +125,7 @@ Principle: **own as little as possible.** Start with zero forked skills; add one
 
 ## 7. Milestone changes
 
-Replaces the M5 outline in `PLAN.md`:
+Replaces the M5 outline in `PLAN.md`. The order against the other milestones is in `PLAN_EXPERIENCE.md` §4.
 
 - **M5a** Discovery (`.claude/skills`, `~/.claude/skills`, plugin dirs, registered spellbooks), frontmatter parse,
   skill combo, manual badge.
@@ -135,10 +135,8 @@ Replaces the M5 outline in `PLAN.md`:
 
 ## 8. Open questions
 
-1. Does positional `"/skill args"` invoke a user-invoked skill in the Claude TUI? (If not: open with a one-line "Use the
-   Skill tool with `<skill>`…" sentence.)
-2. Exact `gh` / REST / GraphQL calls for sub-issues, native blocking and assignees, and whether they work on the user's
-   repos/plan.
+1. Answered in M1: a positional `"/skill args"` invokes a user-invoked skill in the Claude TUI.
+2. Answered in M3: one GraphQL query returns sub-issues, blocked-by edges and assignees.
 3. Is sub-issue nesting enough to detect a map's children, or do we also need the `wayfinder:map` label query? (Both,
    probably.)
 4. Do we want a "skills only" mode without GitHub (e.g. plain terminal + spells in a folder with no remote)? Falls out
