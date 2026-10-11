@@ -18,11 +18,83 @@ already set.
 
 ## Run it
 
-Requires Go, Node and the [Claude Code](https://claude.com/claude-code) CLI.
+### Requirements
+
+To build from source and run the app, install these tools and make them available on your `PATH`:
+
+| Tool | Version / purpose |
+|------|-------------------|
+| Go | 1.26 or newer, as required by `go.mod` |
+| Node.js | Use 24.x, matching the project's CI configuration |
+| npm | Use the version bundled with Node.js; installs and builds the frontend |
+| Git | Resolves campaign repositories and their GitHub remotes |
+| [Claude Code](https://claude.com/claude-code) CLI | Required to launch heroes; authenticate with Claude Code before launching sessions |
+| Make and a Unix shell | Required for the macOS/Linux `make` commands below; Windows uses PowerShell instead |
+| GitHub CLI (`gh`, optional) | Run `gh auth login` to fetch GitHub issues, or supply `GH_TOKEN` / `GITHUB_TOKEN` instead |
+
+Check the required CLI tools from your terminal:
+
+```text
+go version
+node --version
+npm --version
+git --version
+claude --version
+```
+
+Svelte, Vite and the other frontend dependencies are installed locally by `npm ci`; no global installation is needed.
+The build below disables cgo, so it does not require a C compiler. Node.js/npm are needed when building the frontend;
+the built executable serves the embedded frontend without a separate Node.js server. A browser is needed to use the UI.
+
+### macOS
+
+From the repository root, with `make` and a Unix shell available:
 
 ```sh
 make run        # builds the frontend and the binary, then serves on 127.0.0.1:7878
 ```
+
+### Linux
+
+From the repository root, with GNU Make and a Unix shell available:
+
+```sh
+make run
+```
+
+On both macOS and Linux, `make run` installs frontend dependencies with `npm ci`, builds Svelte with `npm run build`,
+builds the Go binary, then starts the server. `make build` performs the same build steps without starting the server;
+after building, use `./bin/dungeon serve` to start it again.
+
+### Windows (PowerShell)
+
+The Makefile uses Unix shell syntax and commands such as `touch`, so it does not run directly in PowerShell.
+From the repository root, run the equivalent steps:
+
+```powershell
+# Install frontend dependencies and build Svelte
+Set-Location web
+npm ci
+npm run build
+Set-Location ..
+
+# Build the Go executable and start the server
+$env:CGO_ENABLED = "0"
+go build -trimpath -o bin/dungeon.exe ./cmd/dungeon
+.\bin\dungeon.exe serve
+```
+
+Stop if any build command fails and resolve the reported error before continuing. After building, subsequent starts
+only need `.\bin\dungeon.exe serve`; rebuild after changing the code.
+
+Windows support still needs verification on a real machine, including the PTY and Gatekeeper socket. The Windows
+`gh.exe` shim copy is not implemented yet: the current installer attempts a symlink named `gh`. If installation fails,
+the app continues with a warning that GitHub writes from agent sessions will not be paced.
+
+### Open the app
+
+The Go executable embeds the built Svelte frontend and serves it itself; these commands start one server. Keep the
+terminal open while using the app and press Ctrl+C to stop it.
 
 Open the URL it prints (it carries an access token that is exchanged for a cookie). The token is stored in the config
 directory, so a browser that is already signed in stays signed in across restarts; `dungeon serve --new-token` replaces
