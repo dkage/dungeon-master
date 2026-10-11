@@ -72,28 +72,24 @@ after building, use `./bin/dungeon serve` to start it again.
 
 ### Windows (PowerShell)
 
-The Makefile uses Unix shell syntax and commands such as `touch`, so it does not run directly in PowerShell.
-From the repository root, run the equivalent steps:
+From the repository root:
 
 ```powershell
-# Install frontend dependencies and build Svelte
-Set-Location web
-npm ci
-npm run build
-Set-Location ..
-
-# Build the Go executable and start the server
-$env:CGO_ENABLED = "0"
-go build -trimpath -o bin/dungeon.exe ./cmd/dungeon
-.\bin\dungeon.exe serve
+.\run.ps1
 ```
 
-Stop if any build command fails and resolve the reported error before continuing. After building, subsequent starts
-only need `.\bin\dungeon.exe serve`; rebuild after changing the code.
+This installs frontend dependencies, builds Svelte and the Go executable, then starts the server. Stop any running
+copy before rebuilding. To build without starting, use `.\run.ps1 -BuildOnly`. To start an existing build without
+rebuilding, use `.\bin\dungeon.exe serve`.
 
-Windows support still needs verification on a real machine, including the PTY and Gatekeeper socket. The Windows
-`gh.exe` shim copy is not implemented yet: the current installer attempts a symlink named `gh`. If installation fails,
-the app continues with a warning that GitHub writes from agent sessions will not be paced.
+If PowerShell blocks local scripts, use a process-scoped policy for this invocation:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run.ps1
+```
+
+The script leaves your saved execution policy unchanged. Windows uses ConPTY for terminals and a `gh.exe` copy for
+the GitHub pacing shim, so symlink privileges are not required. CLI lookup honors Windows executable extensions.
 
 ### Open the app
 
@@ -125,8 +121,8 @@ Builds are for x86-64 and ARM; Linux is also tested in CI and with `make test-li
 
 Where the systems differ, the code takes the plain route on each: the Gatekeeper talks to the shim over a Unix domain
 socket in a private per-user directory (file modes on macOS and Linux, the user's own temporary directory on Windows),
-and the `gh` shim is a symlink on macOS and Linux and will be a copy of the program on Windows (symlinks need extra
-rights there; not done yet). See
+and the `gh` shim is a symlink on macOS and Linux and a copy of the program on Windows. State files use private Unix
+modes on macOS/Linux and protected Windows ACLs. See
 [release/](release/README.md) for how each platform is built and tested.
 
 ## GitHub safety

@@ -22,7 +22,7 @@ Creature art for the map: `design/quest-encounters/` (roster and `ART_DIRECTION.
   in user repos. The RPG theme exists only in the app UI; anything written to git or GitHub uses neutral wording. GitHub
   write-back is opt-in, off by default.
 - **State files** (`campaigns.json`, `sessions.json`, `party.toml`) live in the user config dir (`DUNGEON_HOME`
-  overrides it), written atomically with 0600/0700 permissions. Derived data (git root, owner/repo) is recomputed on
+  overrides it), written atomically with 0600/0700 permissions (protected user ACLs on Windows). Derived data (git root, owner/repo) is recomputed on
   load, never persisted.
 - **Execution config stays local.** Heroes (model, flags, env, binary path) live in the user's `party.toml`, never in
   anything a repo can supply.
@@ -88,7 +88,8 @@ Still to come (see `docs/architecture.md` §4): `spells`.
 ```
 make check     # go vet + go test -race + frontend type check and unit tests (what CI runs)
 make build     # build the frontend, then bin/dungeon (CGO_ENABLED=0)
-make run       # build and serve on 127.0.0.1:7878
+make run       # build and serve on 127.0.0.1:7878 (macOS/Linux)
+.\run.ps1     # build and serve in Windows PowerShell
 make web       # build the frontend into web/dist
 make test-linux # Go tests in a Linux container (needs Docker); PTY behaviour differs from macOS
 make test-e2e  # browser tests against bin/dungeon (needs `npx playwright install chromium` once)
@@ -168,5 +169,6 @@ Still open:
 
 - Hook settings injection (`--settings`) for session state. (M7)
 - Camp and secondary-limit refusal against the real GitHub; only the fake has exercised it. (M3.5)
-- Windows: the `gh` shim needs a copy or a `.cmd` instead of a symlink, and the Gatekeeper socket and PTY need a run on
-  a real Windows machine. (release)
+- Windows runtime fixes (executable extensions, `gh.exe` copies, bounded socket paths, native shells, private state
+  ACLs and ConPTY completion) are covered by native Windows tests; CI is configured for all three supported platforms.
+  Linux runtime verification via WSL is pending its installation reboot.
