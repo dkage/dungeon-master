@@ -457,7 +457,7 @@ test('a campaign without a GitHub repository can open the separate sample projec
   await expect(launchDetail.getByRole('button', { name: 'Go to session' })).toBeVisible()
   await expect(launchDetail.getByRole('button', { name: 'Review launch' })).toBeDisabled()
   const linkedRows = nav(page).getByRole('list', { name: /Expeditions in Sample/ })
-  await linkedRows.getByRole('button', { name: /#9 Evaluate rate-limit libraries running/ }).click()
+  await linkedRows.getByRole('button', { name: /^#9 Evaluate rate-limit libraries/ }).click()
   await expect(launchDetail.getByRole('heading', { name: /#9 Evaluate rate-limit libraries/ })).toBeVisible()
   await page.locator('.quest-session-chip').click()
   await expect(launchDetail.getByRole('heading', { name: /#9 Evaluate rate-limit libraries/ })).toBeVisible()
@@ -646,4 +646,30 @@ test('gh in a session is the shim: reads pass at once, writes are paced', async 
   // The app counted them.
   const status = await page.evaluate(async () => (await fetch('/api/github', { credentials: 'same-origin' })).json())
   expect(status.writes.lastMinute).toBeGreaterThanOrEqual(3)
+})
+
+test('a session that stopped to ask something is found without opening it', async ({ page }) => {
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await hero(page, 'Opus').click()
+  const list = expeditions(page)
+  await expect(list.getByRole('listitem')).toHaveCount(2)
+  // The second session asks a question; the first is the one in front.
+  await page.locator('.pane:not([hidden]) .xterm').click()
+  await page.keyboard.type('ask me')
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('Overwrite the file? (y/n)')
+  await list.getByRole('listitem').first().getByRole('button').first().click()
+
+  // After a few quiet seconds the list says which one is waiting, in words.
+  const waiting = list.getByRole('listitem').nth(1)
+  await expect(waiting).toContainText('waiting for you', { timeout: 15_000 })
+  await expect(list.getByRole('listitem').first()).not.toContainText('waiting for you')
+  await expect(page).toHaveTitle('(1) Dungeon Master')
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute('href', /circle/)
+
+  // Opening it clears the count.
+  await waiting.getByRole('button').first().click()
+  await expect(page).toHaveTitle('Dungeon Master')
 })

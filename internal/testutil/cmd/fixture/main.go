@@ -60,6 +60,9 @@ func main() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
 			fmt.Println("echo:" + scanner.Text())
+			if scanner.Text() == "ask me" {
+				fmt.Print("Overwrite the file? (y/n) ")
+			}
 		}
 	case "ask":
 		fmt.Print(c.Output)
