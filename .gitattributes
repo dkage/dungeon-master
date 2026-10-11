@@ -1,0 +1,13 @@
+# One line ending everywhere: gofmt, Prettier and the plans expect LF, and a
+# Windows checkout with autocrlf would otherwise turn every file into CRLF.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.zip binary
