@@ -138,7 +138,12 @@ design so the work can start from a shared reference.
 - Blank line, then a body wrapped at 72 columns. Say what the change is and why; the diff already says how. Use
   `- file/area: note` bullets for multi-part commits.
 - Breaking changes: `!` after the type and a `BREAKING CHANGE:` footer.
-- One logical change per commit. Commit only when asked.
+- One logical change per commit. Commit only when asked. When asked to commit finished work, commit each step
+  separately (for example the package, then the server wiring, then docs), not one commit for everything.
+- **Always name the GitHub issue (the card).** Put it in the footer, after the body and a blank line:
+  `Closes #N` when the commit finishes the issue, `Refs #N` otherwise (one footer line per issue). Keep issue
+  numbers out of the subject line. For big work, add a short summary of what changed to the body (bullets per
+  area), still before the footer.
 - **Several agent sessions share this working tree**, so other sessions' uncommitted work is usually present. Never
   `git add -A`, `git add .` or `git commit -a`. Stage and commit only the paths you changed (`git add <paths>` then
   `git commit <paths>`), run `git status --short` and `git diff --cached --stat` first, and
