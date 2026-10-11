@@ -97,7 +97,8 @@ the scale and style stay consistent. A flicker of torchlight is done in code.
 - [ ] `slate-panel.jpg`, 512 × 512, seamless, JPG quality 85: replaces the removed slate texture, behind the side
   panels.
   > Seamless tileable texture, 512 × 512: dark slate rock, near black with a hint of warm brown, fine grain and a few
-  > shallow cracks, low contrast, even light with no focal point, no text. Original, not derived from any photograph
+  > shallow cracks, low contrast, even light with no focal point, no text. Match the tone and lighting of the attached
+  > stone floor (our own `stone-floor.png`, the only reference to attach). Original, not derived from any photograph
   > or game asset. Must tile without visible seams.
 - [ ] `world-floor.jpg`, 1024 × 1024, seamless, JPG quality 85:
   > Seamless tileable texture, 1024 × 1024: dark worn stone with a very faint hint of old paths and cracks, low
