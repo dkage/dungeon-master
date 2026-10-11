@@ -3,6 +3,7 @@
   import type { AppStore, ReadingFont, WordMode, ThemePack } from './store.svelte'
   import type { HeroConfig, HeroesConfig } from './api'
   import { wordLabel } from './words'
+  import { permission as notifyPermission, requestPermission } from './notify'
 
   let { store, onclose }: { store: AppStore; onclose: () => void } = $props()
   let dialog: HTMLDialogElement
@@ -43,6 +44,26 @@
   }
   function setWordMode(event: Event) {
     store.updateAppearance({ wordMode: (event.currentTarget as HTMLSelectElement).value as WordMode })
+  }
+  let notifyMessage = $state('')
+  async function toggleNotifications(event: Event) {
+    const box = event.currentTarget as HTMLInputElement
+    notifyMessage = ''
+    if (!box.checked) {
+      store.updateAppearance({ notifications: false })
+      return
+    }
+    // The browser is asked only now, because the user just turned this on.
+    const answer = notifyPermission() === 'granted' ? 'granted' : await requestPermission()
+    if (answer === 'granted') {
+      store.updateAppearance({ notifications: true })
+    } else {
+      box.checked = false
+      store.updateAppearance({ notifications: false })
+      notifyMessage = answer === 'unsupported'
+        ? 'This browser cannot show desktop notifications.'
+        : 'Notifications are blocked for this site. Allow them in the browser settings, then try again.'
+    }
   }
   function setTheme(event: Event) {
     store.updateAppearance({ theme: (event.currentTarget as HTMLSelectElement).value as ThemePack })
@@ -180,6 +201,11 @@
         <option value="plain">Plain</option>
       </select>
     </label>
+    <div class="field">
+      <label class="check"><input type="checkbox" checked={store.appearance.notifications} onchange={toggleNotifications} /> <span>Desktop notifications</span></label>
+      <small class="hint">Tell me when a session is waiting for me and this window is not in front. Off unless you turn it on.</small>
+      {#if notifyMessage}<p class="notice warn" role="alert">{notifyMessage}</p>{/if}
+    </div>
   </section>
 
   <section class="hero-section" aria-labelledby="heroes-title">

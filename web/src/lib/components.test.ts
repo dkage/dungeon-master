@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/svelte'
 import Toolbar from './Toolbar.svelte'
 import Sidebar from './Sidebar.svelte'
@@ -932,5 +932,46 @@ describe('session attention in the cockpit', () => {
     })
     render(Toolbar, { store: s })
     expect(screen.queryByRole('status')).toBeNull()
+  })
+})
+
+describe('desktop notifications switch', () => {
+  beforeEach(() => localStorage.clear())
+  afterEach(() => { localStorage.clear(); vi.unstubAllGlobals() })
+  const fakeNotification = (permission: NotificationPermission, answer: NotificationPermission = permission) => {
+    const request = vi.fn(async () => answer)
+    vi.stubGlobal('Notification', Object.assign(vi.fn(), { permission, requestPermission: request }))
+    return request
+  }
+
+  it('does not ask the browser until the user turns it on', async () => {
+    const request = fakeNotification('default', 'granted')
+    const s = store()
+    render(SettingsDialog, { store: s, onclose: () => {} })
+    expect(request).not.toHaveBeenCalled()
+    expect(s.appearance.notifications).toBe(false)
+    await fireEvent.click(screen.getByRole('checkbox', { name: /Desktop notifications/ }))
+    await vi.waitFor(() => expect(s.appearance.notifications).toBe(true))
+    expect(request).toHaveBeenCalledOnce()
+  })
+
+  it('stays off and explains when the browser says no', async () => {
+    fakeNotification('default', 'denied')
+    const s = store()
+    render(SettingsDialog, { store: s, onclose: () => {} })
+    const box = screen.getByRole('checkbox', { name: /Desktop notifications/ })
+    await fireEvent.click(box)
+    expect(await screen.findByRole('alert')).toHaveTextContent(/blocked for this site/)
+    expect(s.appearance.notifications).toBe(false)
+    expect(box).not.toBeChecked()
+  })
+
+  it('turns off without asking again', async () => {
+    const request = fakeNotification('granted')
+    const s = store((st) => st.updateAppearance({ notifications: true }))
+    render(SettingsDialog, { store: s, onclose: () => {} })
+    await fireEvent.click(screen.getByRole('checkbox', { name: /Desktop notifications/ }))
+    expect(s.appearance.notifications).toBe(false)
+    expect(request).not.toHaveBeenCalled()
   })
 })

@@ -9,6 +9,7 @@
   import SettingsDialog from './lib/SettingsDialog.svelte'
   import WordsDialog from './lib/WordsDialog.svelte'
   import { attentionTitle, faviconHref } from './lib/attention'
+  import { notificationText, permission } from './lib/notify'
 
   let { store = new AppStore() }: { store?: AppStore } = $props()
   let settingsOpen = $state(false)
@@ -73,6 +74,26 @@
   // Looking at a session that waits counts as having seen it.
   $effect(() => {
     store.attend(viewing)
+  })
+
+  // A desktop notification for a session that starts waiting while this window
+  // is not in front: once per wait, only if the user turned it on.
+  $effect(() => {
+    const fire = store.takeNotifications(viewing)
+    if (fire.length === 0 || permission() !== 'granted') return
+    for (const s of fire) {
+      const text = notificationText(s, store.campaigns.find((c) => c.id === s.campaign)?.name ?? 'a project')
+      try {
+        const n = new Notification(text.title, { body: text.body, tag: s.id })
+        n.onclick = () => {
+          window.focus()
+          void store.selectSession(s.id)
+          n.close()
+        }
+      } catch {
+        /* the browser refused; the title and icon still show it */
+      }
+    }
   })
 
   // The tab title and icon say how many sessions are waiting, so it shows from another tab.

@@ -32,6 +32,8 @@ const iconHref = () => document.querySelector<HTMLLinkElement>('link[rel="icon"]
 const iconSvg = () => decodeURIComponent(iconHref())
 
 afterEach(() => {
+  localStorage.clear()
+  vi.unstubAllGlobals()
   document.title = 'Dungeon Master'
   document.querySelector('link[rel="icon"]')?.remove()
 })
@@ -74,5 +76,45 @@ describe('tab title and icon', () => {
     render(App, { store })
     await waitFor(() => expect(store.sessions).toHaveLength(1))
     expect(document.title).toBe('Dungeon Master')
+  })
+})
+
+describe('desktop notifications', () => {
+  const stubNotification = () => {
+    const made: { title: string; options: NotificationOptions }[] = []
+    const Fake = function (this: object, title: string, options: NotificationOptions) { made.push({ title, options }) } as unknown as typeof Notification
+    Object.assign(Fake, { permission: 'granted', requestPermission: vi.fn(async () => 'granted') })
+    vi.stubGlobal('Notification', Fake)
+    return made
+  }
+
+  it('fire once for a session that starts waiting while the window is not in front', async () => {
+    const made = stubNotification()
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false)
+    const store = appWith([sess('a', { activity: 'needs-you', quest: 9, title: '#9 secret issue title' })])
+    store.updateAppearance({ notifications: true })
+    render(App, { store })
+    await waitFor(() => expect(made).toHaveLength(1))
+    expect(made[0].title).toBe('A session is waiting for you')
+    expect(made[0].options.body).toBe('Issue #9 in demo is waiting for your input.')
+    expect(JSON.stringify(made)).not.toContain('secret')
+    await new Promise((r) => setTimeout(r, 50))
+    expect(made).toHaveLength(1)
+  })
+
+  it('stay silent when the window is in front or the setting is off', async () => {
+    const made = stubNotification()
+    const focus = vi.spyOn(document, 'hasFocus').mockReturnValue(true)
+    const a = appWith([sess('a', { activity: 'needs-you' })])
+    a.updateAppearance({ notifications: true })
+    render(App, { store: a })
+    await waitFor(() => expect(a.sessions).toHaveLength(1))
+    expect(made).toHaveLength(0)
+    focus.mockReturnValue(false)
+    const off = appWith([sess('b', { activity: 'needs-you' })])
+    off.updateAppearance({ notifications: false })
+    render(App, { store: off })
+    await waitFor(() => expect(off.sessions).toHaveLength(1))
+    expect(made).toHaveLength(0)
   })
 })
