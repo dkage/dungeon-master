@@ -24,7 +24,7 @@ same query returns.
 | Epic and its quests | Sub-issues: the epic is the parent, the quests are its sub-issues | A top-level parent is a dungeon; its sub-issues are the rooms; a sub-issue that is itself a parent is a hall |
 | Order of work | "Blocked by" links between issues | Lines and gates; lines between dungeons are derived from them |
 | No epic | An issue with no parent and no sub-issues | The Tavern |
-| Effort tier | A label `effort:trivial`, `effort:low`, `effort:moderate`, `effort:high` or `effort:extreme` | Picks the creature (3 per tier in `design/quest-encounters/CREATURE_ROSTER.md`) |
+| Effort tier | A label `effort:trivial`, `effort:low`, `effort:moderate`, `effort:high` or `effort:extreme` | Picks the creature (3 per tier in `docs/design/creature-roster.md`) |
 | In the app's scope | The scope label (`tracked` by default) | Whether the issue is shown or is an out-of-scope stub |
 | Who holds it | Assignees | The assigned-elsewhere marker |
 | Priority | A label `priority:low`, `priority:normal`, `priority:high` or `priority:urgent` | High (amber) and urgent (red) draw a small jewel on the room |

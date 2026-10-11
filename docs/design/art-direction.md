@@ -1,18 +1,31 @@
-# Art direction for the quest cockpit
+---
+status: current
+milestone: M5a, M6
+github_issues: [28, 44]
+tracking: in-gh-issues
+next: use for current theme work; review as later art is added
+verified: 2026-10-11
+---
 
-This document preserves the visual decisions behind the encounter-map study.
-The interactive baseline is [index.html](./index.html); the true-width visual
-check is [preview-panel.png](./preview-panel.png). This is original project
-direction, not an asset sheet.
+# Dungeon theme: art direction
+
+This is the current visual direction for the Dungeon theme. The full cockpit
+baseline is the Google Stitch v4 export in
+[`design/stitch-prototype/`](../../design/stitch-prototype/). The earlier
+quest encounter study and its previews remain in
+[`design/quest-encounters/`](../../design/quest-encounters/) as historical
+references and an asset library. This document describes the direction to
+carry into product work; it is not an asset sheet.
 
 ## Current theme
 
-The first art direction is a **gothic dungeon crawler**: black iron, worn
-stone, oxblood red, dark crimson glass or jewel accents, and restrained aged
-metal. It can evoke the atmosphere of classic dark fantasy game interfaces
-without copying any game's artwork, component shapes, icons, or layout. The
-current prototype fixes the cockpit layout and encounter scale; later visual
-passes should deepen this material language while preserving readability.
+The current direction is the Stitch v4 **Gothic Codex**: a warm parchment
+surface framed by dark carved wood and aged brass, with a near-black slate
+terminal and cool blue-gray stone for the map. Muted burgundy and ember accents
+mark selected or active elements. This replaces the first study's black-iron,
+oxblood-glass material emphasis. Follow v4 for composition, contrast, density,
+and material balance; use the original creature art as a compatible map layer,
+not as authority for the whole cockpit.
 
 The theme selector is a later feature. Build this one coherent Dungeon look
 first, with reusable color and material tokens so another theme can be added
@@ -75,10 +88,9 @@ without rebuilding the layout.
 
 ## Reference order for later design work
 
-1. The interactive prototype and its screenshots define the current layout
-   and visual balance.
-2. This note defines the material and creature rules that should survive a
-   redesign.
+1. `design/stitch-prototype/` v4 exports define the current cockpit layout and
+   visual balance. Its map, list, and blocked-quest views are companion states.
+2. This note defines the material and creature rules to carry into product UI.
 3. External mood images may guide atmosphere and material choices. Create
    original borders, icons, and components for this app; do not import,
    trace, or extract pieces from reference images.

@@ -16,8 +16,9 @@ the plain-words mode in `docs/design/review-findings.md` §9.
 This file describes behaviour in our own terms.
 
 The look is set by the prototype in `design/stitch-prototype/` (v4, the Dungeon pack's default theme, §6.5). The
-first prototype, `design/quest-encounters/`, is kept for its art direction notes. Where a prototype and this file
-disagree on behaviour, this file wins.
+earlier `design/quest-encounters/` prototype is retained as a historical right-panel study and source asset folder.
+Current visual guidance is in `docs/design/art-direction.md`. Where a prototype and this file disagree on behaviour,
+this file wins.
 
 ## 1. Window anatomy
 

@@ -19,7 +19,8 @@ commit dates when its asset batches were first recorded. The latest and most
 up-to-date frontend prototype is the Google Stitch export in
 `design/stitch-prototype/`.
 
-Creature art for the map: `design/quest-encounters/` (roster and `ART_DIRECTION.md`).
+Creature map guidance: `docs/design/creature-roster.md` and `docs/design/art-direction.md`; source sprites and the
+historical right-panel study remain in `design/quest-encounters/`.
 
 ## Scope and principles
 

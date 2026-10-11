@@ -1,6 +1,8 @@
 # Design timeline
 
 This file is the history of the project's design references and visual assets.
+Current design guidance lives in `docs/design/`; this index tracks the prototype
+exports and asset folders under `design/`.
 Folders are ordered by their first appearance in Git history. Dates are the
 commit timestamps for when asset batches were first recorded in the repository;
 they document the history available in Git.

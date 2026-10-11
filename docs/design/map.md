@@ -24,7 +24,7 @@ The parts of the experience we want:
   **Tavern** for quests that belong to no epic; lines between dungeons keep the order of work. Opening a dungeon shows
   its quests as rooms (the Stitch v4 screen). The **List** is a separate flat view.
 - In a dungeon, every quest is a room. A known effort tier selects an original creature sprite from
-  `design/quest-encounters/CREATURE_ROSTER.md`; creatures being worked in a terminal look different (brighter, warmer).
+  `docs/design/creature-roster.md`; creatures being worked in a terminal look different (brighter, warmer).
   Blocked-by and parent links are lines between rooms.
 - Clicking a point highlights it (brighter, its links emphasised) and shows the quest in the lower part of the right
   panel. The split between map and detail can be resized.
@@ -223,7 +223,7 @@ renderer, not a later portrait pass.
 - If no reliable tier is available, use the neutral room fallback; do not guess from the title. Unknown effort must
   remain obvious in the room and detail.
 - Choose a creature deterministically from the selected tier using the stable issue key described in
-  `design/quest-encounters/CREATURE_ROSTER.md`. Persist the chosen creature ID in user state so content edits and
+  `docs/design/creature-roster.md`. Persist the chosen creature ID in user state so content edits and
   later roster additions do not remap an issue. Never write this assignment to the repository or GitHub.
 - At readable zoom, show the four-frame idle strip in the creature window. With reduced motion, show a fixed frame.
   Below the readable zoom threshold, simplify rooms to their state mark and number rather than drawing tiny art.
@@ -231,7 +231,8 @@ renderer, not a later portrait pass.
   remains fully usable if images fail to load.
 
 The tier definitions, sheet dimensions, style anchors and local assignment rule live in
-`design/quest-encounters/CREATURE_ROSTER.md`. The sheets are original design assets and are never fetched at runtime.
+`docs/design/creature-roster.md`. The sheets in `design/quest-encounters/assets/` are original design assets and are
+never fetched at runtime.
 
 ### D. Quest markers
 
@@ -251,10 +252,9 @@ This makes "which agent is where" visible at a glance and is the closest to "cha
 
 ### F. Portraits and dark digital art (later)
 
-Hand-made or commissioned portraits per hero class, a stone-and-ember UI frame, room illustrations by label. This is
-where a "Diablo-like" look would come from. It needs an art direction, a style guide and licensed or original assets
-(our own, or CC0 packs with their notices). It fits behind the same renderer interface and the same tokens, so it can
-come later without redesign.
+Hand-made or commissioned portraits per hero class, a stone-and-ember UI frame, room illustrations by label. Extend the
+current direction in `docs/design/art-direction.md` and use licensed or original assets (our own, or CC0 packs with
+their notices). It fits behind the same renderer interface and the same tokens, so it can come later without redesign.
 
 ### G. Floors, isometric or sprite maps (later)
 
@@ -369,7 +369,8 @@ Decided: the epic itself can be started like any quest (what a session on an epi
 work). A dungeon with many quests scrolls vertically inside the map. The map reads from the local SQLite copy once it
 exists (#41); until then it uses the cached quest service, so it does not wait on #41. Keyboard: as in §7, extended
 across the levels (arrows move between neighbours, Enter opens or selects, Escape goes up one level, one key
-switches to the List). The art still to be made is listed in `design/art-checklist.md`.
+switches to the List). The art still to be made is listed in `docs/design/art-checklist.md`.
 
-Resolved: M5a includes the torchlight skin, state markers, and creature sprites. The 15-sheet roster and its consistent
-art direction are in `design/quest-encounters/`; only walking sprites and isometric floors remain later work.
+Resolved: M5a includes the torchlight skin, state markers, and creature sprites. The 15-sheet roster and current theme
+guidance are in `docs/design/creature-roster.md` and `docs/design/art-direction.md`; source artwork remains in
+`design/quest-encounters/assets/`. Only walking sprites and isometric floors remain later work.

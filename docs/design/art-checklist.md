@@ -1,3 +1,12 @@
+---
+status: current
+milestone: M5a, M6
+github_issues: [23, 28, 44]
+tracking: in-gh-issues
+next: make remaining map art as the map ships; delete when M6 art work closes
+verified: 2026-10-11
+---
+
 # Art checklist
 
 Every image the map and cockpit use or need: what we have, and what is still to be made. Tick a box when the file is in
@@ -6,7 +15,7 @@ the repository and checked at native size next to the existing creatures. The pl
 **Style for every new piece:** the same family as the existing creatures. Original gothic dungeon art, crisp dark
 silhouette, restrained painterly pixel-art influence, cool blue ambient and rim light with small warm amber
 highlights, muted stone, wood and iron. Three-quarter front view. No text, logos, UI, gore or recognisable franchise
-designs. Use `quest-encounters/assets/rat-idle-strip.png`, `goblin-idle-strip.png` and `many-eyed-idle-strip.png` as
+designs. Use `design/quest-encounters/assets/rat-idle-strip.png`, `goblin-idle-strip.png` and `many-eyed-idle-strip.png` as
 style references.
 
 **Raster or vector:** painted subjects with light and texture are PNG (JPG when opaque). Anything that must take the
@@ -18,7 +27,7 @@ are done in code with filters, glows and overlays, so no extra art variants are 
 ### Creatures (`design/quest-encounters/assets/`)
 
 Each is one sheet of four idle frames, transparent, 2172 × 724 px (cells 543 × 724). Tiers are in
-`quest-encounters/CREATURE_ROSTER.md`.
+`docs/design/creature-roster.md`.
 
 - [x] Trivial: `rat-idle-strip.png`, `slime-idle-strip.png`, `bat-idle-strip.png`
 - [x] Low: `kobold-idle-strip.png`, `beetle-idle-strip.png`, `spider-idle-strip.png`
@@ -28,17 +37,17 @@ Each is one sheet of four idle frames, transparent, 2172 × 724 px (cells 543 ×
 
 ### Textures
 
-- [x] `quest-encounters/assets/stone-floor.png`: dark stone floor, 1254 × 1254, opaque. The dungeon view's backdrop.
-- [x] `stitch-prototype/assets/images/stone-floor.png`: the same floor at 512 × 512 (prototype copy).
-- [x] `stitch-prototype/assets/images/slate.png`: dark slate, 1254 × 1254, opaque, generated for this project. Panel
+- [x] `design/quest-encounters/assets/stone-floor.png`: dark stone floor, 1254 × 1254, opaque. The dungeon view's backdrop.
+- [x] `design/stitch-prototype/assets/images/stone-floor.png`: the same floor at 512 × 512 (prototype copy).
+- [x] `design/stitch-prototype/assets/images/slate.png`: dark slate, 1254 × 1254, opaque, generated for this project. Panel
   backgrounds in the prototype.
-- [x] `stitch-prototype/assets/images/6a8650faf410.png` and `97785ef87771.png`: one parchment texture, byte-identical,
+- [x] `design/stitch-prototype/assets/images/6a8650faf410.png` and `97785ef87771.png`: one parchment texture, byte-identical,
   288 × 512, opaque. The terminal's page background. AI-generated (confirmed by the author).
 
 ### Prototype-only copies
 
-- [x] `stitch-prototype/assets/images/rat-idle-strip.png`, `goblin-idle-strip.png`, `many-eyed-idle-strip.png`:
-  512 × 171 downscaled copies of the creature strips. Use the full-size ones from `quest-encounters/`.
+- [x] `design/stitch-prototype/assets/images/rat-idle-strip.png`, `goblin-idle-strip.png`, `many-eyed-idle-strip.png`:
+  512 × 171 downscaled copies of the creature strips. Use the full-size ones from `design/quest-encounters/`.
 
 ### Fonts
 
@@ -96,7 +105,7 @@ the scale and style stay consistent. A flicker of torchlight is done in code.
 
 ## To make: backgrounds, tileable, opaque
 
-- [x] `stitch-prototype/assets/images/slate.png`, done: the slate that replaces the removed texture, behind the side
+- [x] `design/stitch-prototype/assets/images/slate.png`, done: the slate that replaces the removed texture, behind the side
   panels. It arrived as a 1254 × 1254 PNG of 3.5 MB instead of the planned 512 × 512 JPG; downscale it when the app
   starts using it. Not yet checked for seamless tiling.
   > Seamless tileable texture, 512 × 512: dark slate rock, near black with a hint of warm brown, fine grain and a few

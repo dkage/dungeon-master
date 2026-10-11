@@ -6,9 +6,11 @@ Open `index.html` in a browser. This is a standalone, interactive design study a
 392 px right-panel width, alongside a quiet terminal and the sample campaign.
 It does not change the app or its quest data.
 
-`ART_DIRECTION.md` records the visual hierarchy and material rules for future
-UI work. External mood images are separate references; this directory contains
-the original project prototype and generated assets.
+This is a historical right-panel study. Current visual guidance is in
+[`docs/design/art-direction.md`](../../docs/design/art-direction.md); the full
+cockpit baseline is `design/stitch-prototype/`. External mood images are
+separate references; this directory contains the original project prototype
+and generated assets.
 
 The map uses the real sample quest titles and relationships from
 `internal/quests/demo/demo.go`. Effort tiers are **local mock data** for the
@@ -35,8 +37,8 @@ generators. It mirrors the demo source's titles and relationships; its
 ## Assets
 
 The 15-creature tier map, stable issue assignment guidance, and sprite contract
-are in [CREATURE_ROSTER.md](./CREATURE_ROSTER.md). All 15 sheets are in
-`assets/`: rat, slime, bat, kobold, beetle, spider, goblin, skeleton, ghoul,
+are in [`docs/design/creature-roster.md`](../../docs/design/creature-roster.md).
+All 15 sheets are in `assets/`: rat, slime, bat, kobold, beetle, spider, goblin, skeleton, ghoul,
 orc, troll, warlock, many-eyed stone watcher, lich, and dragon. The original
 rat, goblin, and watcher sheets remain the style anchors for the 12 additions.
 Open [roster.html](./roster.html) to compare all strips together by effort tier.
@@ -66,7 +68,7 @@ The images were made with the built-in imagegen tool. The concept sheet used:
 Each original strip used its corresponding concept-sheet row as reference and
 asked for four equally spaced poses of the **same** character on transparent
 background. The 12 new sheets used the rat, goblin, and watcher as style
-references and followed the shared strip contract in `CREATURE_ROSTER.md`.
+references and followed the shared strip contract in `docs/design/creature-roster.md`.
 Every prompt asked for restrained idle movement, no scenery or UI, consistent
 cool blue rim light, and restrained amber accents. The texture prompt asked
 for a quiet top-down blue-black stone floor, uniform lighting and no focal

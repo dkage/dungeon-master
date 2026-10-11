@@ -1,3 +1,12 @@
+---
+status: current
+milestone: M5a
+github_issues: [28, 44]
+tracking: in-gh-issues
+next: use as the source for M5a sprite mapping; delete when M5a closes
+verified: 2026-10-11
+---
+
 # Quest creature roster
 
 This is a 15-creature design roster for encounter-map studies. It is an art
@@ -12,7 +21,7 @@ The three existing sheets are the style anchors and count toward the total.
 | Low | Small, bounded change; roughly 2–3 points | `kobold-scout` → `kobold-idle-strip.png`; `cave-beetle` → `beetle-idle-strip.png`; `cave-spider` → `spider-idle-strip.png` |
 | Moderate | Several steps or a few related files; roughly 3–5 points | `goblin-scout` → `goblin-idle-strip.png`; `skeleton-guard` → `skeleton-idle-strip.png`; `crypt-ghoul` → `ghoul-idle-strip.png` |
 | High | Broad change, substantial uncertainty, or many dependent tasks | `orc-raider` → `orc-idle-strip.png`; `stone-troll` → `troll-idle-strip.png`; `dungeon-warlock` → `warlock-idle-strip.png` |
-| Extreme | Large initiative or boss-sized parent with a substantial child quest chain | `many-eyed-stone-watcher` → `many-eyed-idle-strip.png`; `crypt-lich` → `lich-idle-strip.png`; `ember-dragon` → `dragon-idle-strip.png` |
+| Large / epic | Large initiative or boss-sized parent with a substantial child quest chain | `many-eyed-stone-watcher` → `many-eyed-idle-strip.png`; `crypt-lich` → `lich-idle-strip.png`; `ember-dragon` → `dragon-idle-strip.png` |
 
 Point ranges are illustrative and should be replaced by the project's chosen
 estimate source. Child count can increase the parent encounter's scale, but
@@ -57,8 +66,10 @@ creature still reflects the parent's own effort tier.
   ground plane, cast shadow outside the sprite, UI, text, logos, gore, or
   recognizable franchise designs.
 
-Existing art: `assets/rat-idle-strip.png`, `assets/goblin-idle-strip.png`, and
-`assets/many-eyed-idle-strip.png`. New generated sheets should use all three as
-style references, then be inspected together at native size before acceptance.
-All 15 roster sheets are currently present in `assets/`; the original three
-were retained and 12 additions were generated against those three style anchors.
+Existing art: `design/quest-encounters/assets/rat-idle-strip.png`,
+`design/quest-encounters/assets/goblin-idle-strip.png`, and
+`design/quest-encounters/assets/many-eyed-idle-strip.png`. New generated sheets
+should use all three as style references, then be inspected together at native
+size before acceptance. All 15 roster sheets are currently present in
+`design/quest-encounters/assets/`; the original three were retained and 12
+additions were generated against those three style anchors.
