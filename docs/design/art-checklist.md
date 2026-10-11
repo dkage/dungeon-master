@@ -81,27 +81,27 @@ directly; no image model is needed.
 
 ## To make: painted, PNG with transparent background
 
-- [ ] `dungeon-1-burrow.png`, 512 × 512: smallest dungeon, shown at about 128 to 160 px on the world map.
+- [x] `dungeon-1-burrow.png`, 512 × 512: smallest dungeon, shown at about 128 to 160 px on the world map.
   > Subject: a small burrow or cave mouth in a mossy rock mound, a few stones around it, a faint warm glow inside. The
   > smallest and least threatening of five dungeon sizes.
-- [ ] `dungeon-2-crypt.png`, 512 × 512:
+- [x] `dungeon-2-crypt.png`, 512 × 512:
   > Subject: a crypt entrance cut into a hillside: short stone steps down to a sealed iron-banded door under a carved
   > arch, two small unlit braziers. Slightly larger and grimmer than a burrow.
-- [ ] `dungeon-3-tower.png`, 512 × 512:
+- [x] `dungeon-3-tower.png`, 512 × 512:
   > Subject: a ruined stone watchtower with a broken top, one lit arrow-slit window, ivy and fallen stones at the base.
-- [ ] `dungeon-4-fortress.png`, 512 × 512:
+- [x] `dungeon-4-fortress.png`, 512 × 512:
   > Subject: a fortress gatehouse with two squat towers and a short wall, a closed portcullis, torches on the wall and
   > a banner torn at the edges.
-- [ ] `dungeon-5-citadel.png`, 512 × 512: the largest, a ladder step above the fortress.
+- [x] `dungeon-5-citadel.png`, 512 × 512: the largest, a ladder step above the fortress.
   > Subject: a tall citadel of many spires on a rocky crag, ember-red light in the windows and wisps of smoke, an
   > ominous dragon's-lair feel. The most imposing of the five.
-- [ ] `tavern.png`, 512 × 512:
+- [x] `tavern.png`, 512 × 512:
   > Subject: a cosy, slightly worn timber-and-stone tavern with warm lit windows, a hanging sign (blank, no text), and
   > a notice board beside the door with several pinned paper notes (no readable text). Warmer and friendlier than the
   > dungeons, with the same lighting style.
 
-The five dungeons must read as a ladder from small to grand when placed side by side; generate them in one session so
-the scale and style stay consistent. A flicker of torchlight is done in code.
+The five dungeons read as a ladder from small to grand when placed side by side. The five dungeon assets and tavern were
+generated in one session; all six were checked together at 512 × 512. A flicker of torchlight is done in code.
 
 ## To make: backgrounds, tileable, opaque
 

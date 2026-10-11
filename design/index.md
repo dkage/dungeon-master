@@ -9,6 +9,9 @@ they document the history available in Git.
 
 [`stitch-prototype/`](stitch-prototype/README.md) is the latest and most
 up-to-date frontend prototype. It is the current visual baseline for the UI.
+The current world-map illustrations live in [`map-art/`](map-art/); their
+completion and remaining requests are tracked in
+[`docs/design/art-checklist.md`](../docs/design/art-checklist.md).
 
 | Date | Folder | Design or asset history |
 |---|---|---|
