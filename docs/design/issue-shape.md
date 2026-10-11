@@ -49,7 +49,8 @@ What the map shows:
 - **World map:** a dungeon for #10, one for #25, and the Tavern. A line leads from #25 to #10, because #30 (in #25)
   blocks #14 (in #10); the line carries the count 1 and a gate at #10.
 - **Inside #10:** four rooms in a chain, left to right or top to bottom: #11 (a rat, greyed, green check), then #12 and
-  #13 X.
+  #13 (moderate-tier creatures), then #14 (a high-tier creature; if the boss proposal in `map.md` §10 is adopted, the
+  last quest of the chain gets the boss frame).
   #30 shows as an external stub under the graph, joined to #14 by a dashed line. #12 is ready; #13 and #14 are locked
   but can be read.
 - **Tavern:** #40 with a low-tier creature, and #41 with the hollow diamond, because it has no effort label.
