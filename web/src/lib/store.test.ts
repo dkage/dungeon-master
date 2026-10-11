@@ -174,7 +174,7 @@ describe('onboarding and appearance preferences', () => {
     first.updateAppearance({ font: 'eb-garamond', sidebarSize: 17, terminalSize: 11, questsSize: 19, wordMode: 'plain', theme: 'neutral' })
     const second = new AppStore(fakeClient())
     expect(second.appearance).toEqual({
-      font: 'eb-garamond', sidebarSize: 17, terminalSize: 11, questsSize: 19, wordMode: 'plain', theme: 'neutral',
+      font: 'eb-garamond', sidebarSize: 17, terminalSize: 11, questsSize: 19, wordMode: 'plain', theme: 'neutral', notifications: false,
     })
   })
 
@@ -182,7 +182,7 @@ describe('onboarding and appearance preferences', () => {
     localStorage.setItem('dungeon.appearance', '{broken')
     const s = new AppStore(fakeClient())
     expect(s.appearance).toEqual({
-      font: 'almendra', sidebarSize: 14, terminalSize: 13, questsSize: 14, wordMode: 'hints', theme: 'dungeon',
+      font: 'almendra', sidebarSize: 14, terminalSize: 13, questsSize: 14, wordMode: 'hints', theme: 'dungeon', notifications: false,
     })
   })
 
@@ -782,5 +782,40 @@ describe('session attention', () => {
     await s.refreshSessions()
     expect(s.unauthorised).toBe(false)
     expect(s.sessions[0].activity).toBe('idle')
+  })
+})
+
+describe('desktop notifications', () => {
+  const waiting = (id: string) => sess(id, 'c1', { activity: 'needs-you' })
+
+  it('are off until the user turns them on, and remember the choice', () => {
+    const s = new AppStore(fakeClient())
+    expect(s.appearance.notifications).toBe(false)
+    s.sessions = [waiting('a')]
+    expect(s.takeNotifications(false)).toEqual([])
+    s.updateAppearance({ notifications: true })
+    expect(new AppStore(fakeClient()).appearance.notifications).toBe(true)
+  })
+
+  it('announce a wait once, only when the window is not in front', () => {
+    const s = new AppStore(fakeClient())
+    s.updateAppearance({ notifications: true })
+    s.sessions = [waiting('a')]
+    expect(s.takeNotifications(true)).toEqual([])
+    expect(s.takeNotifications(false).map((x) => x.id)).toEqual(['a'])
+    expect(s.takeNotifications(false)).toEqual([])
+    s.sessions = [sess('a', 'c1', { activity: 'working' })]
+    s.takeNotifications(false)
+    s.sessions = [waiting('a')]
+    expect(s.takeNotifications(false)).toHaveLength(1)
+  })
+
+  it('do not announce a wait the user already looked at', () => {
+    const s = new AppStore(fakeClient())
+    s.updateAppearance({ notifications: true })
+    s.sessions = [waiting('a')]
+    s.activeId = 'a'
+    s.attend(true)
+    expect(s.takeNotifications(false)).toEqual([])
   })
 })

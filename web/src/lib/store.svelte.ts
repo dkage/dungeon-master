@@ -4,6 +4,7 @@ import type {
   SessionInfo,
 } from './api'
 import { stillWaiting, unattended } from './attention'
+import { pickToNotify } from './notify'
 
 export type Client = Pick<
   typeof realApi,
@@ -48,11 +49,13 @@ export interface UISettings {
   questsSize: number
   wordMode: WordMode
   theme: ThemePack
+  /** Desktop notification when a session waits and this window is not in front. Off until the user asks. */
+  notifications: boolean
 }
 
 const SETTINGS_KEY = 'dungeon.appearance'
 const DEFAULT_SETTINGS: UISettings = {
-  font: 'almendra', sidebarSize: 14, terminalSize: 13, questsSize: 14, wordMode: 'hints', theme: 'dungeon',
+  font: 'almendra', sidebarSize: 14, terminalSize: 13, questsSize: 14, wordMode: 'hints', theme: 'dungeon', notifications: false,
 }
 
 function loadSettings(): UISettings {
@@ -71,6 +74,7 @@ function loadSettings(): UISettings {
       questsSize: size(parsed.questsSize, DEFAULT_SETTINGS.questsSize),
       wordMode: allowed(parsed.wordMode, ['hints', 'themed', 'plain'], DEFAULT_SETTINGS.wordMode),
       theme: allowed(parsed.theme, ['dungeon', 'neutral'], DEFAULT_SETTINGS.theme),
+      notifications: parsed.notifications === true,
     }
   } catch {
     return { ...DEFAULT_SETTINGS }
@@ -612,6 +616,15 @@ export class AppStore {
     } catch (e) {
       if ((e as { status?: number }).status === 401) this.unauthorised = true
     }
+  }
+
+  private notified = new Set<string>()
+
+  /** Sessions to announce with a desktop notification now; empty unless the user turned them on. */
+  takeNotifications(viewing: boolean): SessionInfo[] {
+    const { fire, notified } = pickToNotify(this.sessions, this.notified, this.seen, viewing)
+    this.notified = notified
+    return this.appearance.notifications ? fire : []
   }
 
   /** The user is looking at the open session: its wait no longer needs a badge. */
