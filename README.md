@@ -22,15 +22,15 @@ already set.
 
 To build from source and run the app, install these tools and make them available on your `PATH`:
 
-| Tool | Version / purpose |
-|------|-------------------|
-| Go | 1.26 or newer, as required by `go.mod` |
-| Node.js | Use 24.x, matching the project's CI configuration |
-| npm | Use the version bundled with Node.js; installs and builds the frontend |
-| Git | Resolves campaign repositories and their GitHub remotes |
-| [Claude Code](https://claude.com/claude-code) CLI | Required to launch heroes; authenticate with Claude Code before launching sessions |
-| Make and a Unix shell | Required for the macOS/Linux `make` commands below; Windows uses PowerShell instead |
-| GitHub CLI (`gh`, optional) | Run `gh auth login` to fetch GitHub issues, or supply `GH_TOKEN` / `GITHUB_TOKEN` instead |
+| Tool                                              | Version / purpose                                                                         |
+|---------------------------------------------------|-------------------------------------------------------------------------------------------|
+| Go                                                | 1.26 or newer, as required by `go.mod`                                                    |
+| Node.js                                           | Use 24.x, matching the project's CI configuration                                         |
+| npm                                               | Use the version bundled with Node.js; installs and builds the frontend                    |
+| Git                                               | Resolves campaign repositories and their GitHub remotes                                   |
+| [Claude Code](https://claude.com/claude-code) CLI | Required to launch heroes; authenticate with Claude Code before launching sessions        |
+| Make and a Unix shell                             | Required for the macOS/Linux `make` commands below; Windows uses PowerShell instead       |
+| GitHub CLI (`gh`, optional)                       | Run `gh auth login` to fetch GitHub issues, or supply `GH_TOKEN` / `GITHUB_TOKEN` instead |
 
 Check the required CLI tools from your terminal:
 
