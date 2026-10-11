@@ -158,10 +158,7 @@ design so the work can start from a shared reference.
 
 ## Milestones
 
-M0 skeleton, M1 heroes and terminal, M2 campaigns, M3 GitHub quests, M3.5 GitHub scope and write guard, M3.6 Stitch
-cockpit shell and first run, M4 briefing and launch from a quest, M4.5 attention, M5a dungeon map, M5b spells, M6 map
-polish, M7 hooks status and notifications, M8 packaging and release. Details in `docs/design/experience.md` §4,
-`docs/design/skills.md` §7 and `release/PLAN_RELEASE.md`.
+The list, order, status and epic of every milestone are in `docs/roadmap.md`. Update that file when a milestone closes.
 
 ## Verifications
 
