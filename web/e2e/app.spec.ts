@@ -673,3 +673,50 @@ test('a session that stopped to ask something is found without opening it', asyn
   await waiting.getByRole('button').first().click()
   await expect(page).toHaveTitle('Dungeon Master')
 })
+
+test('a desktop notification fires once for a session that asks while the window is not in front', async ({ page }) => {
+  test.setTimeout(60_000)
+  // A fake Notification API, and a window that can be "not in front" on demand.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __shown: { title: string; body?: string }[]; __front: boolean }
+    w.__shown = []
+    w.__front = true
+    document.hasFocus = () => w.__front
+    class FakeNotification {
+      static permission = 'default'
+      static requestPermission = async () => ((FakeNotification.permission = 'granted'), 'granted')
+      onclick: (() => void) | null = null
+      constructor(title: string, options?: { body?: string }) { w.__shown.push({ title, body: options?.body }) }
+      close() {}
+    }
+    ;(window as unknown as { Notification: unknown }).Notification = FakeNotification
+  })
+  await open(page)
+  await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+  await settings.getByRole('checkbox', { name: /Desktop notifications/ }).check()
+  await expect(settings.getByRole('checkbox', { name: /Desktop notifications/ })).toBeChecked()
+  await settings.getByRole('button', { name: 'Close settings' }).click()
+
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await hero(page, 'Opus').click()
+  await expect(expeditions(page).getByRole('listitem')).toHaveCount(2)
+  await page.locator('.pane:not([hidden]) .xterm').click()
+  await page.keyboard.type('ask me')
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('Overwrite the file? (y/n)')
+  // The user switches to another window.
+  await page.evaluate(() => {
+    ;(window as unknown as { __front: boolean }).__front = false
+    window.dispatchEvent(new Event('blur'))
+  })
+
+  const shown = () => page.evaluate(() => (window as unknown as { __shown: unknown[] }).__shown)
+  await expect.poll(shown, { timeout: 15_000 }).toHaveLength(1)
+  const [note] = (await shown()) as { title: string; body: string }[]
+  expect(note.title).toBe('A session is waiting for you')
+  expect(note.body).toMatch(/^A session in demo is waiting for your input\.$/)
+  await page.waitForTimeout(4000) // several polls later it is still the only one
+  expect(await shown()).toHaveLength(1)
+})
