@@ -361,7 +361,7 @@ Decided: the epic itself can be started like any quest (what a session on an epi
 work). A dungeon with many quests scrolls vertically inside the map. The map reads from the local SQLite copy once it
 exists (#41); until then it uses the cached quest service, so it does not wait on #41. Keyboard: as in §7, extended
 across the levels (arrows move between neighbours, Enter opens or selects, Escape goes up one level, one key
-switches to the List). The art still to be made is listed in `design/map-art-request.md`.
+switches to the List). The art still to be made is listed in `design/art-checklist.md`.
 
 Resolved: M5a includes the torchlight skin, state markers, and creature sprites. The 15-sheet roster and its consistent
 art direction are in `design/quest-encounters/`; only walking sprites and isometric floors remain later work.
