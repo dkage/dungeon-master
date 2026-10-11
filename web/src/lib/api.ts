@@ -62,6 +62,8 @@ export interface SessionInfo {
   created: string
   exited: boolean
   exitCode: number
+  /** What a live session is doing, judged from its output; absent for finished or lost ones. */
+  activity?: 'working' | 'idle' | 'needs-you' | 'ended'
   /** Was running when Dungeon Master last stopped; only the record remains. */
   lost?: boolean
 }

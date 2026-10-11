@@ -71,6 +71,8 @@ type sessionJSON struct {
 	Created  time.Time `json:"created"`
 	Exited   bool      `json:"exited"`
 	ExitCode int       `json:"exitCode"`
+	// Activity is working, idle, needs-you or ended; only live sessions have one.
+	Activity string `json:"activity,omitempty"`
 	// Lost is a session that was running when Dungeon Master last stopped; its
 	// terminal is gone and only the record remains.
 	Lost bool `json:"lost,omitempty"`
@@ -123,6 +125,7 @@ func (s *Server) sessionViews() []sessionJSON {
 		}
 		if live, ok := s.cfg.Sessions.Get(r.ID); ok {
 			v.Exited, v.ExitCode = live.Exited()
+			v.Activity = string(live.Activity())
 		}
 		out = append(out, v)
 	}
