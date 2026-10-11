@@ -275,6 +275,8 @@ test('the terminal renders with its own font, colours and selection (CSP must al
   await open(page)
   await hero(page, 'Shell').click()
   await page.locator('.pane:not([hidden]) .xterm').click()
+  // cmd.exe drops keys typed before its first prompt, which a slow runner hits.
+  if (process.platform === 'win32') await expect(screenText(page)).toContainText('work>', { timeout: 25_000 })
   await page.keyboard.type(process.platform === 'win32' ? `powershell -NoProfile -Command "[Console]::WriteLine([char]27 + '[31mRED-TEXT' + [char]27 + '[0m plain-text')"` : "printf '\\033[31mRED-TEXT\\033[0m plain-text\\n'")
   await page.keyboard.press('Enter')
   // A cold PowerShell start on a Windows runner takes several seconds.

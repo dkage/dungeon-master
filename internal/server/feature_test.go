@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -349,12 +350,19 @@ func TestHeroSessionEndToEnd(t *testing.T) {
 	defer c.CloseNow()
 
 	out := readUntil(t, c, "hero-env=")
-	wantCwd, _ := filepath.EvalSymlinks(e.dir)
+	// The child may print the same folder in another spelling (Windows 8.3
+	// short names such as RUNNER~1), so compare folders, not strings.
+	if m := regexp.MustCompile(`cwd=([^\r\n]+)`).FindStringSubmatch(out); m == nil {
+		t.Errorf("output has no cwd line:\n%s", out)
+	} else if got, err := os.Stat(strings.TrimSpace(m[1])); err != nil {
+		t.Errorf("cwd %q: %v", m[1], err)
+	} else if want, err := os.Stat(e.dir); err != nil || !os.SameFile(got, want) {
+		t.Errorf("session started in %q, want %q", m[1], e.dir) // started in the requested directory
+	}
 	for _, want := range []string{
 		"FAKE-CLAUDE",
 		"arg=[--model]", "arg=[m1]", // hero args
 		"arg=[--]", "arg=[/some-skill arg]", // opener behind the separator
-		"cwd=" + wantCwd,     // started in the requested directory
 		"child-marker=unset", // parent-session marker scrubbed
 		"hero-env=yes",       // hero env applied
 	} {
