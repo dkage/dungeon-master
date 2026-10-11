@@ -29,7 +29,7 @@ against.
 
 ## Files
 
-- `assets/images/`: sprite strips, avatars and textures, named by a hash of their Stitch URL.
+- `assets/images/`: the creature strips, the stone floor and the parchment texture (the parchment keeps the hash of its Stitch URL).
 - `assets/fonts/`: Cinzel, MedievalSharp and Fira Code (SIL Open Font License), with `fonts.css`. Licence texts are
   not included, and the parchment text falls back to Georgia, which cannot ship; see `docs/design/ui.md` §9, open question 3.
 - `assets/manifest.json`: each local file and the URL it was downloaded from.

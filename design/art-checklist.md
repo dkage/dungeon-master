@@ -30,10 +30,8 @@ Each is one sheet of four idle frames, transparent, 2172 × 724 px (cells 543 ×
 
 - [x] `quest-encounters/assets/stone-floor.png`: dark stone floor, 1254 × 1254, opaque. The dungeon view's backdrop.
 - [x] `stitch-prototype/assets/images/stone-floor.png`: the same floor at 512 × 512 (prototype copy).
-- [x] `stitch-prototype/assets/images/103e1602d0e3.png` and `8c39cd52d48b.png`: one slate texture, byte-identical,
-  511 × 512, opaque. Panel backgrounds in the prototype. **Source unknown** (see below).
 - [x] `stitch-prototype/assets/images/6a8650faf410.png` and `97785ef87771.png`: one parchment texture, byte-identical,
-  288 × 512, opaque. The terminal's page background. **Source unknown** (see below).
+  288 × 512, opaque. The terminal's page background. AI-generated (confirmed by the author).
 
 ### Prototype-only copies
 
@@ -44,16 +42,11 @@ Each is one sheet of four idle frames, transparent, 2172 × 724 px (cells 543 ×
 
 - [x] Cinzel, Almendra, EB Garamond, Alegreya, Fira Code, bundled in `web/src/assets/fonts/` (M3.6).
 
-### To check before shipping
+### Removed
 
-- [ ] **Provenance of the slate and parchment textures.** They came out of the Stitch export and look like stock
-  photography. Confirm they are Stitch-generated or licensed, or replace them with generated originals (see
-  `CLAUDE.md`: independent design, no copied assets). The app does not use any of them yet; it draws its panels with
-  CSS only.
-- [ ] **`597429b08137.png` (355 × 512) and `993ca6871b69.png` (512 × 432) should leave the repository.** They are
-  screenshots of someone else's fantasy UI kits (an info-box kit and a sign-up form). The prototype names them only in
-  a CSS comment ("inspired by"), and nothing renders them. Delete them and their manifest entries unless there is a
-  licence.
+- The slate texture (a screenshot from another project) and two screenshots of other projects' fantasy UI kits were
+  taken out of the prototype. Its pages now show their dark gradient without the texture layer. A new slate texture is
+  on the list below. The app itself never used any of them; it draws its panels with CSS only.
 
 ## How to use the prompts
 
@@ -101,6 +94,11 @@ the scale and style stay consistent. A flicker of torchlight is done in code.
 
 ## To make: backgrounds, tileable, opaque
 
+- [ ] `slate-panel.jpg`, 512 × 512, seamless, JPG quality 85: replaces the removed slate texture, behind the side
+  panels.
+  > Seamless tileable texture, 512 × 512: dark slate rock, near black with a hint of warm brown, fine grain and a few
+  > shallow cracks, low contrast, even light with no focal point, no text. Original, not derived from any photograph
+  > or game asset. Must tile without visible seams.
 - [ ] `world-floor.jpg`, 1024 × 1024, seamless, JPG quality 85:
   > Seamless tileable texture, 1024 × 1024: dark worn stone with a very faint hint of old paths and cracks, low
   > contrast, nearly black-blue, no focal point, no text. Light and detail must be even across the whole image so it
