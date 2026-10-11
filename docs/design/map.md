@@ -356,6 +356,9 @@ Decided: cleared quests and dungeons are shown greyed with a green check; "hide 
    still follows effort; the frame carries position. At the world level, a dungeon's art tier follows its size and
    longest chain.
 5. A very large world map (many epics): the first version lays out all nodes; grouping by milestone is for later.
+6. Where is a hall's own creature drawn: in its header, or not at all? An epic's effort label is shown as a word either way.
+7. Priority needs its own source (a `priority:*` label, or a Projects field). It is a small jewel on the room and never
+   changes the effort tier.
 
 Decided: the epic itself can be started like any quest (what a session on an epic opens with is part of the briefing
 work). A dungeon with many quests scrolls vertically inside the map. The map reads from the local SQLite copy once it
