@@ -55,6 +55,8 @@ type Session struct {
 	subs     map[*Subscription]struct{}
 	exited   bool
 	exitCode int
+	act      *activity
+	clock    func() time.Time
 
 	done         chan struct{}
 	closeProcess func()
@@ -109,6 +111,8 @@ func start(id string, spec Spec) (*Session, error) {
 		p:            p,
 		cmd:          cmd,
 		scroll:       newRing(ScrollbackBytes),
+		act:          newActivity(time.Now()),
+		clock:        time.Now,
 		subs:         map[*Subscription]struct{}{},
 		done:         make(chan struct{}),
 		closeProcess: closeProcess,
@@ -134,6 +138,7 @@ func (s *Session) pump() {
 			chunk := append([]byte(nil), buf[:n]...)
 			s.mu.Lock()
 			s.scroll.write(chunk)
+			s.act.note(chunk, s.clock())
 			for sub := range s.subs {
 				select {
 				case sub.c <- chunk:
@@ -224,6 +229,14 @@ func (s *Session) Resize(cols, rows int) error {
 		return errors.New("session: bad size")
 	}
 	return s.p.Resize(cols, rows)
+}
+
+// Activity reports whether the session is working, idle, waiting for the user
+// or ended, judged from its output alone.
+func (s *Session) Activity() Activity {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.act.state(s.clock(), s.exited)
 }
 
 // Done is closed once the process has exited and output is drained.

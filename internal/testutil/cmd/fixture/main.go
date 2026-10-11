@@ -61,6 +61,9 @@ func main() {
 		for scanner.Scan() {
 			fmt.Println("echo:" + scanner.Text())
 		}
+	case "ask":
+		fmt.Print(c.Output)
+		bufio.NewScanner(os.Stdin).Scan()
 	case "read":
 		scanner := bufio.NewScanner(os.Stdin)
 		if scanner.Scan() {
