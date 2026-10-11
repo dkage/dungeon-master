@@ -403,7 +403,7 @@ test('a campaign without a GitHub repository can open the separate sample projec
   await expect(panel.getByRole('button', { name: /Epic/ })).toHaveCount(0) // not the other campaign's issues
 
   await panel.getByRole('button', { name: 'Try the separate sample project' }).click()
-  await expect(panel.getByText('sample project')).toBeVisible()
+  await expect(panel.getByText('sample project', { exact: true })).toBeVisible()
   await expect(panel.getByText(/separate sample project/)).toBeVisible()
   await expect(panel.getByRole('button', { name: /Build the signup form/ })).toBeVisible()
   await expect(panel.getByRole('button', { name: /Suspend a user/ })).toContainText('blocked by #12')
