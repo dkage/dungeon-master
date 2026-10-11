@@ -18,6 +18,7 @@ import (
 	"github.com/dkage/dungeon-master/internal/history"
 	"github.com/dkage/dungeon-master/internal/launcher"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/platform"
 	"github.com/dkage/dungeon-master/internal/quests"
 	"github.com/dkage/dungeon-master/internal/session"
 )
@@ -394,7 +395,7 @@ func (s *Server) handleCampaignRemove(w http.ResponseWriter, r *http.Request) {
 	}
 	// Only the app-created scratch directory is removed with the sample campaign.
 	// Ordinary campaign directories are never touched when they are unregistered.
-	if camp.Sample && s.cfg.SampleDir != "" && filepath.Clean(camp.Dir) == filepath.Clean(s.cfg.SampleDir) {
+	if camp.Sample && s.cfg.SampleDir != "" && platform.SamePath(camp.Dir, s.cfg.SampleDir) {
 		if err := os.RemoveAll(s.cfg.SampleDir); err != nil {
 			httpErr(w, http.StatusInternalServerError, "campaign removed, but the sample workspace could not be cleaned up")
 			return

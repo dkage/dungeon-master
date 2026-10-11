@@ -13,6 +13,7 @@ import (
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/launcher"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/platform"
 	"github.com/dkage/dungeon-master/internal/quests"
 )
 
@@ -105,7 +106,6 @@ func (s *Server) activeQuestSessionFor(c campaign.Campaign) *sessionJSON {
 	if tree == "" {
 		tree = c.Dir
 	}
-	tree = filepath.Clean(tree)
 	for _, rec := range s.cfg.History.List() {
 		if rec.Quest <= 0 || rec.Kind != "hero" || rec.Ended != nil || rec.Lost {
 			continue
@@ -125,7 +125,7 @@ func (s *Server) activeQuestSessionFor(c campaign.Campaign) *sessionJSON {
 		if otherTree == "" {
 			otherTree = other.Dir
 		}
-		if filepath.Clean(otherTree) != tree {
+		if !platform.SamePath(otherTree, tree) {
 			continue
 		}
 		found := sessionJSON{

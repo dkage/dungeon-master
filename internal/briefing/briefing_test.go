@@ -52,3 +52,21 @@ func TestBuildLimitsBodyAndSelectsNewestComments(t *testing.T) {
 		t.Fatal("truncated issue body does not say so")
 	}
 }
+
+func TestBuildNormalizesWindowsLineEndings(t *testing.T) {
+	d := quests.Detail{
+		Quest:       quests.Quest{Number: 7, Title: "Line endings", State: quests.StateOpen, Comments: 1},
+		Body:        "first\r\nsecond\rthird\n",
+		CommentList: []quests.Comment{{Author: "bob", Body: "a\r\nb", Created: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)}},
+	}
+	out := Build("acme/app", d)
+	if strings.Contains(out.Content, `\r`) {
+		t.Fatalf("carriage returns reached the briefing: %s", out.Content)
+	}
+	if !strings.Contains(out.Content, `"body": "first\nsecond\nthird\n"`) || !strings.Contains(out.Content, `"body": "a\nb"`) {
+		t.Fatalf("line endings were not normalised: %s", out.Content)
+	}
+	if out.Truncated {
+		t.Fatalf("normalising line endings must not count as truncation: %+v", out)
+	}
+}

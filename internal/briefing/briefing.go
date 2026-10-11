@@ -57,6 +57,7 @@ const Instructions = `Work only on the GitHub issue identified in this briefing.
 // for the untrusted data block; Go escapes HTML delimiters so issue text cannot
 // close the surrounding tags or alter the briefing's structure.
 func Build(repository string, d quests.Detail) Result {
+	body := normalizeNewlines(d.Body)
 	data := issueData{
 		Repository:   repository,
 		Number:       d.Number,
@@ -65,7 +66,7 @@ func Build(repository string, d quests.Detail) Result {
 		State:        d.State,
 		Assignees:    append([]string{}, d.Assignees...),
 		Milestone:    d.Milestone,
-		Body:         truncate(d.Body, maxBodyRunes),
+		Body:         truncate(body, maxBodyRunes),
 		Comments:     []comment{},
 		BlockedBy:    append([]quests.Ref{}, d.BlockedBy...),
 		Blocking:     append([]quests.Ref{}, d.Blocking...),
@@ -73,7 +74,7 @@ func Build(repository string, d quests.Detail) Result {
 		Pulls:        append([]quests.PullRequest{}, d.PRs...),
 		MoreComments: d.Comments > len(d.CommentList),
 	}
-	truncated := len([]rune(data.Body)) != len([]rune(d.Body))
+	truncated := len([]rune(data.Body)) != len([]rune(body))
 	data.Labels = make([]string, 0, len(d.Labels))
 	for _, label := range d.Labels {
 		data.Labels = append(data.Labels, label.Name)
@@ -88,9 +89,10 @@ func Build(repository string, d quests.Detail) Result {
 		comments = comments[:maxComments]
 	}
 	for _, c := range comments {
-		body := truncate(c.Body, maxCommentRunes)
-		truncated = truncated || len([]rune(body)) != len([]rune(c.Body))
-		data.Comments = append(data.Comments, comment{Author: c.Author, Created: c.Created.UTC().Format("2006-01-02T15:04:05Z"), Body: body})
+		text := normalizeNewlines(c.Body)
+		shown := truncate(text, maxCommentRunes)
+		truncated = truncated || len([]rune(shown)) != len([]rune(text))
+		data.Comments = append(data.Comments, comment{Author: c.Author, Created: c.Created.UTC().Format("2006-01-02T15:04:05Z"), Body: shown})
 	}
 	b, _ := json.MarshalIndent(data, "", "  ")
 	content := "# Task briefing\n\n" + Instructions + "\n\n" +
@@ -98,6 +100,12 @@ func Build(repository string, d quests.Detail) Result {
 		"<quest-data type=\"json\">\n" + string(b) + "\n</quest-data>\n"
 	commentsTotal := max(d.Comments, len(d.CommentList))
 	return Result{Content: content, Truncated: truncated || data.MoreComments, CommentsShown: len(data.Comments), CommentsTotal: commentsTotal}
+}
+
+// normalizeNewlines turns the CRLF and lone CR that GitHub keeps from browser
+// edits and Windows clients into LF, so the briefing reads the same everywhere.
+func normalizeNewlines(s string) string {
+	return strings.NewReplacer("\r\n", "\n", "\r", "\n").Replace(s)
 }
 
 func truncate(s string, limit int) string {
