@@ -3,26 +3,20 @@ package github
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/dkage/dungeon-master/internal/quests"
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
-func fakeGH(t *testing.T, script string) string {
-	t.Helper()
-	p := filepath.Join(t.TempDir(), "gh")
-	if err := os.WriteFile(p, []byte("#!/bin/sh\n"+script+"\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return p
+func fakeGH(t *testing.T, options testutil.ProgramOptions) string {
+	return testutil.Program(t, "gh", options)
 }
 
 func TestEnvOrGHPrecedence(t *testing.T) {
-	gh := fakeGH(t, `[ "$1 $2" = "auth token" ] && echo "from-gh"`)
+	gh := fakeGH(t, testutil.ProgramOptions{Output: "from-gh"})
 	ctx := context.Background()
 
 	t.Setenv("GH_TOKEN", "")
@@ -47,9 +41,9 @@ func TestEnvOrGHFailureModes(t *testing.T) {
 	for name, path := range map[string]string{
 		"no gh configured":  "",
 		"gh missing":        "/nonexistent/gh",
-		"gh fails":          fakeGH(t, "echo 'not logged in' >&2; exit 1"),
-		"gh prints nothing": fakeGH(t, "exit 0"),
-		"gh prints blanks":  fakeGH(t, "echo '   '"),
+		"gh fails":          fakeGH(t, testutil.ProgramOptions{Error: "not logged in", Exit: 1}),
+		"gh prints nothing": fakeGH(t, testutil.ProgramOptions{}),
+		"gh prints blanks":  fakeGH(t, testutil.ProgramOptions{Output: "   "}),
 	} {
 		if _, err := EnvOrGH(path)(ctx); !errors.Is(err, quests.ErrNoToken) {
 			t.Errorf("%s: %v", name, err)
@@ -60,7 +54,7 @@ func TestEnvOrGHFailureModes(t *testing.T) {
 func TestEnvOrGHTimesOut(t *testing.T) {
 	t.Setenv("GH_TOKEN", "")
 	t.Setenv("GITHUB_TOKEN", "")
-	gh := fakeGH(t, "sleep 30")
+	gh := fakeGH(t, testutil.ProgramOptions{SleepMS: 30000})
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 	start := time.Now()

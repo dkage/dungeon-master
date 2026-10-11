@@ -4,10 +4,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/dkage/dungeon-master/internal/platform"
 )
 
 // Rule is added to the instructions of every session the app starts. It
@@ -24,6 +28,30 @@ func Install(dir, exe string) (binDir string, err error) {
 	binDir = filepath.Join(dir, "bin")
 	if err := os.MkdirAll(binDir, 0o700); err != nil {
 		return "", err
+	}
+	if runtime.GOOS == "windows" {
+		src, err := os.Open(exe)
+		if err != nil {
+			return "", err
+		}
+		defer src.Close()
+		tmp, err := os.CreateTemp(binDir, "gh-*.exe")
+		if err != nil {
+			return "", err
+		}
+		defer os.Remove(tmp.Name())
+		_, copyErr := io.Copy(tmp, src)
+		closeErr := tmp.Close()
+		if copyErr != nil {
+			return "", copyErr
+		}
+		if closeErr != nil {
+			return "", closeErr
+		}
+		if err := os.Rename(tmp.Name(), filepath.Join(binDir, "gh.exe")); err != nil {
+			return "", err
+		}
+		return binDir, nil
 	}
 	link := filepath.Join(binDir, "gh")
 	_ = os.Remove(link)
@@ -49,6 +77,7 @@ func (s SessionEnv) Apply(env []string) []string {
 	path := ""
 	for _, kv := range env {
 		k, v, _ := strings.Cut(kv, "=")
+		k = platform.EnvKey(k)
 		if k == "PATH" {
 			path = v
 		}

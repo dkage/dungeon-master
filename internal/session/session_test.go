@@ -2,11 +2,13 @@ package session
 
 import (
 	"bytes"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	pty "github.com/aymanbagabas/go-pty"
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
 func TestRing(t *testing.T) {
@@ -49,7 +51,7 @@ func collect(t *testing.T, s *Session, want string) string {
 func TestSpawnEchoAndReplay(t *testing.T) {
 	m := NewManager()
 	defer m.Shutdown()
-	s, err := m.Spawn(Spec{Argv: []string{"sh", "-c", "echo hello-dungeon; sleep 0.2"}, Env: Environ()})
+	s, err := m.Spawn(Spec{Argv: []string{testutil.Program(t, "hello", testutil.ProgramOptions{Output: "hello-dungeon", SleepMS: 200})}, Env: Environ()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,11 +73,11 @@ func TestSpawnEchoAndReplay(t *testing.T) {
 func TestWriteAndExitCode(t *testing.T) {
 	m := NewManager()
 	defer m.Shutdown()
-	s, err := m.Spawn(Spec{Argv: []string{"sh", "-c", "read x; echo got:$x; exit 3"}, Env: Environ()})
+	s, err := m.Spawn(Spec{Argv: []string{testutil.Program(t, "read", testutil.ProgramOptions{Mode: "read", Exit: 3})}, Env: Environ()})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Write([]byte("ping\n")); err != nil {
+	if _, err := s.Write([]byte(testutil.TerminalInput("ping\n"))); err != nil {
 		t.Fatal(err)
 	}
 	collect(t, s, "got:ping")
@@ -87,7 +89,11 @@ func TestWriteAndExitCode(t *testing.T) {
 
 func TestKillStopsProcessGroup(t *testing.T) {
 	m := NewManager()
-	s, err := m.Spawn(Spec{Argv: []string{"sh", "-c", "sleep 60 & sleep 60"}, Env: Environ()})
+	argv := []string{"sh", "-c", "sleep 60 & sleep 60"}
+	if runtime.GOOS == "windows" {
+		argv = []string{testutil.Program(t, "spawn", testutil.ProgramOptions{Mode: "spawn"})}
+	}
+	s, err := m.Spawn(Spec{Argv: argv, Env: Environ()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +122,7 @@ func TestResizeAndBadSpec(t *testing.T) {
 	if _, err := m.Spawn(Spec{Argv: []string{"definitely-not-a-real-binary-xyz"}}); err == nil {
 		t.Fatal("missing binary accepted")
 	}
-	s, err := m.Spawn(Spec{Argv: []string{"sh", "-c", "sleep 1"}, Env: Environ(), Cols: 80, Rows: 24})
+	s, err := m.Spawn(Spec{Argv: []string{testutil.Program(t, "sleep", testutil.ProgramOptions{SleepMS: 1000})}, Env: Environ(), Cols: 80, Rows: 24})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +139,7 @@ func TestIDsAreUniqueAndRandom(t *testing.T) {
 	defer m.Shutdown()
 	seen := map[string]bool{}
 	for range 5 {
-		s, err := m.Spawn(Spec{Argv: []string{"sh", "-c", "sleep 1"}, Env: Environ()})
+		s, err := m.Spawn(Spec{Argv: []string{testutil.Program(t, "sleep", testutil.ProgramOptions{SleepMS: 1000})}, Env: Environ()})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -145,7 +151,7 @@ func TestIDsAreUniqueAndRandom(t *testing.T) {
 	// A fresh manager does not restart from the same ids.
 	m2 := NewManager()
 	defer m2.Shutdown()
-	s, _ := m2.Spawn(Spec{Argv: []string{"sh", "-c", "sleep 1"}, Env: Environ()})
+	s, _ := m2.Spawn(Spec{Argv: []string{testutil.Program(t, "sleep", testutil.ProgramOptions{SleepMS: 1000})}, Env: Environ()})
 	if seen[s.ID] {
 		t.Fatalf("id %q repeated across managers", s.ID)
 	}
@@ -154,7 +160,7 @@ func TestIDsAreUniqueAndRandom(t *testing.T) {
 func TestParentReleasesSlaveEnd(t *testing.T) {
 	m := NewManager()
 	defer m.Shutdown()
-	s, err := m.Spawn(Spec{Argv: []string{"sh", "-c", "sleep 1"}, Env: Environ()})
+	s, err := m.Spawn(Spec{Argv: []string{testutil.Program(t, "sleep", testutil.ProgramOptions{SleepMS: 1000})}, Env: Environ()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +178,7 @@ func TestParentReleasesSlaveEnd(t *testing.T) {
 func TestSessionFinishesWhenProcessExits(t *testing.T) {
 	m := NewManager()
 	defer m.Shutdown()
-	s, err := m.Spawn(Spec{Argv: []string{"sh", "-c", "exit 0"}, Env: Environ()})
+	s, err := m.Spawn(Spec{Argv: []string{testutil.Program(t, "exit", testutil.ProgramOptions{})}, Env: Environ()})
 	if err != nil {
 		t.Fatal(err)
 	}

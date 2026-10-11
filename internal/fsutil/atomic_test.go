@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
 func TestWriteFileAtomic(t *testing.T) {
@@ -19,10 +21,10 @@ func TestWriteFileAtomic(t *testing.T) {
 	if string(got) != "two" {
 		t.Fatalf("got %q", got)
 	}
-	if fi, _ := os.Stat(p); fi.Mode().Perm() != 0o600 {
+	if fi, _ := os.Stat(p); !testutil.PrivateMode(p, fi, 0o600) {
 		t.Fatalf("file mode %v", fi.Mode().Perm())
 	}
-	if di, _ := os.Stat(filepath.Dir(p)); di.Mode().Perm() != 0o700 {
+	if di, _ := os.Stat(filepath.Dir(p)); !testutil.PrivateMode(filepath.Dir(p), di, 0o700) {
 		t.Fatalf("dir mode %v", di.Mode().Perm())
 	}
 	// No temp files are left behind.
@@ -48,7 +50,7 @@ func TestCreateFileAtomicDoesNotReplaceExistingFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	if !testutil.PrivateMode(path, info, 0o600) {
 		t.Fatalf("mode %o, want 600", info.Mode().Perm())
 	}
 }

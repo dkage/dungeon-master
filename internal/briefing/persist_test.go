@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
 func TestSavePreviewIsPrivateAndCannotEscapeStateDirectory(t *testing.T) {
@@ -21,11 +23,11 @@ func TestSavePreviewIsPrivateAndCannotEscapeStateDirectory(t *testing.T) {
 		t.Fatalf("saved content %q, err %v", data, err)
 	}
 	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm() != 0o600 {
+	if err != nil || !testutil.PrivateMode(path, info, 0o600) {
 		t.Fatalf("file mode %v, err %v", info.Mode().Perm(), err)
 	}
 	dirInfo, err := os.Stat(filepath.Dir(path))
-	if err != nil || dirInfo.Mode().Perm() != 0o700 {
+	if err != nil || !testutil.PrivateMode(filepath.Dir(path), dirInfo, 0o700) {
 		t.Fatalf("directory mode %v, err %v", dirInfo.Mode().Perm(), err)
 	}
 	resolved, err := PreviewPath(state, "c1234abcd", 42, "opus", id)

@@ -16,6 +16,7 @@ import (
 
 	"github.com/dkage/dungeon-master/internal/gatekeeper"
 	"github.com/dkage/dungeon-master/internal/quartermaster"
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
 // withGate starts a server whose sessions get the shim, paced by a real
@@ -116,12 +117,20 @@ func TestShellSessionsGetTheShimToo(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer c.CloseNow()
-	send(t, c, "echo URL=$DUNGEON_GATE_URL BIN=$DUNGEON_GATE_BIN REAL=$DUNGEON_REAL_GH\n")
+	if runtime.GOOS == "windows" {
+		send(t, c, "echo URL=%DUNGEON_GATE_URL% BIN=%DUNGEON_GATE_BIN% REAL=%DUNGEON_REAL_GH%\n")
+	} else {
+		send(t, c, "echo URL=$DUNGEON_GATE_URL BIN=$DUNGEON_GATE_BIN REAL=$DUNGEON_REAL_GH\n")
+	}
 	out := readUntil(t, c, "REAL=/real/gh")
 	if !strings.Contains(out, "URL="+gatekeeper.URLPrefix+e.gateSock) || !strings.Contains(out, "BIN=/gk/bin") {
 		t.Fatalf("%s", out)
 	}
-	send(t, c, "echo FIRST=${PATH%%:*}\n")
+	if runtime.GOOS == "windows" {
+		send(t, c, "for /f \"tokens=1 delims=;\" %a in (\"%PATH%\") do @echo FIRST=%a\n")
+	} else {
+		send(t, c, "echo FIRST=${PATH%%:*}\n")
+	}
 	readUntil(t, c, "FIRST=/gk/bin")
 }
 
@@ -381,8 +390,7 @@ func TestTheShimTalksToTheServerEndToEnd(t *testing.T) {
 
 	dir := t.TempDir()
 	calls := filepath.Join(dir, "calls")
-	fake := filepath.Join(dir, "gh")
-	os.WriteFile(fake, []byte("#!/bin/sh\necho \"$@\" >> "+calls+"\necho created\n"), 0o755)
+	fake := testutil.Program(t, "gh", testutil.ProgramOptions{Output: "created", Log: calls})
 
 	envv := map[string]string{
 		gatekeeper.EnvGateURL: gatekeeper.URLPrefix + e.gateSock, gatekeeper.EnvGateTok: tok, gatekeeper.EnvRealGH: fake,

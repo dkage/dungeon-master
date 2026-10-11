@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
 const (
@@ -219,7 +221,7 @@ func TestTokenPersistsBetweenRuns(t *testing.T) {
 	if err != nil || !created || !tokenPattern.MatchString(first) {
 		t.Fatalf("first: %q created=%v err=%v", first, created, err)
 	}
-	if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o600 {
+	if fi, _ := os.Stat(path); !testutil.PrivateMode(path, fi, 0o600) {
 		t.Fatalf("token file mode %v", fi.Mode().Perm())
 	}
 	second, created, err := LoadOrCreateToken(path, false)

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -55,7 +56,9 @@ type Session struct {
 	exited   bool
 	exitCode int
 
-	done chan struct{}
+	done         chan struct{}
+	closeProcess func()
+	closeOnce    sync.Once
 }
 
 // Subscription is one viewer's live feed. Output arrives on C; C closes when
@@ -84,6 +87,13 @@ func start(id string, spec Spec) (*Session, error) {
 		_ = p.Close()
 		return nil, fmt.Errorf("session: start %s: %w", spec.Argv[0], err)
 	}
+	closeProcess, err := containProcess(cmd.Process)
+	if err != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		_ = p.Close()
+		return nil, fmt.Errorf("session: contain process: %w", err)
+	}
 	// The child has its own copy of the slave end. Keeping ours open means
 	// that on Linux reading the master never reports end-of-file after the
 	// child exits, so the session would never finish. macOS reports it
@@ -92,15 +102,16 @@ func start(id string, spec Spec) (*Session, error) {
 		_ = up.Slave().Close()
 	}
 	s := &Session{
-		ID:      id,
-		Created: time.Now(),
-		Dir:     spec.Dir,
-		Meta:    spec.Meta,
-		p:       p,
-		cmd:     cmd,
-		scroll:  newRing(ScrollbackBytes),
-		subs:    map[*Subscription]struct{}{},
-		done:    make(chan struct{}),
+		ID:           id,
+		Created:      time.Now(),
+		Dir:          spec.Dir,
+		Meta:         spec.Meta,
+		p:            p,
+		cmd:          cmd,
+		scroll:       newRing(ScrollbackBytes),
+		subs:         map[*Subscription]struct{}{},
+		done:         make(chan struct{}),
+		closeProcess: closeProcess,
 	}
 	go s.pump()
 	return s, nil
@@ -109,6 +120,13 @@ func start(id string, spec Spec) (*Session, error) {
 // pump copies PTY output into the scrollback and to subscribers until the
 // process exits.
 func (s *Session) pump() {
+	// ConPTY does not reach EOF just because its child exits. Wait in parallel,
+	// then close the console while this goroutine continues draining output.
+	var waited chan error
+	if runtime.GOOS == "windows" {
+		waited = make(chan error, 1)
+		go func() { err := s.cmd.Wait(); s.closeOnce.Do(s.closeProcess); _ = s.p.Close(); waited <- err }()
+	}
 	buf := make([]byte, 32*1024)
 	for {
 		n, err := s.p.Read(buf)
@@ -132,7 +150,13 @@ func (s *Session) pump() {
 		}
 	}
 
-	werr := s.cmd.Wait()
+	var werr error
+	if waited != nil {
+		werr = <-waited
+	} else {
+		werr = s.cmd.Wait()
+		s.closeOnce.Do(s.closeProcess)
+	}
 	code := 0
 	if werr != nil {
 		code = -1
@@ -146,7 +170,9 @@ func (s *Session) pump() {
 		s.dropLocked(sub)
 	}
 	s.mu.Unlock()
-	_ = s.p.Close()
+	if waited == nil {
+		_ = s.p.Close()
+	}
 	close(s.done)
 }
 
@@ -218,7 +244,11 @@ func (s *Session) Kill() {
 		return
 	default:
 	}
-	signalGroup(s.cmd.Process, false)
+	if runtime.GOOS == "windows" {
+		s.closeOnce.Do(s.closeProcess)
+	} else {
+		signalGroup(s.cmd.Process, false)
+	}
 	select {
 	case <-s.done:
 	case <-time.After(killGrace):

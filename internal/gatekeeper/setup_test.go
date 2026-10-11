@@ -3,11 +3,34 @@ package gatekeeper
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
 
 func TestInstallLinksGhToThisProgram(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		dir := t.TempDir()
+		exe := filepath.Join(dir, "dungeon.exe")
+		os.WriteFile(exe, []byte("first"), 0o600)
+		bin, err := Install(filepath.Join(dir, "gatekeeper"), exe)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := os.ReadFile(filepath.Join(bin, "gh.exe"))
+		if err != nil || string(b) != "first" {
+			t.Fatalf("copy: %q %v", b, err)
+		}
+		os.WriteFile(exe, []byte("second"), 0o600)
+		if _, err := Install(filepath.Join(dir, "gatekeeper"), exe); err != nil {
+			t.Fatal(err)
+		}
+		b, _ = os.ReadFile(filepath.Join(bin, "gh.exe"))
+		if string(b) != "second" {
+			t.Fatalf("copy not replaced: %q", b)
+		}
+		return
+	}
 	dir := t.TempDir()
 	exe := filepath.Join(dir, "dungeon")
 	os.WriteFile(exe, []byte("x"), 0o755)

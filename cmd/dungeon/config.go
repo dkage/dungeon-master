@@ -15,6 +15,7 @@ import (
 	"github.com/dkage/dungeon-master/internal/history"
 	"github.com/dkage/dungeon-master/internal/launcher"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/platform"
 	"github.com/dkage/dungeon-master/internal/quartermaster"
 	"github.com/dkage/dungeon-master/internal/quests"
 	"github.com/dkage/dungeon-master/internal/quests/demo"
@@ -54,8 +55,11 @@ func realGH(ctx context.Context, dir string) (string, *server.Gatekeeper) {
 	}
 	self, _ := filepath.EvalSymlinks(exe)
 	real, err := launcher.ResolveExcept(ctx, "gh", func(p string) bool {
+		if bin := os.Getenv(gatekeeper.EnvGateBin); bin != "" && platform.SamePath(filepath.Dir(p), bin) {
+			return true
+		}
 		r, _ := filepath.EvalSymlinks(p)
-		return r != "" && r == self
+		return r != "" && platform.SamePath(r, self)
 	})
 	if err != nil {
 		return "", nil // no gh, so nothing for agents to flood
@@ -128,7 +132,7 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 		Party:      p,
 		PartyPath:  partyPath,
 		PartyError: partyError,
-		Shell:      os.Getenv("SHELL"),
+		Shell:      platform.Shell(),
 
 		Campaigns: campaigns,
 		History:   hist,

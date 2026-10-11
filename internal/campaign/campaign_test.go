@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
 func TestParseGitHubRemote(t *testing.T) {
@@ -234,9 +236,9 @@ func TestOldLabelFiltersBecomeAScope(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(t.TempDir(), "campaigns.json")
 	old := `{"version":1,"campaigns":[
-	  {"id":"c1","name":"api","dir":"` + dir + `","remote":"origin","labels":["area:api","Area:API","bug"]},
-	  {"id":"c2","name":"plain","dir":"` + t.TempDir() + `","remote":"origin","labels":[]},
-	  {"id":"c3","name":"bad","dir":"` + t.TempDir() + `","remote":"origin","labels":["a,b"]}
+	  {"id":"c1","name":"api","dir":"` + filepath.ToSlash(dir) + `","remote":"origin","labels":["area:api","Area:API","bug"]},
+	  {"id":"c2","name":"plain","dir":"` + filepath.ToSlash(t.TempDir()) + `","remote":"origin","labels":[]},
+	  {"id":"c3","name":"bad","dir":"` + filepath.ToSlash(t.TempDir()) + `","remote":"origin","labels":["a,b"]}
 	]}`
 	if err := os.WriteFile(path, []byte(old), 0o600); err != nil {
 		t.Fatal(err)
@@ -294,10 +296,10 @@ func TestPersistenceRoundTripAndPermissions(t *testing.T) {
 		t.Fatal(err)
 	}
 	fi, err := os.Stat(state)
-	if err != nil || fi.Mode().Perm() != 0o600 {
+	if err != nil || !testutil.PrivateMode(state, fi, 0o600) {
 		t.Fatalf("state file: %v %v", fi, err)
 	}
-	if di, _ := os.Stat(filepath.Dir(state)); di.Mode().Perm() != 0o700 {
+	if di, _ := os.Stat(filepath.Dir(state)); !testutil.PrivateMode(filepath.Dir(state), di, 0o700) {
 		t.Fatalf("state dir mode %v", di.Mode().Perm())
 	}
 	raw, _ := os.ReadFile(state)

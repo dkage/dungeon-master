@@ -20,6 +20,7 @@ import (
 	"unicode"
 
 	"github.com/dkage/dungeon-master/internal/fsutil"
+	"github.com/dkage/dungeon-master/internal/platform"
 )
 
 var (
@@ -368,7 +369,12 @@ func sameDir(a, b string) bool {
 	}
 	ra, errA := filepath.EvalSymlinks(a)
 	rb, errB := filepath.EvalSymlinks(b)
-	return errA == nil && errB == nil && ra == rb
+	if errA != nil || errB != nil {
+		return false
+	}
+	ai, errA := os.Stat(ra)
+	bi, errB := os.Stat(rb)
+	return (platform.SamePath(ra, rb) || (errA == nil && errB == nil && os.SameFile(ai, bi)))
 }
 
 func checkName(n string) error {

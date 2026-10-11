@@ -160,7 +160,7 @@ test('a monorepo subfolder runs agents in the subfolder but uses the repository 
   await page.getByRole('button', { name: 'Campaign actions for api' }).click()
   await page.getByRole('group', { name: 'Actions for api' }).getByRole('button', { name: 'Opus: free session' }).click()
   await expect(screenText(page)).toContainText('FAKE-CLAUDE')
-  await expect(screenText(page)).toContainText('apps/api') // cwd is the subfolder
+  await expect(screenText(page)).toContainText(join('apps', 'api')) // cwd is the subfolder
 
   // Clean up so later tests start from one campaign.
   await page.getByRole('button', { name: closeSession }).click()
@@ -273,7 +273,7 @@ test('the terminal renders with its own font, colours and selection (CSP must al
   await open(page)
   await hero(page, 'Shell').click()
   await page.locator('.pane:not([hidden]) .xterm').click()
-  await page.keyboard.type("printf '\\033[31mRED-TEXT\\033[0m plain-text\\n'")
+  await page.keyboard.type(process.platform === 'win32' ? `powershell -NoProfile -Command "[Console]::WriteLine([char]27 + '[31mRED-TEXT' + [char]27 + '[0m plain-text')"` : "printf '\\033[31mRED-TEXT\\033[0m plain-text\\n'")
   await page.keyboard.press('Enter')
   await expect(screenText(page)).toContainText('RED-TEXT plain-text')
 
@@ -283,7 +283,7 @@ test('the terminal renders with its own font, colours and selection (CSP must al
   const colour = (text: RegExp) =>
     page.locator('.pane:not([hidden]) .xterm-rows span').filter({ hasText: text }).last()
       .evaluate((e) => getComputedStyle(e).color)
-  const red = await colour(/^RED-TEXT$/)
+  const red = await colour(/^RED-TEXT\s*$/)
   const plain = await colour(/plain-text$/)
   expect(red).not.toBe(plain)
   expect(red).toMatch(/rgb\((\d+), (\d+), (\d+)\)/)
@@ -608,9 +608,9 @@ test('gh in a session is the shim: reads pass at once, writes are paced', async 
   await page.locator('.pane:not([hidden]) .xterm').click()
 
   // The first gh on the session's PATH is the app's shim, in front of the real one.
-  await page.keyboard.type('type -p gh')
+  await page.keyboard.type(process.platform === 'win32' ? 'where gh' : 'command -v gh')
   await page.keyboard.press('Enter')
-  await expect(term).toContainText('/gatekeeper/bin/gh')
+  await expect(term).toContainText(process.platform === 'win32' ? '\\gatekeeper\\bin\\gh.exe' : '/gatekeeper/bin/gh')
 
   // A read goes straight through to the real gh.
   await page.keyboard.type('gh issue list --limit 3')
@@ -618,9 +618,13 @@ test('gh in a session is the shim: reads pass at once, writes are paced', async 
   await expect(term).toContainText('fake-gh-ran: issue list --limit 3')
 
   // Three writes in a tight loop, as an agent might send them.
-  await page.keyboard.type('for n in a b c; do gh issue create --title $n; done; echo LOOP-DONE-$((40 + 2))')
+  await page.keyboard.type(process.platform === 'win32'
+    ? 'for %n in (a b c) do @gh issue create --title %n'
+    : 'for n in a b c; do gh issue create --title $n; done; echo LOOP-DONE-$((40 + 2))')
   await page.keyboard.press('Enter')
-  await expect(term).toContainText('LOOP-DONE-42', { timeout: 40_000 }) // only the output has 42, not the typed command
+  if (process.platform === 'win32') {
+    await expect(term).toContainText('fake-gh-ran: issue create --title c', { timeout: 40_000 })
+  } else { await expect(term).toContainText('LOOP-DONE-42', { timeout: 40_000 }) } // only the output has 42, not the typed command
   await expect(term).toContainText('fake-gh-ran: issue create --title c')
 
   const calls = readFileSync(ghLog, 'utf8').trim().split('\n').map((l) => {

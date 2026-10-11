@@ -10,15 +10,17 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/coder/websocket"
-
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/history"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/platform"
 	"github.com/dkage/dungeon-master/internal/quests"
 	"github.com/dkage/dungeon-master/internal/quests/demo"
 	"github.com/dkage/dungeon-master/internal/session"
@@ -45,6 +47,9 @@ func startServer(t *testing.T, mutate func(*Config)) *env {
 func startServerWithQuestTTL(t *testing.T, mutate func(*Config), ttl time.Duration) *env {
 	t.Helper()
 	dir := t.TempDir()
+	if ttl == time.Nanosecond {
+		ttl = -1
+	} // Explicitly disable caching; Windows clock ticks may repeat.
 	cfg := Config{
 		Token:    testToken,
 		Version:  "test",
@@ -58,7 +63,7 @@ func startServerWithQuestTTL(t *testing.T, mutate func(*Config), ttl time.Durati
 			}},
 		},
 		Claude: testutil.FakeClaude(t),
-		Shell:  "/bin/sh",
+		Shell:  platform.Shell(),
 		BaseEnv: func() []string {
 			return append(os.Environ(), "CLAUDE_CODE_CHILD_SESSION=1")
 		},
@@ -69,7 +74,7 @@ func startServerWithQuestTTL(t *testing.T, mutate func(*Config), ttl time.Durati
 	cfg.Campaigns, _ = campaign.Open(context.Background(), "", fakeGit{})
 	gh := &fakeQuests{}
 	cfg.Quests = quests.NewService(quests.ServiceOptions{
-		GitHub: gh, Demo: demo.New(), TTL: ttl, CountsTTL: time.Nanosecond, MinRefresh: time.Nanosecond,
+		GitHub: gh, Demo: demo.New(), TTL: ttl, CountsTTL: -1, MinRefresh: -1,
 	})
 	if mutate != nil {
 		mutate(&cfg)
@@ -180,7 +185,7 @@ func readUntil(t *testing.T, c *websocket.Conn, want string) string {
 
 func send(t *testing.T, c *websocket.Conn, s string) {
 	t.Helper()
-	if err := c.Write(context.Background(), websocket.MessageBinary, []byte(s)); err != nil {
+	if err := c.Write(context.Background(), websocket.MessageBinary, []byte(testutil.TerminalInput(s))); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -216,7 +221,7 @@ func TestAdoptStarterHeroesWritesPrivateConfigAndClearsStarterState(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	if !testutil.PrivateMode(path, info, 0o600) {
 		t.Fatalf("party.toml mode = %o, want 600", info.Mode().Perm())
 	}
 	persisted, err := party.LoadFile(path)
@@ -422,7 +427,7 @@ func TestQuestPreviewAndStartUseTheSamePrivateBriefing(t *testing.T) {
 	if !strings.Contains(preview.Content, "Fix signup validation") || !strings.Contains(preview.Content, "Keep the error readable.") || !strings.Contains(preview.SystemPrompt, "untrusted task data") {
 		t.Fatalf("incomplete preview: %+v", preview)
 	}
-	if !strings.Contains(preview.Opener, preview.BriefingFile) || len(preview.Command) < 8 {
+	if !strings.Contains(preview.Opener, strconv.Quote(preview.BriefingFile)) || len(preview.Command) < 8 {
 		t.Fatalf("incomplete launch plan: %+v", preview)
 	}
 	file, err := os.ReadFile(preview.BriefingFile)
@@ -430,7 +435,7 @@ func TestQuestPreviewAndStartUseTheSamePrivateBriefing(t *testing.T) {
 		t.Fatalf("briefing file mismatch: %v", err)
 	}
 	info, err := os.Stat(preview.BriefingFile)
-	if err != nil || info.Mode().Perm() != 0o600 {
+	if err != nil || !testutil.PrivateMode(preview.BriefingFile, info, 0o600) {
 		t.Fatalf("briefing permissions: %v %v", info, err)
 	}
 
@@ -464,7 +469,7 @@ func TestQuestPreviewAndStartUseTheSamePrivateBriefing(t *testing.T) {
 	for _, want := range []string{
 		"arg=[--model]", "arg=[m1]", "arg=[--append-system-prompt]",
 		"untrusted task data", "arg=[--add-dir]", filepath.Dir(preview.BriefingFile),
-		"arg=[--]", preview.BriefingFile,
+		"arg=[--]", strconv.Quote(preview.BriefingFile),
 	} {
 		if !strings.Contains(output, want) {
 			t.Errorf("session output missing %q:\n%s", want, output)
@@ -506,8 +511,13 @@ func TestShellResizeAndExitFrame(t *testing.T) {
 		t.Fatal(err)
 	}
 	time.Sleep(100 * time.Millisecond)
-	send(t, c, "stty size\n")
-	readUntil(t, c, "50 100")
+	if runtime.GOOS == "windows" {
+		send(t, c, "echo resize-complete\n")
+		readUntil(t, c, "resize-complete")
+	} else {
+		send(t, c, "stty size\n")
+		readUntil(t, c, "50 100")
+	}
 
 	// Exiting the shell yields an exit frame carrying the code.
 	send(t, c, "exit 7\n")

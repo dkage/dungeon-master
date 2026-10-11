@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
 func rec(id, campaign string) Record {
@@ -67,7 +69,7 @@ func TestRestartMarksRunningRecordsLost(t *testing.T) {
 	if r, _ := third.Get("running"); !r.Lost {
 		t.Fatal("lost mark not persisted")
 	}
-	if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o600 {
+	if fi, _ := os.Stat(path); !testutil.PrivateMode(path, fi, 0o600) {
 		t.Fatalf("mode %v", fi.Mode().Perm())
 	}
 }

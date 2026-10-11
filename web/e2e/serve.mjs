@@ -4,11 +4,13 @@ import { execFileSync, spawn } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { delimiter, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const bin = resolve(here, '../../bin/dungeon')
+const windows = process.platform === 'win32'
+const suffix = windows ? '.exe' : ''
+const bin = resolve(here, '../../bin/dungeon' + suffix)
 const port = process.env.E2E_PORT ?? '7899'
 
 const root = mkdtempSync(join(tmpdir(), 'dungeon-e2e-'))
@@ -16,10 +18,17 @@ const home = join(root, 'home')
 const workdir = join(root, 'work')
 const fakeBin = join(root, 'bin')
 for (const d of [home, workdir, fakeBin]) mkdirSync(d)
-copyFileSync(join(here, 'fake-claude.sh'), join(fakeBin, 'claude'))
-// A fake gh: records when it ran and with what, so the tests can see the pacing.
+// Build portable stub executables for the real PTY and shim.
+const fixture = join(fakeBin, 'fixture' + suffix)
+execFileSync('go', ['build', '-o', fixture, './internal/testutil/cmd/fixture'], { cwd: resolve(here, '../..') })
 const ghLog = join(root, 'gh-calls.log')
-writeFileSync(join(fakeBin, 'gh'), `#!/bin/sh\necho "$(date +%s) $*" >> ${ghLog}\necho "fake-gh-ran: $*"\n`, { mode: 0o755 })
+for (const [name, options] of [['claude', { Mode: 'e2e-claude' }], ['gh', { Mode: 'e2e-gh', Log: ghLog }]]) {
+  const target = join(fakeBin, name + suffix)
+  copyFileSync(fixture, target)
+  writeFileSync(target + '.json', JSON.stringify(options))
+}
+const emptyGitConfig = join(root, 'empty.gitconfig')
+writeFileSync(emptyGitConfig, '')
 
 // The workdir is a real repository with a GitHub remote, and apps/api is a
 // monorepo subfolder, so the tests can check how campaigns resolve them.
@@ -28,7 +37,7 @@ mkdirSync(subdir, { recursive: true })
 const git = (...args) =>
   execFileSync('git', args, {
     cwd: workdir,
-    env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+    env: { ...process.env, GIT_CONFIG_GLOBAL: emptyGitConfig, GIT_CONFIG_SYSTEM: emptyGitConfig },
   })
 git('init', '-q')
 git('remote', 'add', 'origin', 'git@github.com:acme/demo.git')
@@ -121,8 +130,8 @@ const child = spawn(bin, ['serve', '--addr', `127.0.0.1:${port}`], {
     DUNGEON_HOME: home,
     GH_TOKEN: 'e2e-token',
     DUNGEON_GITHUB_ENDPOINT: githubUrl,
-    PATH: `${fakeBin}:${process.env.PATH}`,
-    SHELL: '/bin/sh',
+    PATH: `${fakeBin}${delimiter}${process.env.PATH}`,
+    SHELL: windows ? '' : '/bin/sh',
   },
   stdio: ['ignore', 'pipe', 'inherit'],
 })

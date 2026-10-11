@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -81,6 +82,9 @@ func TestEnvironScrubsParentSession(t *testing.T) {
 func writeExe(t *testing.T, dir, name string) string {
 	t.Helper()
 	p := filepath.Join(dir, name)
+	if runtime.GOOS == "windows" {
+		p += ".exe"
+	}
 	if err := os.WriteFile(p, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +113,7 @@ func TestResolve(t *testing.T) {
 		t.Fatal("directory accepted")
 	}
 	// PATH lookup.
-	if got, err := resolve(ctx, "claude", "/nonexistent:"+bin, "", nil); err != nil || got != want {
+	if got, err := resolve(ctx, "claude", "/nonexistent"+string(os.PathListSeparator)+bin, "", nil); err != nil || got != want {
 		t.Fatalf("PATH: %q %v", got, err)
 	}
 	// Not found anywhere.
@@ -122,6 +126,9 @@ func TestResolve(t *testing.T) {
 }
 
 func TestResolveFallsBackToLoginShellPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix login shell fallback")
+	}
 	ctx := context.Background()
 	bin := t.TempDir()
 	want := writeExe(t, bin, "claude")
@@ -144,6 +151,9 @@ func TestResolveFallsBackToLoginShellPath(t *testing.T) {
 }
 
 func TestLoginShellWithStrayChildrenDoesNotHang(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix shell process handling")
+	}
 	shell := filepath.Join(t.TempDir(), "slowshell")
 	if err := os.WriteFile(shell, []byte("#!/bin/sh\nsleep 30 &\nsleep 30\n"), 0o755); err != nil {
 		t.Fatal(err)

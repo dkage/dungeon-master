@@ -14,12 +14,15 @@ func WriteFileAtomic(path string, data []byte) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
+	if err := MakePrivate(dir, true); err != nil {
+		return err
+	}
 	tmp, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {
 		return err
 	}
 	defer os.Remove(tmp.Name())
-	if err := tmp.Chmod(0o600); err != nil {
+	if err := MakePrivate(tmp.Name(), false); err != nil {
 		tmp.Close()
 		return err
 	}
@@ -41,13 +44,16 @@ func CreateFileAtomic(path string, data []byte) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
+	if err := MakePrivate(dir, true); err != nil {
+		return err
+	}
 	tmp, err := os.CreateTemp(dir, ".tmp-*")
 	if err != nil {
 		return err
 	}
 	tmpPath := tmp.Name()
 	defer os.Remove(tmpPath)
-	if err := tmp.Chmod(0o600); err != nil {
+	if err := MakePrivate(tmp.Name(), false); err != nil {
 		tmp.Close()
 		return err
 	}

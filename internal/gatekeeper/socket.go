@@ -3,6 +3,7 @@ package gatekeeper
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -37,6 +38,11 @@ func SocketDir() string {
 	if u, err := user.Current(); err == nil && u.Uid != "" {
 		id = u.Uid
 	}
+	// Windows sun_path is also bounded; a full SID makes the path too long.
+	if runtime.GOOS == "windows" {
+		sum := sha256.Sum256([]byte(id))
+		id = hex.EncodeToString(sum[:4])
+	}
 	return filepath.Join(os.TempDir(), "dungeon-"+id)
 }
 
@@ -56,7 +62,7 @@ func ListenSocket() (net.Listener, string, error) {
 		return nil, "", err
 	}
 	path := filepath.Join(dir, "g-"+hex.EncodeToString(b[:])+".sock")
-	if len(path) > maxSocketPath && runtime.GOOS != "windows" {
+	if len(path) > maxSocketPath {
 		return nil, "", fmt.Errorf("gatekeeper: socket path too long (%d bytes)", len(path))
 	}
 	ln, err := net.Listen("unix", path)

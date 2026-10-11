@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -40,7 +41,11 @@ func (ExecGit) run(ctx context.Context, dir string, args ...string) (string, err
 }
 
 func (g ExecGit) Toplevel(ctx context.Context, dir string) (string, error) {
-	return g.run(ctx, dir, "rev-parse", "--show-toplevel")
+	root, err := g.run(ctx, dir, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", err
+	}
+	return filepath.Clean(root), nil
 }
 
 func (g ExecGit) RemoteURL(ctx context.Context, root, remote string) (string, error) {

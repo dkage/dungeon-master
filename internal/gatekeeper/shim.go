@@ -16,6 +16,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/dkage/dungeon-master/internal/launcher"
+	"github.com/dkage/dungeon-master/internal/platform"
 )
 
 // Environment variables the app sets in the sessions it starts.
@@ -230,12 +233,14 @@ func realGH(o ShimOptions) (string, error) {
 	self, _ := os.Executable()
 	selfReal, _ := filepath.EvalSymlinks(self)
 	for _, dir := range filepath.SplitList(o.Getenv("PATH")) {
-		cand := filepath.Join(dir, "gh")
-		fi, err := os.Stat(cand)
-		if err != nil || fi.IsDir() || fi.Mode()&0o111 == 0 {
+		if dir == "" || platform.SamePath(dir, o.Getenv(EnvGateBin)) {
 			continue
 		}
-		if r, _ := filepath.EvalSymlinks(cand); r != "" && r == selfReal {
+		cand, err := launcher.Resolve(context.Background(), filepath.Join(dir, "gh"))
+		if err != nil {
+			continue
+		}
+		if r, _ := filepath.EvalSymlinks(cand); r != "" && platform.SamePath(r, selfReal) {
 			continue
 		}
 		return cand, nil
@@ -250,10 +255,11 @@ func childEnv(o ShimOptions) []string {
 	bin := o.Getenv(EnvGateBin)
 	out := make([]string, 0, len(o.Environ))
 	for _, kv := range o.Environ {
-		if bin != "" && strings.HasPrefix(kv, "PATH=") {
+		key, value, _ := strings.Cut(kv, "=")
+		if bin != "" && platform.EnvKey(key) == "PATH" {
 			var keep []string
-			for _, d := range filepath.SplitList(strings.TrimPrefix(kv, "PATH=")) {
-				if filepath.Clean(d) != filepath.Clean(bin) {
+			for _, d := range filepath.SplitList(value) {
+				if !platform.SamePath(d, bin) {
 					keep = append(keep, d)
 				}
 			}

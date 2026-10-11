@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
 type fakeClock struct {
@@ -517,7 +519,7 @@ func TestCampSurvivesARestart(t *testing.T) {
 		w.WriteHeader(http.StatusTooManyRequests)
 	})
 	get(t, q, g, "/graphql", Interactive)
-	if fi, err := os.Stat(path); err != nil || fi.Mode().Perm() != 0o600 {
+	if fi, err := os.Stat(path); err != nil || !testutil.PrivateMode(path, fi, 0o600) {
 		t.Fatalf("state file: %v %v", fi, err)
 	}
 

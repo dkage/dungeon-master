@@ -9,10 +9,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/platform"
 )
 
 // Opts are the per-launch inputs that are not part of a hero.
@@ -74,6 +76,7 @@ func Environ(base []string, h party.Hero) []string {
 	out := make([]string, 0, len(base)+len(h.Env)+2)
 	for _, kv := range base {
 		k, _, _ := strings.Cut(kv, "=")
+		k = platform.EnvKey(k)
 		if parentSessionMarkers[k] || k == "TERM" || k == "COLORTERM" {
 			continue
 		}
@@ -107,7 +110,7 @@ func resolve(ctx context.Context, name, pathEnv, shell string, reject func(strin
 	if name == "" {
 		return "", errors.New("launcher: empty binary name")
 	}
-	if strings.ContainsRune(name, filepath.Separator) {
+	if strings.ContainsAny(name, `/\`) {
 		return checkExecutable(name)
 	}
 	if p, ok := lookIn(name, pathEnv, reject); ok {
@@ -139,6 +142,11 @@ func lookIn(name, pathList string, reject func(string) bool) (string, bool) {
 }
 
 func checkExecutable(p string) (string, error) {
+	// Windows uses executable extensions (PATHEXT), not Unix mode bits.
+	// LookPath on an explicit path checks only that path, never the ambient PATH.
+	if runtime.GOOS == "windows" {
+		return exec.LookPath(p)
+	}
 	fi, err := os.Stat(p)
 	if err != nil {
 		return "", err

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,13 +9,16 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
 
 	"github.com/dkage/dungeon-master/internal/campaign"
+	"github.com/dkage/dungeon-master/internal/gatekeeper"
 	"github.com/dkage/dungeon-master/internal/party"
+	"github.com/dkage/dungeon-master/internal/platform"
 	"github.com/dkage/dungeon-master/internal/quests"
 	"github.com/dkage/dungeon-master/internal/server"
 	"github.com/dkage/dungeon-master/internal/testutil"
@@ -66,7 +70,7 @@ func TestBuildConfigDefaultsWithFakeClaude(t *testing.T) {
 	if cfg.Claude == "" || cfg.ClaudeErr != "" {
 		t.Fatalf("claude not resolved: %q / %q", cfg.Claude, cfg.ClaudeErr)
 	}
-	if !cfg.Party.Defaulted || len(cfg.Party.Heroes) == 0 || cfg.Shell != "/bin/sh" || cfg.Token != "tok" {
+	if !cfg.Party.Defaulted || len(cfg.Party.Heroes) == 0 || cfg.Shell != platform.Shell() || cfg.Token != "tok" {
 		t.Fatalf("config: %+v", cfg)
 	}
 	if cfg.Quests == nil {
@@ -80,7 +84,7 @@ func TestBuildConfigReadsPartyFile(t *testing.T) {
 	fake := testutil.FakeClaude(t)
 	t.Setenv("PATH", "/nonexistent")
 	t.Setenv("SHELL", "")
-	src := "claude = \"" + fake + "\"\n[heroes.mine]\nlabel = \"Mine\"\nargs = [\"--model\", \"x\"]\n"
+	src := "claude = " + strconv.Quote(fake) + "\n[heroes.mine]\nlabel = \"Mine\"\nargs = [\"--model\", \"x\"]\n"
 	if err := os.WriteFile(filepath.Join(home, "party.toml"), []byte(src), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -207,10 +211,7 @@ func TestBuildConfigQuestsUseTheGitHubCLIToken(t *testing.T) {
 	}
 
 	// With gh on PATH its token is used.
-	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\necho gh-cli-token\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	bin := filepath.Dir(testutil.Program(t, "gh", testutil.ProgramOptions{Output: "gh-cli-token"}))
 	t.Setenv("PATH", bin)
 	cfg, err = buildConfig(ctx, "127.0.0.1:0", "tok")
 	if err != nil {
@@ -325,7 +326,7 @@ func TestQuartermasterIsWiredAndItsPauseSurvivesARestart(t *testing.T) {
 	if !errors.As(err, &rl) || !rl.Paused || hits.Load() != before {
 		t.Fatalf("a request went out during camp: %v (hits %d -> %d)", err, before, hits.Load())
 	}
-	if fi, err := os.Stat(filepath.Join(home, "quartermaster.json")); err != nil || fi.Mode().Perm() != 0o600 {
+	if fi, err := os.Stat(filepath.Join(home, "quartermaster.json")); err != nil || !testutil.PrivateMode(filepath.Join(home, "quartermaster.json"), fi, 0o600) {
 		t.Fatalf("pause not stored privately: %v %v", fi, err)
 	}
 
@@ -343,13 +344,7 @@ func TestQuartermasterIsWiredAndItsPauseSurvivesARestart(t *testing.T) {
 }
 
 func fakeGHScript(t *testing.T, exit int) string {
-	t.Helper()
-	p := filepath.Join(t.TempDir(), "gh")
-	script := "#!/bin/sh\nexit " + strconv.Itoa(exit) + "\n"
-	if err := os.WriteFile(p, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return p
+	return testutil.Program(t, "gh", testutil.ProgramOptions{Exit: exit})
 }
 
 func TestTheProgramIsTheShimOnlyWhenStartedAsGh(t *testing.T) {
@@ -391,7 +386,13 @@ func TestStartupPutsTheShimInFrontOfTheRealGh(t *testing.T) {
 		t.Fatalf("gatekeeper: %+v (want real gh %s)", g, real)
 	}
 	exe, _ := os.Executable()
-	if target, err := os.Readlink(filepath.Join(g.BinDir, "gh")); err != nil || target != exe {
+	if runtime.GOOS == "windows" {
+		copied, err := os.ReadFile(filepath.Join(g.BinDir, "gh.exe"))
+		source, _ := os.ReadFile(exe)
+		if err != nil || !bytes.Equal(copied, source) {
+			t.Fatal("shim copy differs", err)
+		}
+	} else if target, err := os.Readlink(filepath.Join(g.BinDir, "gh")); err != nil || target != exe {
 		t.Fatalf("shim link: %q %v", target, err)
 	}
 	if !strings.HasPrefix(g.BinDir, home) {
@@ -404,11 +405,12 @@ func TestStartedFromInsideASessionTheAppDoesNotTakeItsOwnShimForGh(t *testing.T)
 	t.Setenv("DUNGEON_HOME", home)
 	real := fakeGHScript(t, 0)
 	// A session's PATH: the shim (a link to this very program) comes first.
-	shimDir := t.TempDir()
 	exe, _ := os.Executable()
-	if err := os.Symlink(exe, filepath.Join(shimDir, "gh")); err != nil {
-		t.Skip("symlinks unavailable")
+	shimDir, err := gatekeeper.Install(t.TempDir(), exe)
+	if err != nil {
+		t.Fatal(err)
 	}
+	t.Setenv(gatekeeper.EnvGateBin, shimDir)
 	t.Setenv("PATH", shimDir+string(os.PathListSeparator)+filepath.Dir(real))
 	t.Setenv("SHELL", "")
 	cfg, err := buildConfig(context.Background(), "127.0.0.1:0", "tok")

@@ -13,39 +13,25 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/dkage/dungeon-master/internal/testutil"
 )
 
 // fakeGH writes a stand-in for the real gh. It records its arguments and
 // working environment, echoes stdin, and exits as FAKE_GH_EXIT says.
 func fakeGH(t *testing.T) (path, log string) {
 	t.Helper()
-	dir := t.TempDir()
-	log = filepath.Join(dir, "calls.log")
-	script := `#!/bin/sh
-{
-  echo "ARGS: $*"
-  echo "PATH: $PATH"
-} >> "` + log + `"
-if [ -n "$FAKE_GH_STDERR" ]; then echo "$FAKE_GH_STDERR" >&2; fi
-if [ "$FAKE_GH_ECHO_STDIN" = 1 ]; then cat; fi
-echo "stdout-from-gh"
-exit ${FAKE_GH_EXIT:-0}
-`
-	path = filepath.Join(dir, "gh")
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return path, log
+	log = filepath.Join(t.TempDir(), "calls.log")
+	return testutil.Program(t, "gh", testutil.ProgramOptions{Mode: "gh", Log: log}), log
 }
 
-// gate is a fake app: it answers slot and report requests.
 type gate struct {
 	srv     *httptest.Server
 	mu      sync.Mutex
 	slots   int
 	reports []map[string]any
 	auths   []string
-	answer  func(w http.ResponseWriter)
+	answer  func(http.ResponseWriter)
 }
 
 func newGate(t *testing.T) *gate {
