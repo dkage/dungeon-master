@@ -87,7 +87,7 @@
   function beginNew() {
     draftNew = true
     draft = { id: '', label: '', args: [], env: [] }
-    model = 'claude-sonnet-5-5'
+    model = 'sonnet'
     permission = ''
     extraArgs = ''
     envRows = []

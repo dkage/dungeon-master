@@ -59,9 +59,9 @@ func Defaults() Party {
 		DefaultHero: "opus",
 		Defaulted:   true,
 		Heroes: []Hero{
-			{ID: "opus", Label: "Opus", Args: []string{"--model", "claude-opus-5-5"}},
-			{ID: "sonnet", Label: "Sonnet", Args: []string{"--model", "claude-sonnet-5-5"}},
-			{ID: "haiku", Label: "Haiku", Args: []string{"--model", "claude-haiku-5-5"}},
+			{ID: "opus", Label: "Opus", Args: []string{"--model", "opus"}},
+			{ID: "sonnet", Label: "Sonnet", Args: []string{"--model", "sonnet"}},
+			{ID: "haiku", Label: "Haiku", Args: []string{"--model", "haiku"}},
 		},
 	}
 }

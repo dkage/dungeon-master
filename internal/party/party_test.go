@@ -153,3 +153,14 @@ func TestDefaultsAreValid(t *testing.T) {
 		}
 	}
 }
+
+// The starter heroes use model aliases, which Claude resolves to the latest
+// model of each family, so they stay current without an app update.
+func TestDefaultsUseModelAliases(t *testing.T) {
+	want := map[string]string{"opus": "opus", "sonnet": "sonnet", "haiku": "haiku"}
+	for _, h := range Defaults().Heroes {
+		if len(h.Args) != 2 || h.Args[0] != "--model" || h.Args[1] != want[h.ID] {
+			t.Errorf("default hero %q args = %v, want --model %s", h.ID, h.Args, want[h.ID])
+		}
+	}
+}

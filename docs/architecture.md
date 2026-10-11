@@ -155,16 +155,16 @@ grant yourself):
 ```toml
 [heroes.opus]
 label = "Opus"
-args = ["--model", "claude-opus-5-5"]
+args = ["--model", "opus"]
 env = ["CLAUDE_CONFIG_DIR=~/.claude"]
 
 [heroes.sonnet]
 label = "Sonnet"
-args = ["--model", "claude-sonnet-5-5", "--permission-mode", "acceptEdits"]
+args = ["--model", "sonnet", "--permission-mode", "acceptEdits"]
 
 [heroes.haiku]
 label = "Haiku (fast)"
-args = ["--model", "claude-haiku-5-5"]
+args = ["--model", "haiku"]
 ```
 
 - No `adapter` field in v1: every hero is `claude`. The binary path is the only global setting (default: `claude` on

@@ -100,7 +100,7 @@ Open the URL it prints (it carries an access token that is exchanged for a cooki
 directory, so a browser that is already signed in stays signed in across restarts; `dungeon serve --new-token` replaces
 it. Add a campaign (a project directory), then click a hero to start a session in it. The right-hand panel lists the
 project's GitHub issues; it needs credentials from `gh auth login` (or `GH_TOKEN`), or you can load sample quests.
-Heroes come from `party.toml` in the config directory; without one, built-in Opus, Sonnet and Haiku heroes are offered.
+Heroes come from `party.toml` in the config directory; without one, built-in Opus, Sonnet and Haiku heroes are offered. The built-in heroes pass model aliases (`--model opus`), which Claude resolves to the latest model of each family, so they stay current; put a full model name in a hero to pin it.
 
 `make check` runs the Go and frontend tests; `make test-e2e` runs the browser tests (once:
 `cd web && npx playwright install chromium`).
