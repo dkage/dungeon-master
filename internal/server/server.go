@@ -253,43 +253,45 @@ func (s *Server) startPartyWatcher() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 		var last [32]byte
+		// refresh holds the lock from the read to the assignment, so a save
+		// made through the API in between cannot be overwritten by stale
+		// file contents.
+		refresh := func() {
+			s.partyMu.Lock()
+			defer s.partyMu.Unlock()
+			data, err := os.ReadFile(s.cfg.PartyPath)
+			if errors.Is(err, os.ErrNotExist) {
+				data = nil
+				err = nil
+			}
+			if err != nil {
+				s.cfg.PartyError = fmt.Sprintf("%s: %v", s.cfg.PartyPath, err)
+				return
+			}
+			stamp := sha256.Sum256(data)
+			if stamp == last {
+				return
+			}
+			var current party.Party
+			if data == nil {
+				current = party.Defaults()
+			} else {
+				current, err = party.Parse(data)
+			}
+			last = stamp
+			if err != nil {
+				s.cfg.PartyError = fmt.Sprintf("%s: %v", s.cfg.PartyPath, err)
+				return
+			}
+			s.cfg.Party = current
+			s.cfg.PartyError = ""
+		}
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				data, err := os.ReadFile(s.cfg.PartyPath)
-				if errors.Is(err, os.ErrNotExist) {
-					data = nil
-					err = nil
-				}
-				if err != nil {
-					s.partyMu.Lock()
-					s.cfg.PartyError = fmt.Sprintf("%s: %v", s.cfg.PartyPath, err)
-					s.partyMu.Unlock()
-					continue
-				}
-				stamp := sha256.Sum256(data)
-				if stamp == last {
-					continue
-				}
-				var current party.Party
-				if data == nil {
-					current = party.Defaults()
-				} else {
-					current, err = party.Parse(data)
-				}
-				last = stamp
-				if err != nil {
-					s.partyMu.Lock()
-					s.cfg.PartyError = fmt.Sprintf("%s: %v", s.cfg.PartyPath, err)
-					s.partyMu.Unlock()
-					continue
-				}
-				s.partyMu.Lock()
-				s.cfg.Party = current
-				s.cfg.PartyError = ""
-				s.partyMu.Unlock()
+				refresh()
 			}
 		}
 	}()

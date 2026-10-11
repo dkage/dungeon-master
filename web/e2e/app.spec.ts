@@ -112,7 +112,8 @@ test('a fresh install shows the getting-started checklist and a separate sample 
   const settings = page.getByRole('dialog', { name: 'Settings' })
   await expect(settings.getByRole('cell', { name: 'Opus', exact: true })).toBeVisible()
   await captureMilestoneScreen(page, 'settings')
-  const opusRow = settings.locator('tbody tr').first()
+  // Row order changes when the party file is reloaded, so pick the row by name.
+  const opusRow = settings.locator('tbody tr', { hasText: /^\s*Opus/ })
   await opusRow.getByRole('button', { name: 'Edit' }).click()
   await settings.getByLabel('Model').fill('claude-opus-5-5')
   await settings.getByRole('button', { name: 'Save hero' }).click()
@@ -183,7 +184,8 @@ test('launch a hero, see its output, type to it', async ({ page }) => {
   const term = screenText(page)
   await expect(term).toContainText('FAKE-CLAUDE')
   await expect(term).toContainText('arg=[--model]')
-  await expect(term).toContainText('arg=[opus]')
+  // The first test saved this model for Opus through the settings dialog.
+  await expect(term).toContainText('arg=[claude-opus-5-5]')
   await expect(term).toContainText('cwd=')
 
   await page.locator('.pane:not([hidden]) .xterm').click()

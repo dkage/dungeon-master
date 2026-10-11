@@ -24,17 +24,31 @@ func PrivateMode(path string, info os.FileInfo, _ os.FileMode) bool {
 	if err != nil {
 		return false
 	}
-	allowed := map[string]bool{"SY": true, "BA": true, user.User.Sid.String(): true}
+	// Windows prints well-known accounts as aliases (BA, SY, and LA for the
+	// built-in Administrator), so compare resolved SIDs, not the text.
+	allowed := map[string]bool{
+		canonicalSID("SY"):                   true,
+		canonicalSID("BA"):                   true,
+		canonicalSID(user.User.Sid.String()): true,
+	}
 	entries := regexp.MustCompile("\\(([^()]*)\\)").FindAllStringSubmatch(sd.String(), -1)
 	if len(entries) != 3 {
 		return false
 	}
 	for _, entry := range entries {
 		fields := strings.Split(entry[1], ";")
-		if len(fields) != 6 || fields[0] != "A" || fields[2] != "FA" || !allowed[fields[5]] {
+		if len(fields) != 6 || fields[0] != "A" || fields[2] != "FA" || !allowed[canonicalSID(fields[5])] {
 			return false
 		}
-		delete(allowed, fields[5])
+		delete(allowed, canonicalSID(fields[5]))
 	}
 	return len(allowed) == 0
+}
+
+// canonicalSID resolves a SID string or alias to its full SID text.
+func canonicalSID(s string) string {
+	if sid, err := windows.StringToSid(s); err == nil {
+		return sid.String()
+	}
+	return s
 }
