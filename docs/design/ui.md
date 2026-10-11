@@ -147,6 +147,11 @@ Layout and map behaviour are in `docs/design/map.md` §2 and §3. The controls a
   panel like any other session. It is per folder, not per quest, so it sits in the panel header rather than the quest
   footer. Same action as "Shell" in the campaign card's `+` menu; the right panel just keeps it within reach while
   reading quests.
+- In the Dungeon pack the title reads **Quest encounters** (as in the v4 prototype); the Neutral pack and plain-words
+  mode keep `Map`. A `?` button opens the plain-language help for the panel's words (the help layer from M3.6).
+- **List view** has state filters with counts, as in the prototype: All, Ready, In progress, Blocked, Cleared. Each row
+  shows a small creature or diamond, the title, the effort word and its relations ("Blocks #4", "Blocked by #3"), and
+  the state tag at the right. Closed quests are struck through.
 - **Drilling into a hall**: clicking a parent issue's region zooms into it and shows `← All` plus the parent's title.
   Clicking the title shows the parent issue itself in the detail (its plan, notes, decisions). This is how an epic with
   many children is read without collapsing the whole graph.
@@ -184,7 +189,9 @@ Layout and map behaviour are in `docs/design/map.md` §2 and §3. The controls a
 | Shell here       | no   | no            | no            | right panel header, card |
 
 - Disabled states say why next to Start, not only in a tooltip. A locked or closed quest keeps both combos and Start
-  visible, but Start is disabled; "Blocked by #41, #43" links select the blockers (rules in `docs/design/map.md` §3). A quest
+  visible, but Start is disabled; "Blocked by #41, #43" links select the blockers (rules in `docs/design/map.md` §3).
+  The v4 prototype also puts a **Jump to prerequisite #N** button inside the blocked-by card and shows a lock on the
+  disabled combos and Start ("Blocked · prerequisite required", "Resolve #3 to unlock"); build that. A quest
   with an active session offers **Go to session** instead of starting a duplicate.
 
 ## 6. Settings

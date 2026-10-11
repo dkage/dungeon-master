@@ -104,8 +104,14 @@ or later a pull request ready for review), so it means "come back and answer".
 - **Blocked by**: a line with a door marker at the blocked end. Closed blockers turn the door open (or the line faint).
 - **Parent / sub-issue**: not a line but containment. A parent with children becomes a **hall**: a rounded region that
   holds its children, with the parent's title on it. Halls can be collapsed to one room with a count.
-- **Quests with no links at all**: grouped in an **outskirts** strip at the edge (a loose grid), so they do not scatter
-  the graph. This is the "loose tasks are a town" idea, kept simple.
+- **Outside the scope**: a blocker or parent that the scope leaves out is drawn as a small stub (a hollow diamond, effort
+  "unknown", its number, kind and short title) in a strip under the graph labelled **Outskirts · external quests**,
+  joined to the room it blocks by a dashed line. The v4 prototype shows exactly this. Closed stubs are struck through.
+- **Quests with no links at all**: grouped in their own **Unlinked** strip at the edge (a loose grid), so they do not
+  scatter the graph. The v4 prototype has no example of this strip, so its look is ours to design: same rooms, no
+  lines. (Earlier drafts called this strip the outskirts; the prototype uses that name for the external stubs.)
+- **Scope chip above the graph**: shows the hall in view and its progress ("Onboarding flow · 1 of 4 cleared") with an
+  **All N quests** button that returns to the whole campaign. This is the drilling control from `docs/design/ui.md` §5.1.
 
 ### Selection: the map is how you pick the next quest
 
@@ -134,6 +140,18 @@ detail footer. So a locked quest can always be opened and read, it just cannot b
 - Decided: **a locked quest cannot be started**, not even through an override. GitHub's blocked-by link is the source
   of truth: if the link is wrong, fix it on GitHub ("Open on GitHub" is in the detail) and the quest unlocks on the
   next refresh. To explore a locked quest anyway, start a free session from the campaign card and talk it through.
+
+### Room anatomy (from the v4 prototype)
+
+- Top to bottom: creature (or the hollow diamond when effort is unknown), then `#N` with the effort word (Trivial,
+  Moderate, Large, Unknown), then the short title.
+- A round **state badge** sits on the top-right corner: `✓` cleared, `!` open, a small lock or box for locked, `@`
+  assigned elsewhere, `×` closed, `?` needs you. The prototype also puts `!` on the quest that has a running session;
+  that is a prototype shortcut. A running quest shows the hero token and warm light from §3 States, so state and
+  effort stay separate.
+- A **gate** marker sits on a blocked-by line next to the blocked room; it opens (or the line fades) when the blocker
+  closes.
+- The selected room gets a bright outline; the rest dims only a little so the map stays readable.
 
 ## 4. Visual directions
 
