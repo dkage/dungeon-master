@@ -63,7 +63,7 @@ func startServerWithQuestTTL(t *testing.T, mutate func(*Config), ttl time.Durati
 			}},
 		},
 		Claude: testutil.FakeClaude(t),
-		Shell:  platform.Shell(),
+		Shell:  testShell(),
 		BaseEnv: func() []string {
 			return append(os.Environ(), "CLAUDE_CODE_CHILD_SESSION=1")
 		},
@@ -853,4 +853,13 @@ func TestSessionsFromAPreviousRunAreLost(t *testing.T) {
 	if got := reopened.List(); len(got) != 0 {
 		t.Fatalf("history after dismiss: %+v", got)
 	}
+}
+
+// testShell is a shell that reads no startup files on Unix, so tests do not
+// depend on the machine's rc files rewriting PATH (which would hide the shim).
+func testShell() string {
+	if runtime.GOOS == "windows" {
+		return platform.Shell()
+	}
+	return "/bin/sh"
 }

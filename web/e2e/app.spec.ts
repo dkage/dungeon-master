@@ -183,7 +183,7 @@ test('launch a hero, see its output, type to it', async ({ page }) => {
   const term = screenText(page)
   await expect(term).toContainText('FAKE-CLAUDE')
   await expect(term).toContainText('arg=[--model]')
-  await expect(term).toContainText('arg=[claude-opus-5-5]')
+  await expect(term).toContainText('arg=[opus]')
   await expect(term).toContainText('cwd=')
 
   await page.locator('.pane:not([hidden]) .xterm').click()
