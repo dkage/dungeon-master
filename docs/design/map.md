@@ -1,9 +1,9 @@
 ---
 status: current
 milestone: M5a, M6
-github_issues: [23, 28]
+github_issues: [23, 28, 44]
 tracking: in-gh-issues
-next: keep until M5a closes; then delete
+next: keep until M5a and M6 close; then delete
 verified: 2026-10-11
 ---
 

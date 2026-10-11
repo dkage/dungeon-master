@@ -1,9 +1,9 @@
 ---
 status: partial
 milestone: M3.5
-github_issues: []
-tracking: none
-next: phases A, B, E built; move C, D and the real-GitHub probe to issues when triggered
+github_issues: [33, 34, 41, 42]
+tracking: in-gh-issues
+next: phases A, B, E built; C and D are issues #41 and #42; delete when those close
 verified: 2026-10-11
 ---
 

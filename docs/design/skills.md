@@ -1,9 +1,9 @@
 ---
 status: proposal
 milestone: M5b
-github_issues: []
-tracking: none
-next: open a spells issue when M5b starts; then delete
+github_issues: [43]
+tracking: in-gh-issues
+next: issue #43 holds the scope; delete when M5b closes
 verified: 2026-10-11
 ---
 

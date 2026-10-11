@@ -1,9 +1,9 @@
 ---
 status: partial
 milestone: M8 (R0 to R6)
-github_issues: []
-tracking: none
-next: ci.yml and release-please config exist; release workflow and GoReleaser do not; open an issue per phase
+github_issues: [29, 30, 31, 35, 36, 37, 38, 39]
+tracking: in-gh-issues
+next: phases R0 to R6 are issues; delete when the first release ships
 verified: 2026-10-11
 ---
 
