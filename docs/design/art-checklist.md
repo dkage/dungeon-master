@@ -3,7 +3,7 @@ status: current
 milestone: M5a, M6
 github_issues: [23, 28, 44]
 tracking: in-gh-issues
-next: make remaining map art as the map ships; delete when M6 art work closes
+next: review assets in the map as it ships; delete when M6 art work closes
 verified: 2026-10-11
 ---
 
@@ -112,12 +112,12 @@ generated in one session; all six were checked together at 512 × 512. A flicker
   > shallow cracks, low contrast, even light with no focal point, no text. Match the tone and lighting of the attached
   > stone floor (our own `stone-floor.png`, the only reference to attach). Original, not derived from any photograph
   > or game asset. Must tile without visible seams.
-- [ ] `world-floor.jpg`, 1024 × 1024, seamless, JPG quality 85:
+- [x] `world-floor.jpg`, 1024 × 1024, seamless, JPG quality 85:
   > Seamless tileable texture, 1024 × 1024: dark worn stone with a very faint hint of old paths and cracks, low
   > contrast, nearly black-blue, no focal point, no text. Light and detail must be even across the whole image so it
   > tiles without visible seams. Cool blue ambient, a trace of warm tone. Same material family as the attached stone
   > floor.
-- [ ] `tavern-floor.jpg`, 1024 × 1024, seamless, JPG quality 85: optional; the stone floor can be reused.
+- [x] `tavern-floor.jpg`, 1024 × 1024, seamless, JPG quality 85 (optional; the stone floor can be reused):
   > Seamless tileable texture, 1024 × 1024: dark wooden floor planks, warm brown, low contrast, a little wear, no
   > focal point, no text, even light so it tiles without seams.
 
@@ -126,27 +126,31 @@ generated in one session; all six were checked together at 512 × 512. A flicker
 Rules: `viewBox` as given, no fixed width or height, `fill` or `stroke` set to `currentColor`, no embedded raster, no
 text, stroke 1.5 or heavier so they stay clear at 12 to 16 px. Each prompt follows the **SVG prefix**.
 
-- [ ] `gate-closed.svg`, `viewBox="0 0 24 40"`:
+- [x] `gate-closed.svg`, `viewBox="0 0 24 40"`:
   > A small portcullis seen from the front: two stone posts, a row of vertical iron bars with pointed ends lowered
   > fully, a crossbar. Reads as "blocked".
-- [ ] `gate-open.svg`, `viewBox="0 0 24 40"`:
+- [x] `gate-open.svg`, `viewBox="0 0 24 40"`:
   > The same portcullis and posts as the closed gate, with the bars raised to the top third, leaving the opening
   > empty. Reads as "open".
-- [ ] `badge-ready.svg`, `viewBox="0 0 24 24"`: > A bold exclamation mark, centred, thick stroke.
-- [ ] `badge-needs-you.svg`, `viewBox="0 0 24 24"`: > A bold question mark, centred, thick stroke.
-- [ ] `badge-assigned.svg`, `viewBox="0 0 24 24"`: > An at-sign, centred, thick stroke.
-- [ ] `badge-locked.svg`, `viewBox="0 0 24 24"`: > A closed padlock: rounded body, a shackle, a small keyhole.
-- [ ] `badge-closed.svg`, `viewBox="0 0 24 24"`: > A bold multiplication cross (×), centred, thick stroke.
-- [ ] `badge-cleared.svg`, `viewBox="0 0 24 24"`: > A bold check mark, centred, thick stroke.
-- [ ] `badge-running.svg`, `viewBox="0 0 24 24"`:
+- [x] `badge-ready.svg`, `viewBox="0 0 24 24"`:
+  > A bold fantasy-style exclamation mark, centred, with an angular shaft and faceted diamond dot. Use the chunky,
+  > ornamental readability of WoW's punctuation marks as inspiration while drawing an original shape.
+- [x] `badge-needs-you.svg`, `viewBox="0 0 24 24"`:
+  > A bold fantasy-style question mark, centred, with an angular curve and faceted diamond dot. Use the chunky,
+  > ornamental readability of WoW's punctuation marks as inspiration while drawing an original shape.
+- [x] `badge-assigned.svg`, `viewBox="0 0 24 24"`: > An at-sign, centred, thick stroke.
+- [x] `badge-locked.svg`, `viewBox="0 0 24 24"`: > A closed padlock: rounded body, a shackle, a small keyhole.
+- [x] `badge-closed.svg`, `viewBox="0 0 24 24"`: > A bold multiplication cross (×), centred, thick stroke.
+- [x] `badge-cleared.svg`, `viewBox="0 0 24 24"`: > A bold check mark, centred, thick stroke.
+- [x] `badge-running.svg`, `viewBox="0 0 24 24"`:
   > A hand torch: a short handle and a flame with one inner tongue. Reads as "someone is working here".
-- [ ] `stub-diamond.svg`, `viewBox="0 0 64 64"`:
+- [x] `stub-diamond.svg`, `viewBox="0 0 64 64"`:
   > A hollow diamond (a square rotated 45°) with a thick outline and nothing inside, centred with a small margin.
-- [ ] `boss-frame.svg`, `viewBox="0 0 240 280"`, optional, for 9-slice scaling:
+- [x] `boss-frame.svg`, `viewBox="0 0 240 280"` (optional), for 9-slice scaling:
   > A rectangular room frame, outline only: an ornate border with a small spike or crest at each corner and a small
   > crown notch at the top centre. The corners are 40 × 40 units and the straight edges between them are plain, so the
   > frame can stretch. The inside is empty.
-- [ ] `priority-gem.svg`, `viewBox="0 0 16 16"`, optional:
+- [x] `priority-gem.svg`, `viewBox="0 0 16 16"` (optional):
   > A small faceted gem seen from the front, a flat-top cut with a few facet lines.
 
 ## Not needed

@@ -20,7 +20,8 @@ up-to-date frontend prototype is the Google Stitch export in
 `design/stitch-prototype/`.
 
 Creature map guidance: `docs/design/creature-roster.md` and `docs/design/art-direction.md`; source sprites and the
-historical right-panel study remain in `design/quest-encounters/`.
+historical right-panel study remain in `design/quest-encounters/`. Current map assets are indexed in
+`design/map-art/README.md` and tracked in `docs/design/art-checklist.md`.
 
 ## Scope and principles
 
