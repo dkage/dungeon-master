@@ -3,7 +3,7 @@ status: current
 milestone: M3.6, M4, M4.5, M5a
 github_issues: [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 23, 28, 45]
 tracking: in-gh-issues
-next: keep until M4.5 and M5a close; M3.6 and M4 are built
+next: keep until M5a closes; M3.6, M4 and M4.5 are built
 verified: 2026-10-11
 ---
 

@@ -4,9 +4,10 @@ A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents ag
 an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native
 webview shell.
 
-Status: M0-M4 done. M3.5 (GitHub budget, scope and the `gh` shim) is done except the SQLite copy and write queue
+Status: M0-M4.5 done. M3.5 (GitHub budget, scope and the `gh` shim) is done except the SQLite copy and write queue
 (issues #41, #42). M3.6 (Stitch v4 cockpit shell, first run and words) and M4 (quest briefing, launch, session linkage)
-are done. Next: M4.5 attention (#23), then M5a map (#28). Everything unbuilt is a GitHub issue; the open list is the
+are done, and so is M4.5 (attention: waiting sessions in the list, tab title and icon, and optional
+desktop notifications). Next: M5a map (#28). Everything unbuilt is a GitHub issue; the open list is the
 source of truth for what is left, including Windows and release work. Themed words: `GLOSSARY.md`.
 
 Design for work not yet built lives in `docs/` (`architecture.md`, `ideas.md`, `design/`), not in the repo root. Each of
