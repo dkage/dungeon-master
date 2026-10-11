@@ -3,6 +3,7 @@
   import type { SessionInfo } from './api'
   import Term from './Term.svelte'
   import { wordLabel } from './words'
+  import { sessionStatus } from './attention'
 
   let { store, onsettings = () => {}, onwords = () => {} }: { store: AppStore; onsettings?: () => void; onwords?: () => void } = $props()
 
@@ -46,13 +47,7 @@
     if (await store.updateCampaign(id, { name: renameName.trim() })) renameFor = null
   }
 
-  function status(s: SessionInfo): { label: string; kind: string } {
-    if (s.lost) return { label: 'lost (app restarted)', kind: 'lost' }
-    if (!s.exited) return { label: 'running', kind: 'running' }
-    return s.exitCode === 0
-      ? { label: 'exited', kind: 'done' }
-      : { label: `exited with code ${s.exitCode}`, kind: 'failed' }
-  }
+  const status = (s: SessionInfo) => sessionStatus(s, store.appearance.wordMode)
 </script>
 
 <aside class="sidebar">
@@ -133,9 +128,10 @@
                     aria-current={s.id === store.activeId ? 'true' : undefined}
                     onclick={() => store.selectSession(s.id)}
                   >
-                    <span class="dot {st.kind}" aria-hidden="true"></span>
+                    <span class="dot {st.kind}" aria-hidden="true">{st.glyph}</span>
                     <span class="stitle">{s.title}</span>
                     <span class="sr">{st.label}</span>
+                    {#if st.kind === 'needs'}<span class="badge needs" aria-hidden="true">{st.label}</span>{/if}
                     {#if s.exited && !s.lost}<span class="badge">exit {s.exitCode}</span>{/if}
                     {#if s.lost}<span class="badge">lost</span>{/if}
                   </button>

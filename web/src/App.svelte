@@ -8,6 +8,7 @@
   import StartHere from './lib/StartHere.svelte'
   import SettingsDialog from './lib/SettingsDialog.svelte'
   import WordsDialog from './lib/WordsDialog.svelte'
+  import { attentionTitle, faviconHref } from './lib/attention'
 
   let { store = new AppStore() }: { store?: AppStore } = $props()
   let settingsOpen = $state(false)
@@ -18,6 +19,12 @@
   // most of these from its cache, so they cost GitHub nothing.
   const BUDGET_EVERY = 30_000
   const QUESTS_EVERY = 60_000
+  // Sessions are local and cheap to read, so their activity is read often.
+  const SESSIONS_EVERY = 2_000
+  const BASE_TITLE = 'Dungeon Master'
+
+  // Is the user really looking at this window? A visible tab in a background window is not.
+  let viewing = $state(document.visibilityState === 'visible' && document.hasFocus())
 
   onMount(() => {
     store.refresh()
@@ -29,6 +36,13 @@
     }
     window.addEventListener('keydown', onShortcut)
     const visible = () => document.visibilityState === 'visible'
+    const look = () => (viewing = document.visibilityState === 'visible' && document.hasFocus())
+    window.addEventListener('focus', look)
+    window.addEventListener('blur', look)
+    document.addEventListener('visibilitychange', look)
+    const sessions = setInterval(() => {
+      if (!store.unauthorised && store.sessions.length > 0) void store.refreshSessions()
+    }, SESSIONS_EVERY)
     const budget = setInterval(() => visible() && store.loadGithub(), BUDGET_EVERY)
     const quests = setInterval(() => {
       if (visible() && store.campaignId && !store.unauthorised) void store.loadQuests(false, true)
@@ -42,6 +56,10 @@
     document.addEventListener('visibilitychange', onFocus)
     return () => {
       clearInterval(budget)
+      clearInterval(sessions)
+      window.removeEventListener('focus', look)
+      window.removeEventListener('blur', look)
+      document.removeEventListener('visibilitychange', look)
       clearInterval(quests)
       document.removeEventListener('visibilitychange', onFocus)
       window.removeEventListener('keydown', onShortcut)
@@ -51,6 +69,25 @@
   // Sessions of every campaign stay mounted (hidden) so switching is instant
   // and their terminals keep their state; lost sessions have no terminal.
   const live = $derived(store.sessions.filter((s) => !s.lost))
+
+  // Looking at a session that waits counts as having seen it.
+  $effect(() => {
+    store.attend(viewing)
+  })
+
+  // The tab title and icon say how many sessions are waiting, so it shows from another tab.
+  const waiting = $derived(store.attention.length)
+  $effect(() => {
+    document.title = attentionTitle(BASE_TITLE, waiting)
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    if (!link) {
+      link = document.createElement('link')
+      link.rel = 'icon'
+      document.head.appendChild(link)
+    }
+    link.type = 'image/svg+xml'
+    link.href = faviconHref(waiting)
+  })
 </script>
 
 {#if store.unauthorised}

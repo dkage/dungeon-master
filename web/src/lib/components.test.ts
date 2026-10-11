@@ -196,7 +196,7 @@ describe('Sidebar', () => {
     render(Sidebar, { store: s })
     const list = screen.getByRole('list', { name: 'Expeditions in Camp c1' })
     expect(within(list).getAllByRole('listitem')).toHaveLength(4)
-    expect(within(list).getByText('running')).toBeInTheDocument()
+    expect(within(list).getAllByText('working').length).toBeGreaterThan(0)
     expect(within(list).getByText('exited with code 2')).toBeInTheDocument()
     expect(within(list).getByText('exited')).toBeInTheDocument()
     expect(within(list).getByText('lost (app restarted)')).toBeInTheDocument()
@@ -889,5 +889,48 @@ describe('QuestsPanel scope', () => {
   it('offers no label filters when there is nothing to choose between', () => {
     render(QuestsPanel, { store: questStore(questResult([quest(1, { labels: [{ name: 'only' }] })])) })
     expect(screen.queryByRole('group', { name: 'Filter by label' })).not.toBeInTheDocument()
+  })
+})
+
+describe('session attention in the cockpit', () => {
+  it('marks a waiting session in the list with words and a mark, not colour alone', () => {
+    const s = store((st) => {
+      st.sessions = [sess('a', 'c1', { activity: 'needs-you' }), sess('b', 'c1', { activity: 'working' }), sess('c', 'c1', { activity: 'idle' })]
+      st.activeId = 'b'
+    })
+    render(Sidebar, { store: s })
+    const list = screen.getByRole('list', { name: 'Expeditions in Camp c1' })
+    const waiting = within(list).getByRole('button', { name: /^T-a/ })
+    expect(waiting).toHaveTextContent('waiting for you')
+    expect(waiting.querySelector('.dot.needs')).toHaveTextContent('?')
+    expect(within(list).getByRole('button', { name: /^T-b/ })).not.toHaveTextContent('waiting')
+    expect(within(list).getByRole('button', { name: /^T-c/ })).toHaveTextContent('idle')
+  })
+
+  it('uses plain wording in plain mode', () => {
+    const s = store((st) => {
+      st.appearance.wordMode = 'plain'
+      st.sessions = [sess('a', 'c1', { activity: 'needs-you' })]
+    })
+    render(Sidebar, { store: s })
+    expect(screen.getByRole('button', { name: /^T-a/ })).toHaveTextContent('waiting for your input')
+  })
+
+  it('shows the state of the open session as a chip in the toolbar', () => {
+    const s = store((st) => {
+      st.sessions = [sess('a', 'c1', { activity: 'needs-you' })]
+      st.activeId = 'a'
+    })
+    render(Toolbar, { store: s })
+    expect(screen.getByRole('status')).toHaveTextContent('? waiting for you')
+  })
+
+  it('shows no chip once the session has ended', () => {
+    const s = store((st) => {
+      st.sessions = [sess('a', 'c1', { exited: true, activity: 'ended' })]
+      st.activeId = 'a'
+    })
+    render(Toolbar, { store: s })
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })

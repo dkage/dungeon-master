@@ -98,6 +98,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .dot.failed { background: #d64545; }
 .dot.done { background: var(--muted); }
 .dot.lost { background: transparent; border: 1.5px solid var(--muted); }
+.dot.idle { background: transparent; border: 1.5px solid #2fb36a; }
+.dot.needs { width: 15px; height: 15px; background: #e5a50a; color: #1b1405; font-size: 11px; font-weight: 700; line-height: 15px; text-align: center; }
+.badge.needs { color: #e5a50a; border-color: #e5a50a; }
+.activity-chip { font-size: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; color: var(--muted); white-space: nowrap; }
+.activity-chip.needs { color: #1b1405; background: #e5a50a; border-color: #e5a50a; font-weight: 600; }
 .badge { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; margin-left: auto; }
 
 .add { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 14px; }

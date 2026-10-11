@@ -1,10 +1,12 @@
 <script lang="ts">
   import type { AppStore } from './store.svelte'
   import { wordLabel } from './words'
+  import { sessionStatus } from './attention'
 
   let { store }: { store: AppStore } = $props()
   const campaign = $derived(store.campaign)
   const activeSession = $derived(store.active)
+  const activity = $derived(activeSession && !activeSession.exited && !activeSession.lost ? sessionStatus(activeSession, store.appearance.wordMode) : null)
   const canLaunch = $derived(!store.busy && !!campaign)
 </script>
 
@@ -14,6 +16,7 @@
       <strong>{campaign.name}</strong>
       <span class="repo" class:none={!campaign.repo}>{campaign.repo ?? 'no GitHub repo'}</span>
       {#if activeSession}<span class="session-title"><span class="session-light" aria-hidden="true"></span>{activeSession.title}</span>{/if}
+      {#if activity}<span class="activity-chip {activity.kind}" role="status">{activity.glyph}{activity.glyph ? ' ' : ''}{activity.label}</span>{/if}
       {#if activeSession?.quest}<button type="button" class="quest-session-chip" title={`Select issue #${activeSession.quest}`} onclick={() => { store.questsOpen = true; void store.selectQuest(activeSession.quest!) }}>#{activeSession.quest}</button>{/if}
       <code class="path" title={campaign.dir}>{campaign.dir}</code>
     {:else}
