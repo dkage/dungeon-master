@@ -350,12 +350,18 @@ Decided: cleared quests and dungeons are shown greyed with a green check; "hide 
 1. Hero tokens: generated geometric faces, or user-chosen class glyphs?
 2. Do halls (parents as regions) read better than parent links drawn as lines? Worth a quick prototype of both on the
    sample data.
-3. A quest whose parent epic is outside the scope: does it go in the Tavern, or under a stub of its parent?
-4. Can the epic itself be started (it is a quest like any other), and what would a session on an epic open with?
-5. Dungeon art: plain shapes with a progress ring first; who makes the real art, and when?
-6. A very large world map (many epics): the first version lays out all nodes; do we need grouping by milestone?
-7. Needs more design: keyboard and screen-reader paths across the three levels, and how the map is cached and loaded
-   for a repository with many quests.
+3. A quest in the scope whose parent epic is not: the Tavern (simplest, recommended for v1, with "part of #N, not in
+   scope" in the detail), or a dashed stub dungeon holding only its in-scope children?
+4. Danger by blocker chain (proposal): the last quest of a chain is the boss, drawn in the boss frame. The creature
+   still follows effort; the frame carries position. At the world level, a dungeon's art tier follows its size and
+   longest chain.
+5. A very large world map (many epics): the first version lays out all nodes; grouping by milestone is for later.
+
+Decided: the epic itself can be started like any quest (what a session on an epic opens with is part of the briefing
+work). A dungeon with many quests scrolls vertically inside the map. The map reads from the local SQLite copy once it
+exists (#41); until then it uses the cached quest service, so it does not wait on #41. Keyboard: as in §7, extended
+across the levels (arrows move between neighbours, Enter opens or selects, Escape goes up one level, one key
+switches to the List). The art still to be made is listed in `design/map-art-request.md`.
 
 Resolved: M5a includes the torchlight skin, state markers, and creature sprites. The 15-sheet roster and its consistent
 art direction are in `design/quest-encounters/`; only walking sprites and isometric floors remain later work.
