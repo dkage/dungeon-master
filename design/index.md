@@ -19,3 +19,4 @@ completion and remaining requests are tracked in
 | 2026-10-09 01:30 −03:00 | [`stitch-prototype/`](stitch-prototype/README.md) | Google Stitch v4 frontend prototype exports, images, and fonts, first committed under `stitch/`; renamed to `stitch-prototype/` at 01:32. This is the latest and most up-to-date frontend prototype. |
 | 2026-10-09 01:54 −03:00 | [`font-study/`](font-study/README.md) | Font comparison assets and licensed font files (`docs: add design resource index and font study`). |
 | 2026-10-09 03:55 −03:00 | [`quest-encounters/`](quest-encounters/README.md) | Second creature asset batch: 12 additional idle sprite strips for the 15-creature roster (`design: add consistent 15-creature quest roster`). |
+| 2026-10-11 19:32 −03:00 | [`map-art/`](map-art/README.md) | World-map art set: dungeon tiers, tavern, tileable floors, gates, badges, and room markers (`feat: complete world map art assets`). |
