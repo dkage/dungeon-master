@@ -13,6 +13,12 @@ source of truth for what is left, including Windows and release work. Themed wor
 Design for work not yet built lives in `docs/` (`architecture.md`, `ideas.md`, `design/`), not in the repo root. Each of
 those files starts with front-matter properties (`status`, `milestone`, `github_issues`, `tracking`, `next`,
 `verified`); update them when its state changes. When a milestone closes, delete its design doc (git keeps the history).
+The history of the project's design references and visual assets lives in
+[`design/index.md`](design/index.md). It lists each design folder and the
+commit dates when its asset batches were first recorded. The latest and most
+up-to-date frontend prototype is the Google Stitch export in
+`design/stitch-prototype/`.
+
 Creature art for the map: `design/quest-encounters/` (roster and `ART_DIRECTION.md`).
 
 ## Scope and principles
