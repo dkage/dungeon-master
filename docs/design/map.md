@@ -20,7 +20,10 @@ specifies the surrounding controls. Where the generated prototype differs from t
 
 The parts of the experience we want:
 
-- Every open quest is a room on a map. A known effort tier selects an original creature sprite from
+- The map has three levels (§3, Levels). The **world map** shows every top-level epic as a **dungeon** and the
+  **Tavern** for quests that belong to no epic; lines between dungeons keep the order of work. Opening a dungeon shows
+  its quests as rooms (the Stitch v4 screen). The **List** is a separate flat view.
+- In a dungeon, every quest is a room. A known effort tier selects an original creature sprite from
   `design/quest-encounters/CREATURE_ROSTER.md`; creatures being worked in a terminal look different (brighter, warmer).
   Blocked-by and parent links are lines between rooms.
 - Clicking a point highlights it (brighter, its links emphasised) and shows the quest in the lower part of the right
@@ -80,6 +83,31 @@ and keeping the three regions in stable roles.
 
 ## 3. What the map shows
 
+### Levels
+
+Words: a **quest** is any GitHub issue. An **epic** is a quest that has sub-issues; this is worked out from the
+sub-issue links, never from a label. A **dungeon** is a top-level epic (one with no parent). A **hall** is a sub-epic
+inside a dungeon (drawing term only). The **Tavern** is the place for quests that belong to no epic: a quest with no
+parent and no sub-issues, including an issue labelled "epic" that has no sub-issues.
+
+| Level | Shows | Opens with | Back |
+|---|---|---|---|
+| **World** | one node per dungeon, plus the Tavern; lines between dungeons | it is the Map's top | none |
+| **Dungeon** | the epic's quests as rooms, halls for sub-epics, external stubs | double-click or Enter on a node | Escape, or the breadcrumb |
+| **Tavern** | the dungeon view for stray quests: a plain grid, no halls, lines only for real blockers | double-click or Enter on the Tavern node | Escape, or the breadcrumb |
+
+- **Breadcrumb** above the map: `World › Onboarding flow`, with its progress ("1 of 4 cleared"). It replaces the scope
+  chip and the "All N quests" button of the v4 prototype: the breadcrumb root is the way back to the whole campaign.
+- **World node**: the epic's number and title, a progress ring, counts (ready, running, blocked), and the state markers
+  of §3 (a dungeon with a waiting session inside shows `?`). Dungeon art starts as a plain shape; real art comes later.
+  A dungeon whose quests are all closed is greyed out with a green check, not hidden.
+- **World lines**: dungeon A leads to dungeon B when any open or closed quest in A blocks a quest in B. The line carries
+  the count of such links and a gate at B. Walking into B shows those blockers as external stubs (below).
+- **A cleared quest or dungeon** is shown greyed with a green check, at every level. An optional "hide cleared" switch
+  (off by default) is for large repositories.
+- **Selection works at every level.** Selecting a dungeon shows the epic's own issue in the detail, with its progress
+  and its quests; selecting a quest shows that quest. Blocked dungeons and quests can always be opened and read.
+
 ### States
 
 The state language from `docs/design/experience.md` §7.3, made visual. Colour is never the only signal; each state has a
@@ -92,7 +120,7 @@ shape or glyph too.
 | Needs you            | bright, pulsing ring     | `?`      | the agent is waiting for an answer        |
 | Assigned (elsewhere) | lit, muted               | `@`      | someone else holds it                     |
 | Locked               | dark, behind a door      | `!` grey | blocked by an open issue                  |
-| Cleared              | faint, desaturated       | `✓`     | closed; hidden by default, toggle to show |
+| Cleared              | faint, desaturated       | `✓` green | closed; always shown greyed, "hide cleared" is optional |
 | Outside scope        | outline only, small      | none     | a blocker or parent not in the scope      |
 
 The `!` and `?` borrow the familiar MMO convention: a mark over something means "there is something for you here", a
@@ -102,16 +130,15 @@ or later a pull request ready for review), so it means "come back and answer".
 ### Links
 
 - **Blocked by**: a line with a door marker at the blocked end. Closed blockers turn the door open (or the line faint).
-- **Parent / sub-issue**: not a line but containment. A parent with children becomes a **hall**: a rounded region that
-  holds its children, with the parent's title on it. Halls can be collapsed to one room with a count.
+- **Parent / sub-issue**: not a line but containment. A top-level parent is a dungeon (see Levels). A parent that is
+  itself a child becomes a **hall** inside its dungeon: a rounded region that holds its children, with the parent's
+  title on it. Halls can be collapsed to one room with a count.
 - **Outside the scope**: a blocker or parent that the scope leaves out is drawn as a small stub (a hollow diamond, effort
   "unknown", its number, kind and short title) in a strip under the graph labelled **Outskirts · external quests**,
   joined to the room it blocks by a dashed line. The v4 prototype shows exactly this. Closed stubs are struck through.
-- **Quests with no links at all**: grouped in their own **Unlinked** strip at the edge (a loose grid), so they do not
-  scatter the graph. The v4 prototype has no example of this strip, so its look is ours to design: same rooms, no
-  lines. (Earlier drafts called this strip the outskirts; the prototype uses that name for the external stubs.)
-- **Scope chip above the graph**: shows the hall in view and its progress ("Onboarding flow · 1 of 4 cleared") with an
-  **All N quests** button that returns to the whole campaign. This is the drilling control from `docs/design/ui.md` §5.1.
+- **Quests that belong to no epic** are not scattered on the graph: they live in the Tavern (see Levels). Inside a
+  dungeon every quest is a child of the epic, so there is no strip of unlinked quests; siblings without blockers sit
+  in the first column.
 
 ### Selection: the map is how you pick the next quest
 
@@ -135,9 +162,13 @@ detail footer. So a locked quest can always be opened and read, it just cannot b
 - Disabled launch controls stay visible, so the user sees what would be offered once the blockers clear. The reason is
   next to Start, not only in a tooltip, and each blocker is a link that selects it on the map, so the user can walk the
   chain to the quest that is actually startable.
-- Double-click on a startable room starts it with the footer's current hero and spell; on any other room it only
-  selects.
-- Decided: **a locked quest cannot be started**, not even through an override. GitHub's blocked-by link is the source
+- **Jump to prerequisite**: a button in the blocked-by card. One blocker: selects it. Several: a short list to pick
+  from. A blocker in another dungeon: the map moves to that dungeon first, then selects it.
+- Starting is only the footer's Start button. Double-click never starts a session: on a dungeon or the Tavern it
+  enters; on a room it only selects. A launch costs tokens and writes to the repository, so it is never one slip away.
+- Decided: **a locked quest cannot be started**, not even through an override. The same holds for a dungeon's epic.
+  Reading stays open on purpose: someone building the foundation may still want to read the future work to understand
+  the whole roadmap, so locked items are never hidden or made unreadable. GitHub's blocked-by link is the source
   of truth: if the link is wrong, fix it on GitHub ("Open on GitHub" is in the detail) and the quest unlocks on the
   next refresh. To explore a locked quest anyway, start a free session from the campaign card and talk it through.
 
@@ -248,7 +279,9 @@ on real repositories, and only behind the same renderer interface.
 - **One renderer interface**: `mount(el)`, `setModel(model)`, `onSelect(fn)`, `focus(id)`, `destroy()`. The model is
   plain data (rooms, halls, links, tokens, states, positions). Skins A to F are implementations or style layers of it.
 - **Layout is a pure function** `layout(quests, sessions, scope) → model`, unit-tested without a browser: same input,
-  same positions. It handles halls, outskirts, out-of-scope stubs and collapsed halls.
+  same positions. It handles the three levels (world, dungeon, Tavern), halls, out-of-scope stubs, derived lines
+  between dungeons and collapsed halls. A view-model per quest (state, effort tier, blockers, parent, epic) is built
+  once and shared by the map and the list, so the two cannot disagree.
 - **Graph layout library**: `@dagrejs/dagre` (MIT) for a layered left-to-right layout. Check licences before adding
   anything else; `elkjs` is EPL-2.0, which is not on our permissive list.
 - **SVG in Svelte**, no canvas for the MVP. Pan and zoom with a small in-house handler (wheel, drag, pinch, fit to view)
@@ -263,8 +296,8 @@ on real repositories, and only behind the same renderer interface.
 
 1. Right column: map on top, detail below, resizable splitter, Map | List toggle, pinned footer with hero/model combo,
    skill combo (recommended by default or None), and Start.
-2. Plain graph with halls for parents, outskirts for unlinked quests, door markers on blocked-by links, out-of-scope
-   stubs, and a readable fallback for unknown effort or missing sprites.
+2. The world map and Tavern, the dungeon view with halls for sub-epics, door markers on blocked-by links,
+   out-of-scope stubs, and a readable fallback for unknown effort or missing sprites.
 3. Torchlight skin: dark floor, creature sprites in readable rooms, lit and dark states, warm flicker for active sessions.
 4. `!`, grey `!` and `?` markers; creature identity remains independent of status.
 5. Plain-words and Neutral modes show skin A with plain state names and no reliance on creature art.
@@ -293,8 +326,9 @@ the list. Selecting a room and pressing Start launches the selected hero with th
 
 ## 8. Sample campaign as the showcase
 
-The sample quests (`internal/quests/demo`) should be shaped to show the map well: one epic with five children (a hall),
-a blocked chain of three, two loose quests (outskirts), one closed, one assigned elsewhere. The first-run experience
+The sample quests (`internal/quests/demo`) should be shaped to show the map well: two epics, the second blocked by
+a quest of the first (a line on the world map and an external stub inside), one epic with a hall, a blocked chain of
+three, two stray quests (the Tavern), one closed, one assigned elsewhere. The first-run experience
 then shows a meaningful map within seconds, before any GitHub setup.
 
 ## 9. Plan alignment
@@ -305,15 +339,23 @@ then shows a meaningful map within seconds, before any GitHub setup.
   defaulted to the recommendation or None, and Start. None gives a plain quest session without a skill.
 - `docs/design/experience.md` §7.4: point to this file for the map design.
 - `docs/design/skills.md` §6: the spell strip becomes the footer's skill combo, not a separate strip.
-- `GLOSSARY.md`: "hall" and "outskirts" are drawing terms, not new vocabulary; if shown at all, they appear as plain
-  "group" and "unlinked" in the popover.
+- `GLOSSARY.md`: "dungeon" now means an epic and "Tavern" the place for quests with no epic (plain: "No epic").
+  "hall" and "outskirts" are drawing terms, not new vocabulary; if shown at all, they appear as plain "group" and
+  "other epics" in the popover.
 
 ## 10. Remaining design questions
 
-1. Should cleared quests show by default (faint) or be hidden until toggled?
-2. Hero tokens: generated geometric faces, or user-chosen class glyphs?
-3. Do halls (parents as regions) read better than parent links drawn as lines? Worth a quick prototype of both on the
+Decided: cleared quests and dungeons are shown greyed with a green check; "hide cleared" is optional (§3, Levels).
+
+1. Hero tokens: generated geometric faces, or user-chosen class glyphs?
+2. Do halls (parents as regions) read better than parent links drawn as lines? Worth a quick prototype of both on the
    sample data.
+3. A quest whose parent epic is outside the scope: does it go in the Tavern, or under a stub of its parent?
+4. Can the epic itself be started (it is a quest like any other), and what would a session on an epic open with?
+5. Dungeon art: plain shapes with a progress ring first; who makes the real art, and when?
+6. A very large world map (many epics): the first version lays out all nodes; do we need grouping by milestone?
+7. Needs more design: keyboard and screen-reader paths across the three levels, and how the map is cached and loaded
+   for a repository with many quests.
 
 Resolved: M5a includes the torchlight skin, state markers, and creature sprites. The 15-sheet roster and its consistent
 art direction are in `design/quest-encounters/`; only walking sprites and isometric floors remain later work.

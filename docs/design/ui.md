@@ -151,10 +151,12 @@ Layout and map behaviour are in `docs/design/map.md` §2 and §3. The controls a
   mode keep `Map`. A `?` button opens the plain-language help for the panel's words (the help layer from M3.6).
 - **List view** has state filters with counts, as in the prototype: All, Ready, In progress, Blocked, Cleared. Each row
   shows a small creature or diamond, the title, the effort word and its relations ("Blocks #4", "Blocked by #3"), and
-  the state tag at the right. Closed quests are struck through.
-- **Drilling into a hall**: clicking a parent issue's region zooms into it and shows `← All` plus the parent's title.
-  Clicking the title shows the parent issue itself in the detail (its plan, notes, decisions). This is how an epic with
-  many children is read without collapsing the whole graph.
+  the state tag at the right. Closed quests are struck through. A dungeon filter (default: all, with the Tavern as an
+  entry) narrows the list to one epic. The list is a separate view, not a level of the map.
+- **Levels and breadcrumb**: the map opens on the world level (dungeons and the Tavern). Double-click or Enter on a
+  node opens it; the breadcrumb (`World › Onboarding flow · 1 of 4 cleared`) and Escape go back up. Clicking the
+  breadcrumb title shows the epic itself in the detail (its plan, notes, decisions). Rules in `docs/design/map.md` §3,
+  Levels. This replaces the scope chip and "All N quests" button of the v4 prototype.
 
 ### 5.2 Quest detail
 
@@ -435,7 +437,8 @@ bindings; the R1 smoke test opens Settings with ⌘, and pastes into a text fiel
   files section; browser keyboard shortcuts and shortcut help; session terminal settings. Keep native app menus and
   window state in R1.
 - **M5a**: the sprite-backed graph in the map area established in M3.6; stable per-issue creature assignment from
-  known effort tiers, separate state markers, Map / List behavior, expand, and drilling into halls (`docs/design/map.md`).
+  known effort tiers, separate state markers, Map / List behavior, expand, and the three levels (world map of
+  dungeons, dungeon view, the Tavern) with the breadcrumb (`docs/design/map.md`).
 - **M5b**: Spells settings (sources, recommendation rules, skill presets) and the populated skill combo.
 - **R1** (release): native menus with Settings on ⌘, and the standard Edit menu (§7.1), window state.
 - **Later**: automatic titles for free sessions, art for hero crests.

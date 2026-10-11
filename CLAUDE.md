@@ -61,7 +61,7 @@ Creature art for the map: `design/quest-encounters/` (roster and `ART_DIRECTION.
 
 Campaign = registered working directory (issues come from the git root's remote). Quest = GitHub issue. Hero = a
 registered Claude configuration. Spell = skill. Expedition = live session. Briefing = generated context file. Dungeon
-(the map) = the map of a campaign's quests. Keep these terms out of GitHub-facing text and out of Go identifiers where a
+= an epic (a top-level issue with sub-issues) on the map; Tavern = quests that belong to no epic. Keep these terms out of GitHub-facing text and out of Go identifiers where a
 neutral name is clearer.
 
 ## Layout
