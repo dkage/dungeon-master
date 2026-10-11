@@ -1,3 +1,12 @@
+---
+status: proposal
+milestone: M5b
+github_issues: []
+tracking: none
+next: open a spells issue when M5b starts; then delete
+verified: 2026-10-11
+---
+
 # Dungeon Master — skills plan
 
 How skills ("spells") fit into Dungeon Master. Extends §7 of `PLAN.md` (M5). v1 = Claude Code only.

@@ -1,3 +1,12 @@
+---
+status: current
+milestone: M5a, M6
+github_issues: [23, 28]
+tracking: in-gh-issues
+next: keep until M5a closes; then delete
+verified: 2026-10-11
+---
+
 # Map and right panel: design
 
 Design for the map (M5a and M6 in `PLAN_EXPERIENCE.md` §4) and the right-hand panel around it. The right-column

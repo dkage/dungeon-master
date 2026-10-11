@@ -1,3 +1,12 @@
+---
+status: partial
+milestone: M8 (R0 to R6)
+github_issues: []
+tracking: none
+next: ci.yml and release-please config exist; release workflow and GoReleaser do not; open an issue per phase
+verified: 2026-10-11
+---
+
 # Release plan
 
 How Dungeon Master is versioned, built, packaged, verified and distributed. Everything release-related lives in this

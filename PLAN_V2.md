@@ -1,3 +1,12 @@
+---
+status: parking-lot
+milestone: after v1
+github_issues: []
+tracking: none
+next: ideas only; promote an idea to an issue when v1 is stable
+verified: 2026-10-11
+---
+
 # Dungeon Master — plan v2 (parking lot)
 
 Brainstorm only. Nothing here is in v1 (see `PLAN.md`: Claude only, GitHub issues read-mostly, one expedition per

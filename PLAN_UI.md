@@ -1,3 +1,12 @@
+---
+status: current
+milestone: M3.6 to M6
+github_issues: [8, 9, 10, 11, 12, 15]
+tracking: in-gh-issues
+next: screen spec; keep
+verified: 2026-10-11
+---
+
 # Screens and controls
 
 Every screen of the cockpit, region by region: what is on it, what each control does, and which milestone builds it.

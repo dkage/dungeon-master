@@ -11,6 +11,9 @@ sprite-backed graph in the reserved map area. The 15-creature roster and shared 
 `design/quest-encounters/`;
 future creature art must follow `design/quest-encounters/ART_DIRECTION.md`. Themed words: `GLOSSARY.md`.
 
+Each `PLAN*.md` starts with front-matter properties (`status`, `milestone`, `github_issues`, `tracking`, `next`,
+`verified`). Update them when a plan's state changes; a plan whose work is in issues and built can be deleted.
+
 ## Scope and principles
 
 - **v1 is Claude Code only.** Keep one `Launcher` seam; do not build an adapter registry, typed-prompt fallback or

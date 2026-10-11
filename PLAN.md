@@ -1,3 +1,12 @@
+---
+status: partial
+milestone: M0-M8 master plan
+github_issues: []
+tracking: none
+next: keep; built through M4; remaining sections are history, order of work is in PLAN_EXPERIENCE.md
+verified: 2026-10-11
+---
+
 # Dungeon Master — plan
 
 A desktop cockpit for a human "Dungeon Master" who runs a party of CLI coding agents (Claude in v1; Codex and agy later)

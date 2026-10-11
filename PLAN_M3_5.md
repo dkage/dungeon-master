@@ -1,3 +1,12 @@
+---
+status: partial
+milestone: M3.5
+github_issues: []
+tracking: none
+next: phases A, B, E built; move C, D and the real-GitHub probe to issues when triggered
+verified: 2026-10-11
+---
+
 # M3.5: GitHub budget and scope
 
 Status: phases A, B and E done; C and D deferred. Comes after M3 (quests list and detail). It runs in parallel with M3.6

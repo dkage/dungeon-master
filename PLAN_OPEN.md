@@ -1,3 +1,12 @@
+---
+status: worklist
+milestone: all
+github_issues: []
+tracking: none
+next: turn each item into a GitHub issue, delete it here, delete the file when empty
+verified: 2026-10-11
+---
+
 # Open work
 
 A snapshot of remaining work after M4, updated 2026-10-09. It is a worklist, not a design: the designs live in the

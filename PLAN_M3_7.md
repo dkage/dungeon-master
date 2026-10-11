@@ -1,3 +1,12 @@
+---
+status: partial
+milestone: M3.7 docs reconciliation
+github_issues: []
+tracking: none
+next: part 1 done 2026-10-11 except plan headers and status words in PLAN_M3_5.md; then delete
+verified: 2026-10-11
+---
+
 # M3.7: plan reconciliation and review follow-ups
 
 This is a docs-and-decisions milestone. It touches no code and edits no file that another milestone is working in. It
