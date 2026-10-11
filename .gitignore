@@ -34,3 +34,6 @@ web/dist/*
 web/e2e/.url.json
 web/test-results/
 web/playwright-report/
+
+# Formatter test file that the markdown skill leaves behind
+/DUMMY_PLAN.md

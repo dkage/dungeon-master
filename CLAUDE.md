@@ -4,15 +4,15 @@ A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents ag
 an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native
 webview shell.
 
-Status: M0-M4 done. M3.5 (GitHub budget, scope and the `gh` shim, `docs/design/github-budget.md`) is done except the deferred SQLite
-copy and write queue (phases C and D). M3.6 (Stitch v4 cockpit shell, first run and words; `docs/design/experience.md`) and
-M4 (quest briefing, launch, and session linkage) are done. M4.5 attention signals are next, followed by M5a's
-sprite-backed graph in the reserved map area. The 15-creature roster and shared sprite art direction are in
-`design/quest-encounters/`;
-future creature art must follow `design/quest-encounters/ART_DIRECTION.md`. Themed words: `GLOSSARY.md`.
+Status: M0-M4 done. M3.5 (GitHub budget, scope and the `gh` shim) is done except the SQLite copy and write queue
+(issues #41, #42). M3.6 (Stitch v4 cockpit shell, first run and words) and M4 (quest briefing, launch, session linkage)
+are done. Next: M4.5 attention (#23), then M5a map (#28). Everything unbuilt is a GitHub issue; the open list is the
+source of truth for what is left, including Windows and release work. Themed words: `GLOSSARY.md`.
 
-Each `PLAN*.md` starts with front-matter properties (`status`, `milestone`, `github_issues`, `tracking`, `next`,
-`verified`). Update them when a plan's state changes; a plan whose work is in issues and built can be deleted.
+Design for work not yet built lives in `docs/` (`architecture.md`, `ideas.md`, `design/`), not in the repo root. Each of
+those files starts with front-matter properties (`status`, `milestone`, `github_issues`, `tracking`, `next`,
+`verified`); update them when its state changes. When a milestone closes, delete its design doc (git keeps the history).
+Creature art for the map: `design/quest-encounters/` (roster and `ART_DIRECTION.md`).
 
 ## Scope and principles
 
