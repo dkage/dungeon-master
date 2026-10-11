@@ -1,19 +1,19 @@
 # Open work
 
-A snapshot of what is missing or undecided, taken on 2026-10-08 after M3.5 phases A, B and E. It is meant to be picked
-up in a later session and then turned into GitHub issues. This file is a worklist, not a design: the designs live in the
-plans it points at. When an item becomes an issue, delete it here; when the file is empty, delete the file.
+A snapshot of remaining work after M4, updated 2026-10-09. It is a worklist, not a design: the designs live in the
+plans it points at. M3.6 and M4 are complete and tracked in GitHub; M4's parent issue #19 is closed. Update this list
+when work moves into GitHub issues.
 
-Built so far: M0 to M3 (skeleton, heroes and terminal, campaigns, GitHub quests), the Quartermaster, scope in the query
-and its picker, the `gh` shim over a private socket, and plain-words notices. Details are in `CLAUDE.md`.
+Built so far: M0 to M4 (cockpit, campaigns, GitHub quests, briefing and launch), the Quartermaster, scope picker, `gh`
+shim over a private socket, and plain-words notices. Details are in `CLAUDE.md`.
 
-## 1. Decide first
+## 1. Decisions carried forward
 
-These block or shape the work below. Each has a recommendation; none has an answer yet.
+These choices shaped the milestone order and remain the current direction unless a later plan changes them.
 
-| # | Question                                                                           | Recommendation                                                        |
+| # | Decision                                                                           | Current direction                                                     |
 |---|------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| 1 | Roadmap import: build an idempotent command before M4, or go straight to M4?       | Straight to M4; import once the Quartermaster has a real write caller |
+| 1 | Roadmap import before M4?                                                          | Deferred until the Quartermaster has a real write caller             |
 | 2 | Should sessions receive `GH_TOKEN` and `GITHUB_TOKEN` from the app's own env?      | Keep inheriting; document the issues-only token (done in README)      |
 | 3 | Does the scope picker live inside the Start-here checklist (M3.6)?                 | Yes, one first-run path (`PLAN_M3_7.md` 2.5)                          |
 | 4 | Does the plain-words switch ship with the hover help in M3.6 or right after?       | With it; both are about the same words (`PLAN_M3_7.md` 2.9)           |
@@ -24,15 +24,19 @@ These block or shape the work below. Each has a recommendation; none has an answ
 
 The content of each is in `PLAN_EXPERIENCE.md` §4; this is only what is not started.
 
-- **M3.6 First run and words** (`PLAN_EXPERIENCE.md` §5): Start-here panel, sample campaign, repo suggestions,
-  `words.ts` with `Term` popovers, starter heroes as an action, empty states, design tokens, `make run-fresh`, a
-  first-run browser test from an empty config directory.
-- **M4 Launch from a quest**: briefing file, primary "Start with" button, session titles from quests, quest chip,
-  one-session-per-tree gate. GitHub write-back stays opt-in and off.
 - **M4.5 Attention**: "needs you" from PTY output recency, tab title and favicon badge, optional OS notification.
-- **M5a Map v1** (`PLAN_MAP.md`, `PLAN_UI.md`): read-only layered graph, blocked-by and parent edges, click selects,
+- **M5a Map v1** (`PLAN_MAP.md`, `PLAN_UI.md`): implement the read-only Svelte/SVG graph inside the map region
+  reserved in M3.6, using the 15 generated sprite sheets as creature art for rooms with known effort tiers. Keep
+  per-issue creature assignments stable in local user state; show state with separate markers; retain a readable
+  fallback for unknown effort or missing art; honor reduced motion. Include blocked-by and parent edges, click selects,
   double-click starts. It must not hide blockers outside the scope (`PLAN_M3_7.md` 2.6).
 - **M5b Spells** (`PLAN_SKILLS.md`), **M6 Map v2**, **M7 Hooks status**, **M8 Packaging**.
+
+The 15-creature effort roster and style-matched prototype sheets are now in
+`design/quest-encounters/`. They are the planned art inputs for the first M5a
+renderer; before runtime use, inspect frame edges and baseline at native size as
+specified in that directory's README. The no-art fallback still needs to keep
+issue identity and state readable.
 
 ## 3. Left over from M3.5
 

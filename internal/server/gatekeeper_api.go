@@ -96,10 +96,25 @@ func (s *Server) sessionEnv(env []string, id string) []string {
 
 // hero and shell specs get the shim and, for heroes, the rule.
 func (s *Server) heroSpecWithGate(h party.Hero, opener string) session.Spec {
-	opts := launcher.Opts{Opener: opener}
+	return s.heroSpecWithOpts(h, launcher.Opts{Opener: opener})
+}
+
+func (s *Server) withGatekeeperRule(opts launcher.Opts) launcher.Opts {
 	if s.cfg.Gatekeeper != nil {
-		opts.AppendSystemPrompt = gatekeeper.Rule
+		if opts.AppendSystemPrompt != "" {
+			opts.AppendSystemPrompt += "\n\n"
+		}
+		opts.AppendSystemPrompt += gatekeeper.Rule
 	}
+	return opts
+}
+
+func (s *Server) systemPrompt(prompt string) string {
+	return s.withGatekeeperRule(launcher.Opts{AppendSystemPrompt: prompt}).AppendSystemPrompt
+}
+
+func (s *Server) heroSpecWithOpts(h party.Hero, opts launcher.Opts) session.Spec {
+	opts = s.withGatekeeperRule(opts)
 	base := s.cfg.BaseEnv()
 	return session.Spec{
 		Argv:   launcher.Command(s.cfg.Claude, h, opts),

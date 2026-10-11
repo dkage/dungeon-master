@@ -21,16 +21,24 @@ const baseState: AppState = {
 function fakeClient(over: Partial<Client> = {}, state: Partial<AppState> = {}): Client {
   return {
     getState: vi.fn(async () => ({ ...baseState, ...state })),
-    createSession: vi.fn(async (req) => sess('s1', req.campaign, { kind: req.shell ? 'shell' : 'hero' })),
+    createSession: vi.fn(async (req) => sess('s1', req.campaign, { kind: req.shell ? 'shell' : 'hero', quest: req.quest })),
     deleteSession: vi.fn(async () => undefined),
     addCampaign: vi.fn(async (i) => camp('cnew', { dir: i.dir, name: i.name ?? 'new' })),
     updateCampaign: vi.fn(async (id, p) => camp(id, { name: p.name ?? 'C' })),
     removeCampaign: vi.fn(async () => undefined),
     getQuests: vi.fn(async () => result([quest(1)])),
     getQuest: vi.fn(async (_c, n) => detailOf(n)),
+    previewQuestLaunch: vi.fn(async () => ({ content: 'brief', canStart: true, truncated: false, commentsShown: 0, commentsTotal: 0 })),
+    pickFolder: vi.fn(async () => ({ cancelled: true })),
+    openCampaignFolder: vi.fn(async () => undefined),
     getGithub: vi.fn(async () => githubOk),
     setScope: vi.fn(async (id, scope) => camp(id, { scope })),
     getScopeOptions: vi.fn(async () => scopeOptions),
+    getProjectSuggestions: vi.fn(async () => []),
+    createSampleCampaign: vi.fn(async () => camp('sample', { name: 'Sample (not a real project)', sample: true, demo: true })),
+    adoptStarterHeroes: vi.fn(async () => ({ saved: true })),
+    getHeroesConfig: vi.fn(async () => ({ defaultHero: 'opus', heroes: [{ id: 'opus', label: 'Opus', args: [], env: [] }] })),
+    saveHeroesConfig: vi.fn(async () => ({ saved: true })),
     ...over,
   }
 }
@@ -128,6 +136,64 @@ describe('refresh and selection', () => {
   })
 })
 
+describe('onboarding and appearance preferences', () => {
+  it('loads project suggestions and adds a suggested project', async () => {
+    const c = fakeClient({
+      getProjectSuggestions: vi.fn(async () => [{ name: 'Dungeon', dir: '/work/dungeon', repo: 'dkage/dungeon-master' }]),
+    })
+    const s = new AppStore(c)
+    await s.refresh()
+    await s.loadSuggestions()
+    expect(s.suggestions).toEqual([{ name: 'Dungeon', dir: '/work/dungeon', repo: 'dkage/dungeon-master' }])
+    expect(await s.addSuggestedProject(s.suggestions[0])).toBe(true)
+    expect(c.addCampaign).toHaveBeenCalledWith({ dir: '/work/dungeon', name: 'Dungeon' })
+  })
+
+  it('creates and selects the separate sample campaign', async () => {
+    const c = fakeClient()
+    const s = new AppStore(c)
+    await s.refresh()
+    expect(await s.addSampleCampaign()).toBe(true)
+    expect(c.createSampleCampaign).toHaveBeenCalledOnce()
+    expect(s.campaignId).toBe('sample')
+    expect(s.campaign?.sample).toBe(true)
+  })
+
+  it('adopts starter heroes and refreshes the persisted state', async () => {
+    const client = fakeClient({ adoptStarterHeroes: vi.fn(async () => ({ saved: true })) }, { defaultHeroes: false })
+    const s = new AppStore(client)
+    expect(await s.adoptStarterHeroes()).toBe(true)
+    expect(client.adoptStarterHeroes).toHaveBeenCalledOnce()
+    expect(client.getState).toHaveBeenCalledOnce()
+    expect(s.defaultHeroes).toBe(false)
+  })
+
+  it('persists independent sizes, font, word mode and theme', () => {
+    const first = new AppStore(fakeClient())
+    first.updateAppearance({ font: 'eb-garamond', sidebarSize: 17, terminalSize: 11, questsSize: 19, wordMode: 'plain', theme: 'neutral' })
+    const second = new AppStore(fakeClient())
+    expect(second.appearance).toEqual({
+      font: 'eb-garamond', sidebarSize: 17, terminalSize: 11, questsSize: 19, wordMode: 'plain', theme: 'neutral',
+    })
+  })
+
+  it('recovers from invalid appearance data with safe defaults', () => {
+    localStorage.setItem('dungeon.appearance', '{broken')
+    const s = new AppStore(fakeClient())
+    expect(s.appearance).toEqual({
+      font: 'almendra', sidebarSize: 14, terminalSize: 13, questsSize: 14, wordMode: 'hints', theme: 'dungeon',
+    })
+  })
+
+  it('remembers and reopens the first-run guide locally', () => {
+    const s = new AppStore(fakeClient())
+    s.dismissFirstRun()
+    expect(new AppStore(fakeClient()).firstRunDismissed).toBe(true)
+    s.openFirstRun()
+    expect(new AppStore(fakeClient()).firstRunDismissed).toBe(false)
+  })
+})
+
 describe('campaigns', () => {
   it('addCampaign adds, selects and clears the error', async () => {
     const c = fakeClient()
@@ -212,6 +278,40 @@ describe('sessions', () => {
     expect(s.busy).toBe(false)
     await s.launch({ shell: true })
     expect(c.createSession).toHaveBeenLastCalledWith({ shell: true, campaign: 'c2' })
+  })
+
+  it('previews and launches a selected quest with the inspected briefing id', async () => {
+    const c = fakeClient({
+      previewQuestLaunch: vi.fn(async () => ({ content: 'brief', canStart: true, briefingId: 'preview-1', truncated: false, commentsShown: 0, commentsTotal: 0 })),
+    })
+    const s = new AppStore(c)
+    await s.refresh()
+    const preview = await s.previewQuestLaunch(9, 'opus')
+    expect(preview?.briefingId).toBe('preview-1')
+    expect(c.previewQuestLaunch).toHaveBeenCalledWith('c1', 9, 'opus')
+    expect(await s.launchQuest(9, 'opus', preview?.briefingId)).toBe(true)
+    expect(c.createSession).toHaveBeenCalledWith({ campaign: 'c1', hero: 'opus', quest: 9, briefingId: 'preview-1' })
+    expect(s.activeId).toBe('s1')
+    expect(s.sessions[0].quest).toBe(9)
+    expect(s.questNumber).toBe(9)
+    expect(s.questsOpen).toBe(true)
+  })
+
+  it('restores the selected issue from a quest session and finds worktree conflicts', async () => {
+    const linked = sess('linked', 'c1', { quest: 9, title: '#9 Evaluate rate limits' })
+    const c = fakeClient({}, {
+      campaigns: [camp('c1', { gitRoot: '/repo' }), camp('c2', { gitRoot: '/repo' })],
+      sessions: [linked],
+    })
+    const s = new AppStore(c)
+    await s.refresh()
+    expect(s.questSessionForCampaign('c2')?.id).toBe('linked')
+    await s.selectSession('linked')
+    expect(s.campaignId).toBe('c1')
+    expect(s.activeId).toBe('linked')
+    expect(s.questsOpen).toBe(true)
+    expect(s.questNumber).toBe(9)
+    expect(s.detail?.number).toBe(9)
   })
 
   it('launch shows the server error and clears busy', async () => {

@@ -23,7 +23,7 @@ when" at the end of the part gives a check that can be run.
 |--------------------------|----------------------------------------------------------------------------------|
 | Top status line          | Still says "plan only… GoLand hello-world… `module dungeon`"                     |
 | §2 Room state row        | Uses Unexplored, Occupied, Trapped; code uses open, in progress, locked, cleared |
-| §3 UI layout             | Superseded by `PLAN_EXPERIENCE.md` §3 (stage tabs, one primary Start button)     |
+| §3 UI layout             | `PLAN_MAP.md` resolves the right-column map/detail layout; `PLAN_EXPERIENCE.md` §4 now places its shell in M3.6    |
 | §4 Libraries             | Lists `go-github` (REST); the client is hand-written GraphQL                     |
 | §6 Auth                  | A pasted token in the OS keychain (`99designs/keyring`); never built             |
 | §6 Sync                  | Describes ETag polling and a JSON cache; replaced by `PLAN_M3_5.md`              |

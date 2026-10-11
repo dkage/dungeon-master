@@ -1,13 +1,14 @@
 import * as realApi from './api'
 import type {
-  AppState, Campaign, CampaignInput, CampaignPatch, GithubStatus, Hero, QuestDetail, QuestResult, Scope, ScopeOptions,
+  AppState, Campaign, CampaignInput, CampaignPatch, GithubStatus, Hero, HeroesConfig, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
   SessionInfo,
 } from './api'
 
 export type Client = Pick<
   typeof realApi,
   | 'getState' | 'createSession' | 'deleteSession' | 'addCampaign' | 'updateCampaign' | 'removeCampaign'
-  | 'getQuests' | 'getQuest' | 'getGithub' | 'setScope' | 'getScopeOptions'
+  | 'getQuests' | 'getQuest' | 'previewQuestLaunch' | 'getGithub' | 'setScope' | 'getScopeOptions' | 'getProjectSuggestions' | 'createSampleCampaign'
+  | 'adoptStarterHeroes' | 'getHeroesConfig' | 'saveHeroesConfig' | 'pickFolder' | 'openCampaignFolder'
 >
 
 const CAMPAIGN_KEY = 'dungeon.campaign'
@@ -36,6 +37,45 @@ export interface Failure {
   message: string
 }
 
+export type ReadingFont = 'almendra' | 'eb-garamond' | 'alegreya'
+export type WordMode = 'hints' | 'themed' | 'plain'
+export type ThemePack = 'dungeon' | 'neutral'
+export interface UISettings {
+  font: ReadingFont
+  sidebarSize: number
+  terminalSize: number
+  questsSize: number
+  wordMode: WordMode
+  theme: ThemePack
+}
+
+const SETTINGS_KEY = 'dungeon.appearance'
+const DEFAULT_SETTINGS: UISettings = {
+  font: 'almendra', sidebarSize: 14, terminalSize: 13, questsSize: 14, wordMode: 'hints', theme: 'dungeon',
+}
+
+function loadSettings(): UISettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY)
+    if (!raw) return { ...DEFAULT_SETTINGS }
+    const parsed = JSON.parse(raw) as Partial<UISettings>
+    const allowed = <T extends string>(value: unknown, values: readonly T[], fallback: T): T =>
+      values.includes(value as T) ? value as T : fallback
+    const size = (value: unknown, fallback: number) =>
+      typeof value === 'number' && Number.isFinite(value) ? Math.max(10, Math.min(24, Math.round(value))) : fallback
+    return {
+      font: allowed(parsed.font, ['almendra', 'eb-garamond', 'alegreya'], DEFAULT_SETTINGS.font),
+      sidebarSize: size(parsed.sidebarSize, DEFAULT_SETTINGS.sidebarSize),
+      terminalSize: size(parsed.terminalSize, DEFAULT_SETTINGS.terminalSize),
+      questsSize: size(parsed.questsSize, DEFAULT_SETTINGS.questsSize),
+      wordMode: allowed(parsed.wordMode, ['hints', 'themed', 'plain'], DEFAULT_SETTINGS.wordMode),
+      theme: allowed(parsed.theme, ['dungeon', 'neutral'], DEFAULT_SETTINGS.theme),
+    }
+  } catch {
+    return { ...DEFAULT_SETTINGS }
+  }
+}
+
 function failure(e: unknown): Failure {
   return { code: (e as { code?: string }).code ?? 'error', message: message(e) }
 }
@@ -44,6 +84,8 @@ export class AppStore {
   version = $state('')
   claude = $state<AppState['claude']>({ found: true })
   defaultHeroes = $state(false)
+  defaultHero = $state('')
+  partyError = $state('')
   heroes = $state<Hero[]>([])
   campaigns = $state<Campaign[]>([])
   sessions = $state<SessionInfo[]>([])
@@ -77,6 +119,10 @@ export class AppStore {
    * screen: an empty list would look like lost data.
    */
   unauthorised = $state(false)
+  suggestions = $state<ProjectSuggestion[]>([])
+  suggestionsLoading = $state(false)
+  firstRunDismissed = $state(load('dungeon.first-run.dismissed') === '1')
+  appearance = $state<UISettings>(loadSettings())
 
   // Responses that arrive after a newer request, or after the selection moved
   // on, are dropped so one campaign's quests never show under another.
@@ -97,6 +143,22 @@ export class AppStore {
     return this.sessions.filter((s) => s.campaign === campaignId)
   }
 
+  questSessionForCampaign(campaignId: string): SessionInfo | undefined {
+    const campaign = this.campaigns.find((c) => c.id === campaignId)
+    if (!campaign) return
+    const tree = campaign.gitRoot || campaign.dir
+    return this.sessions.find((s) => {
+      if (!s.quest || s.exited || s.lost) return false
+      const other = this.campaigns.find((c) => c.id === s.campaign)
+      return (other?.gitRoot || other?.dir) === tree
+    })
+  }
+
+  async goToSession(id: string) {
+    if (!this.sessions.some((s) => s.id === id)) await this.refresh()
+    await this.selectSession(id)
+  }
+
   private fail(e: unknown): string {
     if ((e as { status?: number }).status === 401) this.unauthorised = true
     return message(e)
@@ -113,6 +175,8 @@ export class AppStore {
       this.version = st.version
       this.claude = st.claude
       this.defaultHeroes = st.defaultHeroes
+      this.defaultHero = st.defaultHero ?? ''
+      this.partyError = st.partyError ?? ''
       this.heroes = st.heroes
       this.campaigns = st.campaigns
       this.sessions = st.sessions
@@ -120,9 +184,112 @@ export class AppStore {
       this.normalise()
       this.error = null
       if (this.campaignId && this.questsFor !== this.campaignId) void this.loadQuests()
+      if (this.campaigns.length === 0) void this.loadSuggestions()
     } catch (e) {
       this.error = this.fail(e)
     }
+  }
+
+  async loadSuggestions() {
+    this.suggestionsLoading = true
+    try {
+      this.suggestions = await this.client.getProjectSuggestions()
+    } catch {
+      this.suggestions = []
+    } finally {
+      this.suggestionsLoading = false
+    }
+  }
+
+  async addSuggestedProject(suggestion: ProjectSuggestion): Promise<boolean> {
+    return this.addCampaign({ dir: suggestion.dir, name: suggestion.name })
+  }
+
+  async addSampleCampaign(): Promise<boolean> {
+    this.busy = true
+    try {
+      const sample = await this.client.createSampleCampaign()
+      if (!this.campaigns.some((c) => c.id === sample.id)) this.campaigns = [...this.campaigns, sample]
+      this.selectCampaign(sample.id)
+      this.error = null
+      return true
+    } catch (e) {
+      this.error = this.fail(e)
+      return false
+    } finally {
+      this.busy = false
+    }
+  }
+
+  async pickFolder(): Promise<string | null> {
+    try {
+      const result = await this.client.pickFolder()
+      return result.path ?? null
+    } catch (e) {
+      this.error = this.fail(e)
+      return null
+    }
+  }
+
+  async openCampaignFolder(id: string) {
+    try {
+      await this.client.openCampaignFolder(id)
+      this.error = null
+    } catch (e) {
+      this.error = this.fail(e)
+    }
+  }
+
+  changeCampaignScope(id: string) {
+    if (!this.campaigns.some((c) => c.id === id)) return
+    this.selectCampaign(id)
+    this.questsOpen = true
+    this.pickingScope = true
+    void this.loadScopeOptions()
+  }
+
+  async adoptStarterHeroes(): Promise<boolean> {
+    this.busy = true
+    try {
+      await this.client.adoptStarterHeroes()
+      await this.refresh()
+      return true
+    } catch (e) {
+      this.error = this.fail(e)
+      return false
+    } finally {
+      this.busy = false
+    }
+  }
+
+  loadHeroesConfig(): Promise<HeroesConfig> {
+    return this.refresh().then(() => this.client.getHeroesConfig())
+  }
+
+  async saveHeroesConfig(config: HeroesConfig): Promise<boolean> {
+    try {
+      await this.client.saveHeroesConfig(config)
+      await this.refresh()
+      return true
+    } catch (e) {
+      this.error = this.fail(e)
+      return false
+    }
+  }
+
+  dismissFirstRun() {
+    this.firstRunDismissed = true
+    save('dungeon.first-run.dismissed', '1')
+  }
+
+  openFirstRun() {
+    this.firstRunDismissed = false
+    save('dungeon.first-run.dismissed', '0')
+  }
+
+  updateAppearance(patch: Partial<UISettings>) {
+    this.appearance = { ...this.appearance, ...patch }
+    save(SETTINGS_KEY, JSON.stringify(this.appearance))
   }
 
   /** Keep the selection pointing at things that exist. */
@@ -284,20 +451,25 @@ export class AppStore {
     if (changed) void this.loadQuests()
   }
 
-  selectSession(id: string) {
+  async selectSession(id: string) {
     const s = this.sessions.find((x) => x.id === id)
     if (!s) return
     const changed = s.campaign !== this.campaignId
     this.pickCampaign(s.campaign)
     this.activeId = id
     if (changed) void this.loadQuests()
+    const session = this.sessions.find((x) => x.id === id)
+    if (session?.quest) {
+      this.questsOpen = true
+      await this.selectQuest(session.quest)
+    }
   }
 
   async addCampaign(input: CampaignInput): Promise<boolean> {
     this.busy = true
     try {
       const c = await this.client.addCampaign(input)
-      this.campaigns = [...this.campaigns, c]
+      if (!this.campaigns.some((x) => x.id === c.id)) this.campaigns = [...this.campaigns, c]
       this.selectCampaign(c.id)
       this.error = null
       return true
@@ -339,7 +511,11 @@ export class AppStore {
   }
 
   async launch(target: Target) {
-    const campaign = this.campaign
+    await this.launchInCampaign(this.campaignId, target)
+  }
+
+  async launchInCampaign(campaignId: string | null, target: Target) {
+    const campaign = this.campaigns.find((c) => c.id === campaignId)
     if (!campaign) {
       this.error = 'Add or select a campaign first.'
       return
@@ -348,10 +524,45 @@ export class AppStore {
     try {
       const sess = await this.client.createSession({ ...target, campaign: campaign.id })
       this.sessions = [...this.sessions, sess]
+      this.selectCampaign(campaign.id)
       this.activeId = sess.id
       this.error = null
     } catch (e) {
       this.error = this.fail(e)
+    } finally {
+      this.busy = false
+    }
+  }
+
+  async previewQuestLaunch(number: number, hero: string): Promise<LaunchPreview | null> {
+    const campaign = this.campaign
+    if (!campaign) return null
+    try {
+      return await this.client.previewQuestLaunch(campaign.id, number, hero)
+    } catch (e) {
+      this.error = this.fail(e)
+      return null
+    }
+  }
+
+  async launchQuest(number: number, hero: string, briefingId?: string): Promise<boolean> {
+    const campaign = this.campaign
+    if (!campaign) {
+      this.error = 'Add or select a campaign first.'
+      return false
+    }
+    this.busy = true
+    try {
+      const sess = await this.client.createSession({ campaign: campaign.id, hero, quest: number, briefingId })
+      this.sessions = [...this.sessions, sess]
+      this.activeId = sess.id
+      this.questNumber = number
+      this.questsOpen = true
+      this.error = null
+      return true
+    } catch (e) {
+      this.error = this.fail(e)
+      return false
     } finally {
       this.busy = false
     }

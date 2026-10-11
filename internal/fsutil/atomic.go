@@ -32,3 +32,31 @@ func WriteFileAtomic(path string, data []byte) error {
 	}
 	return os.Rename(tmp.Name(), path)
 }
+
+// CreateFileAtomic writes data to path only if path does not already exist.
+// A temporary file is linked into place so readers see either no file or the
+// complete file, and an existing user config is never replaced.
+func CreateFileAtomic(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, ".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Link(tmpPath, path)
+}

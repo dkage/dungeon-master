@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, test, type Page } from '@playwright/test'
@@ -21,10 +21,32 @@ const screenText = (page: Page) => page.locator('.pane:not([hidden]) .xterm-rows
 const expeditions = (page: Page, campaign = 'demo') =>
   page.getByRole('list', { name: `Expeditions in ${campaign}` })
 
+async function captureMilestoneScreen(page: Page, name: string) {
+  if (process.env.M4_SCREENSHOTS !== '1') return
+  const dir = join(here, '../../_probe/m4')
+  mkdirSync(dir, { recursive: true })
+  await page.screenshot({ path: join(dir, `${name}.png`), fullPage: true })
+}
+
 async function addCampaign(page: Page, dir: string, name: string) {
+  await page.getByRole('button', { name: 'Add project', exact: true }).click()
   await page.getByPlaceholder('/absolute/path/to/project').fill(dir)
   await page.getByPlaceholder(/defaults to the folder/).fill(name)
   await page.getByRole('button', { name: 'Add campaign' }).click()
+}
+
+async function requestCampaignRemoval(page: Page, name: string, sample = false) {
+  if (sample) {
+    await page.getByRole('button', { name: 'Remove sample project' }).click()
+  } else {
+    await page.getByRole('button', { name: `Campaign actions for ${name}` }).click()
+    await page.getByRole('group', { name: `Actions for ${name}` }).getByRole('button', { name: 'Remove project' }).click()
+  }
+}
+
+async function confirmCampaignRemoval(page: Page, name: string, sample = false) {
+  const group = page.getByRole('group', { name: `Confirm removal of ${name}` })
+  await group.getByRole('button', { name: sample ? 'Remove sample' : 'Remove project' }).click()
 }
 
 // A campaign that has not chosen which issues to show is asked once. Most tests
@@ -69,6 +91,44 @@ test('unauthenticated API access is refused, the page itself loads', async ({ pl
   await anon.dispose()
 })
 
+test('a fresh install shows the getting-started checklist and a separate sample workspace', async ({ page }) => {
+  await page.goto(url)
+  await expect(page.getByRole('heading', { name: 'Start here' })).toBeVisible()
+  await captureMilestoneScreen(page, 'first-run')
+  await expect(page.locator('.start-here .intro')).toContainText('then start an agent.')
+  await expect(page.locator('.brand-header')).toContainText('Dungeon Master')
+  expect(await page.locator('.app').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(3)
+  await page.getByRole('button', { name: 'Try the sample first' }).click()
+  const panel = questPanel(page)
+  await expect(panel.getByText('sample project', { exact: true })).toBeVisible()
+  await expect(panel.getByText(/separate sample project/)).toBeVisible()
+  await panel.getByRole('region', { name: 'Quest browser' }).getByRole('button', { name: /#1 Ship the onboarding flow/ }).click()
+  await expect(panel.getByLabel('Filter quests')).toBeVisible()
+  await expect(panel.getByRole('region', { name: 'Selected issue detail' })).toBeVisible()
+  await captureMilestoneScreen(page, 'quest-selected')
+  await page.getByRole('button', { name: 'Keep these starter heroes' }).click()
+  await expect(page.getByRole('button', { name: 'Keep these starter heroes' })).toHaveCount(0)
+  await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+  await expect(settings.getByRole('cell', { name: 'Opus', exact: true })).toBeVisible()
+  await captureMilestoneScreen(page, 'settings')
+  const opusRow = settings.locator('tbody tr').first()
+  await opusRow.getByRole('button', { name: 'Edit' }).click()
+  await settings.getByLabel('Model').fill('claude-opus-5-5')
+  await settings.getByRole('button', { name: 'Save hero' }).click()
+  await expect(settings.getByRole('group', { name: 'Edit Opus' })).toHaveCount(0)
+  await settings.getByRole('button', { name: 'Close settings' }).click()
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await expect(screenText(page)).toContainText('sample-workspace')
+  await captureMilestoneScreen(page, 'session-running')
+  await page.getByRole('button', { name: closeSession }).click()
+  await requestCampaignRemoval(page, 'Sample (not a real project)', true)
+  await confirmCampaignRemoval(page, 'Sample (not a real project)', true)
+  await expect(page.getByRole('button', { name: /^Sample/ })).toHaveCount(0)
+  await captureMilestoneScreen(page, 'empty-state')
+})
+
 test('a browser that is not signed in is told so, and never sees an empty app that looks like lost data', async ({ browser, baseURL }) => {
   const ctx = await browser.newContext() // no cookie, no token
   const page = await ctx.newPage()
@@ -93,24 +153,26 @@ test('a campaign shows the GitHub repo resolved from its git remote', async ({ p
 test('a monorepo subfolder runs agents in the subfolder but uses the repository remote', async ({ page }) => {
   await open(page)
   await addCampaign(page, subdir, 'api')
+  await expect(nav(page).getByRole('button', { name: /^api/ })).toHaveAttribute('aria-current', 'true')
   await expect(page.locator('.toolbar')).toContainText('api')
   await expect(page.locator('.toolbar')).toContainText('acme/demo') // from the git root's remote
 
-  await hero(page, 'Opus').click()
+  await page.getByRole('button', { name: 'Campaign actions for api' }).click()
+  await page.getByRole('group', { name: 'Actions for api' }).getByRole('button', { name: 'Opus: free session' }).click()
   await expect(screenText(page)).toContainText('FAKE-CLAUDE')
   await expect(screenText(page)).toContainText('apps/api') // cwd is the subfolder
 
   // Clean up so later tests start from one campaign.
   await page.getByRole('button', { name: closeSession }).click()
-  await page.getByRole('button', { name: 'Remove campaign api' }).click()
-  await page.getByRole('button', { name: 'Remove?' }).click()
+  await requestCampaignRemoval(page, 'api')
+  await confirmCampaignRemoval(page, 'api')
   await expect(nav(page).getByRole('button', { name: /^api/ })).toHaveCount(0)
 })
 
-test('adding the same directory twice is refused', async ({ page }) => {
+test('adding an existing directory selects its campaign', async ({ page }) => {
   await open(page)
   await addCampaign(page, workdir, 'again')
-  await expect(page.getByRole('alert')).toContainText('already a campaign')
+  await expect(nav(page).getByRole('button', { name: /^demo/ })).toHaveAttribute('aria-current', 'true')
   await expect(nav(page).getByRole('button', { name: /^again/ })).toHaveCount(0)
 })
 
@@ -160,19 +222,22 @@ test('two expeditions are independent and a shell exit is shown in the list', as
 
 test('a campaign with a running expedition cannot be removed', async ({ page }) => {
   await open(page)
-  await addCampaign(page, subdir, 'busy')
+  const busyDir = join(dirname(plaindir), 'busy-app')
+  mkdirSync(busyDir, { recursive: true })
+  await addCampaign(page, busyDir, 'busy')
+  await expect(nav(page).getByRole('button', { name: /^busy/ })).toHaveAttribute('aria-current', 'true')
   await hero(page, 'Shell').click()
   await expect(expeditions(page, 'busy').getByRole('listitem')).toHaveCount(1)
 
-  await page.getByRole('button', { name: 'Remove campaign busy' }).click()
-  await page.getByRole('button', { name: 'Remove?' }).click()
-  await expect(page.getByRole('alert')).toContainText('running sessions')
+  await requestCampaignRemoval(page, 'busy')
+  await confirmCampaignRemoval(page, 'busy')
+  await expect(page.locator('p[role="alert"]')).toContainText('running sessions')
   await expect(nav(page).getByRole('button', { name: /^busy/ })).toBeVisible()
 
   // Close the expedition, then removal succeeds.
   await page.getByRole('button', { name: closeSession }).click()
-  await page.getByRole('button', { name: 'Remove campaign busy' }).click()
-  await page.getByRole('button', { name: 'Remove?' }).click()
+  await requestCampaignRemoval(page, 'busy')
+  await confirmCampaignRemoval(page, 'busy')
   await expect(nav(page).getByRole('button', { name: /^busy/ })).toHaveCount(0)
 })
 
@@ -249,8 +314,8 @@ test("the quest panel lists the repository's issues with their states and relati
   await expect(panel.getByRole('button', { name: /#5 \[demo\] Bug/ })).toContainText('@dkage') // assigned
   await expect(panel.getByRole('button', { name: /#3 \[demo\] Render rooms/ })).toContainText('blocked by #2') // locked
   await expect(panel.getByTitle('Sub-issues done')).toHaveText('0/2')
-  await expect(panel.getByLabel('Quest counts')).toContainText('1 locked')
-  await expect(panel.getByLabel('Quest counts')).toContainText('1 in progress')
+  await expect(panel.getByLabel('Quests counts')).toContainText('1 locked')
+  await expect(panel.getByLabel('Quests counts')).toContainText('1 in progress')
 
   // The two sub-issues are nested under the epic.
   const rows = await panel.getByRole('listitem').evaluateAll((els) =>
@@ -277,20 +342,22 @@ test('the quest filter narrows the list', async ({ page }) => {
 test('opening a quest shows its markdown, relations and comments; an unknown issue fails gracefully', async ({ page }) => {
   await open(page)
   const panel = questPanel(page)
-  await panel.getByRole('button', { name: /#3 \[demo\] Render rooms/ }).click()
-  await expect(panel.getByRole('heading', { name: /#3 \[demo\] Render rooms on the map/ })).toBeVisible()
-  await expect(panel.getByText('opened by @dkage')).toBeVisible()
-  await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).toBeVisible() // parent
-  await expect(panel.getByRole('button', { name: /#2 \[demo\] Sketch/ })).toBeVisible() // blocker
-  await expect(panel.getByLabel('Description')).toContainText('See also the epic')
-  await expect(panel.getByLabel('Comments')).toContainText('Needs the layout sketch first')
-  await expect(panel.getByLabel('Comments').locator('strong').last()).toHaveText('layout sketch') // markdown rendered
+  const browser = panel.getByRole('region', { name: 'Quest browser' })
+  await browser.getByRole('button', { name: /#3 \[demo\] Render rooms/ }).click()
+  const detail = panel.getByRole('region', { name: 'Selected issue detail' })
+  await expect(detail.getByRole('heading', { name: /#3 \[demo\] Render rooms on the map/ })).toBeVisible()
+  await expect(detail.getByText('opened by @dkage')).toBeVisible()
+  await expect(detail.getByRole('button', { name: /#1 \[demo\] Epic/ })).toBeVisible() // parent
+  await expect(detail.getByRole('button', { name: /#2 \[demo\] Sketch/ })).toBeVisible() // blocker
+  await expect(detail.getByLabel('Description')).toContainText('See also the epic')
+  await expect(detail.getByLabel('Comments')).toContainText('Needs the layout sketch first')
+  await expect(detail.getByLabel('Comments').locator('strong').last()).toHaveText('layout sketch') // markdown rendered
 
   // The fake GitHub only knows #3 in detail, so following the blocker shows the error state.
-  await panel.getByRole('button', { name: /#2 \[demo\] Sketch/ }).click()
-  await expect(panel.getByRole('alert')).toContainText('That issue was not found.')
-  await panel.getByRole('button', { name: /← Quests/ }).click()
-  await expect(panel.getByLabel('Filter quests')).toBeVisible()
+  await detail.getByRole('button', { name: /#2 \[demo\] Sketch/ }).click()
+  await expect(detail.getByRole('alert')).toContainText('That issue was not found.')
+  await detail.getByRole('button', { name: /← Quests/ }).click()
+  await expect(browser.getByLabel('Filter quests')).toBeVisible()
 })
 
 test('a hostile issue cannot run script or load anything (sanitiser and CSP together)', async ({ page }) => {
@@ -300,15 +367,17 @@ test('a hostile issue cannot run script or load anything (sanitiser and CSP toge
   })
   await open(page)
   const panel = questPanel(page)
-  await panel.getByRole('button', { name: /#9 Hostile body/ }).click()
-  await expect(panel.getByRole('heading', { name: /#9 Hostile body/ })).toBeVisible()
-  await expect(panel.getByLabel('Description')).toContainText('still bold')
-  await expect(panel.getByLabel('Comments')).toBeVisible()
+  const browser = panel.getByRole('region', { name: 'Quest browser' })
+  await browser.getByRole('button', { name: /#9 Hostile body/ }).click()
+  const detail = panel.getByRole('region', { name: 'Selected issue detail' })
+  await expect(detail.getByRole('heading', { name: /#9 Hostile body/ })).toBeVisible()
+  await expect(detail.getByLabel('Description')).toContainText('still bold')
+  await expect(detail.getByLabel('Comments')).toBeVisible()
 
   // Nothing dangerous reached the DOM…
-  const dangerous = await panel.locator('script, img, svg, iframe, [onerror], [onload]').count()
+  const dangerous = await detail.locator('script, img, svg, iframe, [onerror], [onload]').count()
   expect(dangerous).toBe(0)
-  const hrefs = await panel.getByLabel('Description').locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href') ?? ''))
+  const hrefs = await detail.getByLabel('Description').locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href') ?? ''))
   for (const h of hrefs) expect(h).not.toMatch(/^javascript:/i)
   // …nothing ran…
   expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined()
@@ -326,46 +395,90 @@ test('refreshing reloads the quests', async ({ page }) => {
   await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).toBeVisible()
 })
 
-test('a campaign without a GitHub repository offers demo quests, and can go back', async ({ page }) => {
+test('a campaign without a GitHub repository can open the separate sample project', async ({ page }) => {
   await open(page)
   await addCampaign(page, plaindir, 'plain')
   const panel = questPanel(page)
   await expect(panel.getByRole('alert')).toContainText('no GitHub repository')
   await expect(panel.getByRole('button', { name: /Epic/ })).toHaveCount(0) // not the other campaign's issues
 
-  await panel.getByRole('button', { name: 'Load demo quests' }).click()
-  await expect(panel.getByText('demo data')).toBeVisible()
+  await panel.getByRole('button', { name: 'Try the separate sample project' }).click()
+  await expect(panel.getByText('sample project')).toBeVisible()
+  await expect(panel.getByText(/separate sample project/)).toBeVisible()
   await expect(panel.getByRole('button', { name: /Build the signup form/ })).toBeVisible()
   await expect(panel.getByRole('button', { name: /Suspend a user/ })).toContainText('blocked by #12')
 
   // Demo detail, with its relations, and no GitHub link for sample data.
   await panel.getByRole('button', { name: /Build the signup form/ }).click()
-  await expect(panel.getByRole('heading', { name: /#3 Build the signup form/ })).toBeVisible()
-  await expect(panel.getByRole('button', { name: /#2 Design the welcome screen/ })).toBeVisible()
-  await expect(panel.getByRole('link', { name: 'Open on GitHub' })).toHaveCount(0)
+  const detail = panel.getByRole('region', { name: 'Selected issue detail' })
+  await expect(detail.getByRole('heading', { name: /#3 Build the signup form/ })).toBeVisible()
+  await expect(detail.getByRole('button', { name: /#2 Design the welcome screen/ })).toBeVisible()
+  await expect(detail.getByRole('link', { name: 'Open on GitHub' })).toHaveCount(0)
+  await detail.getByRole('button', { name: 'Review launch' }).click()
+  const briefing = page.getByRole('dialog', { name: 'Review launch plan' })
+  await expect(briefing.locator('.brief-content')).toContainText('Build the signup form')
+  await expect(briefing.locator('.brief-content')).toContainText('untrusted task data')
+  await expect(briefing.getByRole('button', { name: 'Start expedition' })).toBeEnabled()
+  await briefing.getByRole('button', { name: 'Close briefing' }).click()
   // Titles and headings inside an issue are content: they must not inherit the
   // small uppercase style used for section labels.
-  const title = panel.getByRole('heading', { name: /#3 Build the signup form/ })
+  const title = detail.getByRole('heading', { name: /#3 Build the signup form/ })
   expect(await title.evaluate((e) => getComputedStyle(e).textTransform)).toBe('none')
-  await panel.getByRole('button', { name: /← Quests/ }).click()
-  await panel.getByRole('button', { name: /Login button unresponsive/ }).click()
-  const steps = panel.getByLabel('Description').getByRole('heading', { name: 'Steps' })
+  await detail.getByRole('button', { name: /← Quests/ }).click()
+  await panel.getByRole('region', { name: 'Quest browser' }).getByRole('button', { name: /Send the welcome email/ }).click()
+  const blockedDetail = panel.getByRole('region', { name: 'Selected issue detail' })
+  await blockedDetail.getByRole('button', { name: 'Review launch' }).click()
+  const blockedPlan = page.getByRole('dialog', { name: 'Review launch plan' })
+  await expect(blockedPlan.getByRole('button', { name: 'Start expedition' })).toBeDisabled()
+  await expect(blockedPlan.getByRole('status')).toContainText('Blocked by #4, #7')
+  await blockedPlan.getByRole('button', { name: 'Close briefing' }).click()
+  await blockedDetail.getByRole('button', { name: /← Quests/ }).click()
+  await panel.getByRole('region', { name: 'Quest browser' }).getByRole('button', { name: /#2 Design the welcome screen/ }).click()
+  const closedDetail = panel.getByRole('region', { name: 'Selected issue detail' })
+  await expect(closedDetail.getByRole('button', { name: 'Review launch' })).toBeDisabled()
+  await expect(closedDetail.getByText('Closed issues cannot be started.')).toBeVisible()
+  await closedDetail.getByRole('button', { name: /← Quests/ }).click()
+  await panel.getByRole('region', { name: 'Quest browser' }).getByRole('button', { name: /Evaluate rate-limit libraries/ }).click()
+  const launchDetail = panel.getByRole('region', { name: 'Selected issue detail' })
+  await launchDetail.getByRole('button', { name: 'Review launch' }).click()
+  const launchPlan = page.getByRole('dialog', { name: 'Review launch plan' })
+  await expect(launchPlan.getByText('Evaluate rate-limit libraries')).toBeVisible()
+  await captureMilestoneScreen(page, 'launch-preview')
+  await launchPlan.getByRole('button', { name: 'Start expedition' }).click()
+  await expect(screenText(page)).toContainText('arg=[--append-system-prompt]')
+  await expect(screenText(page)).toContainText('task briefing file at')
+  await expect(screenText(page)).toContainText('sample-workspace')
+  await expect(page.locator('.quest-session-chip')).toHaveText('#9')
+  await expect(launchDetail.getByRole('button', { name: 'Go to session' })).toBeVisible()
+  await expect(launchDetail.getByRole('button', { name: 'Review launch' })).toBeDisabled()
+  const linkedRows = nav(page).getByRole('list', { name: /Expeditions in Sample/ })
+  await linkedRows.getByRole('button', { name: /#9 Evaluate rate-limit libraries running/ }).click()
+  await expect(launchDetail.getByRole('heading', { name: /#9 Evaluate rate-limit libraries/ })).toBeVisible()
+  await page.locator('.quest-session-chip').click()
+  await expect(launchDetail.getByRole('heading', { name: /#9 Evaluate rate-limit libraries/ })).toBeVisible()
+  await launchDetail.getByRole('button', { name: 'Go to session' }).click()
+  await expect(page.locator('.quest-session-chip')).toHaveText('#9')
+  await page.getByRole('button', { name: closeSession }).click()
+  await launchDetail.getByRole('button', { name: /← Quests/ }).click()
+  await panel.getByRole('region', { name: 'Quest browser' }).getByRole('button', { name: /Login button unresponsive/ }).click()
+  const selectedDetail = panel.getByRole('region', { name: 'Selected issue detail' })
+  const steps = selectedDetail.getByLabel('Description').getByRole('heading', { name: 'Steps' })
   await expect(steps).toBeVisible()
   expect(await steps.evaluate((e) => getComputedStyle(e).textTransform)).toBe('none')
-  await panel.getByRole('button', { name: /← Quests/ }).click()
+  await selectedDetail.getByRole('button', { name: /← Quests/ }).click()
 
-  await panel.getByRole('button', { name: 'Use real issues' }).click()
-  await expect(panel.getByRole('alert')).toContainText('no GitHub repository')
-
-  // Switching back to the other campaign shows its own issues again.
+  // Switching back to the real campaign shows its own issues again.
   await nav(page).getByRole('button', { name: /^demo/ }).click()
   await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).toBeVisible()
 
   // Clean up.
   await nav(page).getByRole('button', { name: /^plain/ }).click()
-  await page.getByRole('button', { name: 'Remove campaign plain' }).click()
-  await page.getByRole('button', { name: 'Remove?' }).click()
+  await requestCampaignRemoval(page, 'plain')
+  await confirmCampaignRemoval(page, 'plain')
   await expect(nav(page).getByRole('button', { name: /^plain/ })).toHaveCount(0)
+  await requestCampaignRemoval(page, 'Sample (not a real project)', true)
+  await confirmCampaignRemoval(page, 'Sample (not a real project)', true)
+  await expect(page.getByRole('button', { name: /^Sample/ })).toHaveCount(0)
 })
 
 test('on a narrow window the quest panel is a drawer opened from the toolbar', async ({ page }) => {
@@ -438,8 +551,8 @@ test('a new campaign asks which issues to show, with real counts, and remembers 
   await panel.getByRole('button', { name: 'Cancel' }).click()
   await expect(panel.getByLabel('Filter quests')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Remove campaign scoped' }).click()
-  await page.getByRole('button', { name: 'Remove?' }).click()
+  await requestCampaignRemoval(page, 'scoped')
+  await confirmCampaignRemoval(page, 'scoped')
   await expect(nav(page).getByRole('button', { name: /^scoped/ })).toHaveCount(0)
 })
 
@@ -463,7 +576,10 @@ test('the label chips narrow the list without another request to GitHub', async 
 
 test('a list that was cut says so and points to narrowing the scope', async ({ page }) => {
   await open(page)
-  await addCampaign(page, subdir, 'huge')
+  const hugeDir = join(dirname(subdir), 'huge-app')
+  mkdirSync(hugeDir, { recursive: true })
+  await addCampaign(page, hugeDir, 'huge')
+  await expect(nav(page).getByRole('button', { name: /^huge/ })).toHaveAttribute('aria-current', 'true')
   const panel = questPanel(page)
   await panel.getByRole('radio', { name: /Pick labels/ }).check()
   await panel.getByRole('checkbox', { name: /^huge \(/ }).check()
@@ -477,8 +593,8 @@ test('a list that was cut says so and points to narrowing the scope', async ({ p
   await panel.getByRole('button', { name: 'Apply' }).click()
   await expect(panel.getByText(/Narrow the scope to see the rest/)).toHaveCount(0)
 
-  await page.getByRole('button', { name: 'Remove campaign huge' }).click()
-  await page.getByRole('button', { name: 'Remove?' }).click()
+  await requestCampaignRemoval(page, 'huge')
+  await confirmCampaignRemoval(page, 'huge')
   await expect(nav(page).getByRole('button', { name: /^huge/ })).toHaveCount(0)
 })
 

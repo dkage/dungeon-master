@@ -4,6 +4,7 @@
 package party
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -32,15 +33,17 @@ type Hero struct {
 // Party is the validated set of heroes.
 type Party struct {
 	// Claude is the binary to run: a name looked up on PATH or an absolute path.
-	Claude string
-	Heroes []Hero
+	Claude      string
+	DefaultHero string
+	Heroes      []Hero
 	// Defaulted is true when no file existed and built-in templates are used.
 	Defaulted bool
 }
 
 type rawFile struct {
-	Claude string             `toml:"claude"`
-	Heroes map[string]rawHero `toml:"heroes"`
+	Claude      string             `toml:"claude"`
+	DefaultHero string             `toml:"default_hero"`
+	Heroes      map[string]rawHero `toml:"heroes"`
 }
 
 type rawHero struct {
@@ -52,8 +55,9 @@ type rawHero struct {
 // Defaults are the starter heroes offered before the user writes a file.
 func Defaults() Party {
 	return Party{
-		Claude:    "claude",
-		Defaulted: true,
+		Claude:      "claude",
+		DefaultHero: "opus",
+		Defaulted:   true,
 		Heroes: []Hero{
 			{ID: "opus", Label: "Opus", Args: []string{"--model", "claude-opus-5-5"}},
 			{ID: "sonnet", Label: "Sonnet", Args: []string{"--model", "claude-sonnet-5-5"}},
@@ -101,7 +105,7 @@ func Parse(data []byte) (Party, error) {
 	if undecoded := md.Undecoded(); len(undecoded) > 0 {
 		return Party{}, fmt.Errorf("unknown key %q", undecoded[0].String())
 	}
-	p := Party{Claude: strings.TrimSpace(raw.Claude)}
+	p := Party{Claude: strings.TrimSpace(raw.Claude), DefaultHero: strings.TrimSpace(raw.DefaultHero)}
 	if p.Claude == "" {
 		p.Claude = "claude"
 	}
@@ -139,9 +143,47 @@ func Parse(data []byte) (Party, error) {
 		if label == "" {
 			label = id
 		}
+		if strings.ContainsAny(label, "\x00\r\n") {
+			return Party{}, fmt.Errorf("hero %q: label contains a control character", id)
+		}
 		p.Heroes = append(p.Heroes, Hero{ID: id, Label: label, Args: h.Args, Env: env})
 	}
+	if p.DefaultHero == "" {
+		p.DefaultHero = p.Heroes[0].ID
+	}
+	if _, ok := p.Hero(p.DefaultHero); !ok {
+		return Party{}, fmt.Errorf("default_hero %q does not name a configured hero", p.DefaultHero)
+	}
 	return p, nil
+}
+
+// Encode serializes a validated party to the local TOML format.
+func Encode(p Party) ([]byte, error) {
+	if len(p.Heroes) == 0 {
+		return nil, errors.New("no heroes defined")
+	}
+	if strings.TrimSpace(p.Claude) == "" {
+		p.Claude = "claude"
+	}
+	if p.DefaultHero == "" {
+		p.DefaultHero = p.Heroes[0].ID
+	}
+	raw := rawFile{Claude: p.Claude, DefaultHero: p.DefaultHero, Heroes: make(map[string]rawHero, len(p.Heroes))}
+	for _, h := range p.Heroes {
+		if _, exists := raw.Heroes[h.ID]; exists {
+			return nil, fmt.Errorf("duplicate hero id %q", h.ID)
+		}
+		raw.Heroes[h.ID] = rawHero{Label: h.Label, Args: h.Args, Env: h.Env}
+	}
+	var buf bytes.Buffer
+	if err := toml.NewEncoder(&buf).Encode(raw); err != nil {
+		return nil, err
+	}
+	// Re-parse the output so callers cannot persist a party the loader would reject.
+	if _, err := Parse(buf.Bytes()); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 // Hero returns a hero by id.

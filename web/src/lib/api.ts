@@ -6,6 +6,16 @@ export interface Hero {
   label: string
 }
 
+export interface HeroConfig extends Hero {
+  args: string[]
+  env: string[]
+}
+
+export interface HeroesConfig {
+  defaultHero: string
+  heroes: HeroConfig[]
+}
+
 export interface Scope {
   mode: 'labels' | 'assigned' | 'all'
   labels: string[]
@@ -27,8 +37,16 @@ export interface Campaign {
   scope: Scope | null
   /** Shows built-in sample quests instead of GitHub issues. */
   demo: boolean
+  /** Built-in scratch campaign; its workspace lives under the local state directory. */
+  sample?: boolean
   gitRoot?: string
   /** "owner/repo" on github.com, when the remote could be resolved. */
+  repo?: string
+}
+
+export interface ProjectSuggestion {
+  name: string
+  dir: string
   repo?: string
 }
 
@@ -36,6 +54,8 @@ export interface SessionInfo {
   id: string
   kind: 'hero' | 'shell'
   hero?: string
+  /** GitHub issue number for a quest session; absent for free sessions. */
+  quest?: number
   title: string
   campaign: string
   dir: string
@@ -50,6 +70,8 @@ export interface AppState {
   version: string
   claude: { found: boolean; path?: string; error?: string }
   defaultHeroes: boolean
+  defaultHero?: string
+  partyError?: string
   heroes: Hero[]
   campaigns: Campaign[]
   sessions: SessionInfo[]
@@ -68,8 +90,28 @@ export interface CreateRequest {
   hero?: string
   shell?: boolean
   opener?: string
+  quest?: number
+  briefingId?: string
   cols?: number
   rows?: number
+}
+
+export interface LaunchPreview {
+  content: string
+  truncated: boolean
+  commentsShown: number
+  commentsTotal: number
+  canStart: boolean
+  reason?: string
+  hero?: string
+  heroLabel?: string
+  directory?: string
+  briefingId?: string
+  briefingFile?: string
+  opener?: string
+  systemPrompt?: string
+  command?: string[]
+  existingSession?: SessionInfo
 }
 
 export type QuestState = 'open' | 'locked' | 'claimed' | 'cleared'
@@ -141,6 +183,15 @@ export interface QuestDetail extends Quest {
   subIssues: QuestRef[]
   parentTitle?: string
   commentList: QuestComment[]
+  /** Fresh context assembled from this issue when its detail is loaded. */
+  briefing?: BriefingResult
+}
+
+export interface BriefingResult {
+  content: string
+  truncated: boolean
+  commentsShown: number
+  commentsTotal: number
 }
 
 export interface Ration {
@@ -199,12 +250,24 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T 
 }
 
 export const getState = () => call<AppState>('GET', '/api/state') as Promise<AppState>
+export const getProjectSuggestions = () =>
+  call<ProjectSuggestion[]>('GET', '/api/onboarding/suggestions') as Promise<ProjectSuggestion[]>
+export const createSampleCampaign = () =>
+  call<Campaign>('POST', '/api/onboarding/sample', {}) as Promise<Campaign>
+export const pickFolder = () => call<{ path?: string; cancelled?: boolean }>('POST', '/api/pick-folder', {}) as Promise<{ path?: string; cancelled?: boolean }>
+export const adoptStarterHeroes = () =>
+  call<{ saved: boolean }>('POST', '/api/heroes/adopt-starters', {}) as Promise<{ saved: boolean }>
+export const getHeroesConfig = () => call<HeroesConfig>('GET', '/api/heroes/config') as Promise<HeroesConfig>
+export const saveHeroesConfig = (config: HeroesConfig) =>
+  call<{ saved: boolean }>('PUT', '/api/heroes/config', config) as Promise<{ saved: boolean }>
 export const addCampaign = (req: CampaignInput) =>
   call<Campaign>('POST', '/api/campaigns', req) as Promise<Campaign>
 export const updateCampaign = (id: string, patch: CampaignPatch) =>
   call<Campaign>('PATCH', `/api/campaigns/${encodeURIComponent(id)}`, patch) as Promise<Campaign>
 export const removeCampaign = (id: string) =>
   call<void>('DELETE', `/api/campaigns/${encodeURIComponent(id)}`) as Promise<void>
+export const openCampaignFolder = (id: string) =>
+  call<void>('POST', `/api/campaigns/${encodeURIComponent(id)}/open-folder`, {}) as Promise<void>
 export const getQuests = (campaignId: string, refresh = false, background = false) => {
   const q = [refresh && 'refresh=1', background && 'background=1'].filter(Boolean).join('&')
   return call<QuestResult>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/quests${q ? `?${q}` : ''}`) as Promise<QuestResult>
@@ -216,6 +279,8 @@ export const getScopeOptions = (campaignId: string) =>
 export const getGithub = () => call<GithubStatus>('GET', '/api/github') as Promise<GithubStatus>
 export const getQuest = (campaignId: string, number: number) =>
   call<QuestDetail>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}`) as Promise<QuestDetail>
+export const previewQuestLaunch = (campaignId: string, number: number, hero: string) =>
+  call<LaunchPreview>('POST', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}/launch-preview`, { hero }) as Promise<LaunchPreview>
 export const createSession = (req: CreateRequest) =>
   call<SessionInfo>('POST', '/api/sessions', req) as Promise<SessionInfo>
 export const deleteSession = (id: string) =>

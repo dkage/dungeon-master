@@ -45,7 +45,10 @@ func TestRestartMarksRunningRecordsLost(t *testing.T) {
 	s, _ := Open(path)
 	_ = s.Add(rec("done", "c1"))
 	_ = s.Finish("done", 0)
-	_ = s.Add(rec("running", "c1"))
+	running := rec("running", "c1")
+	running.Quest = 42
+	running.Title = "#42 Validate the issue link"
+	_ = s.Add(running)
 
 	again, err := Open(path)
 	if err != nil {
@@ -56,7 +59,7 @@ func TestRestartMarksRunningRecordsLost(t *testing.T) {
 		t.Fatalf("finished record changed: %+v", done)
 	}
 	run, _ := again.Get("running")
-	if !run.Lost || run.Ended == nil || run.ExitCode != -1 {
+	if !run.Lost || run.Ended == nil || run.ExitCode != -1 || run.Quest != 42 || run.Title != "#42 Validate the issue link" {
 		t.Fatalf("running record not marked lost: %+v", run)
 	}
 	// The correction was persisted: a third open sees the same.

@@ -4,9 +4,12 @@ A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents ag
 an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native
 webview shell.
 
-Status: M0-M3 done. M3.5 (GitHub budget, scope and the `gh` shim, `PLAN_M3_5.md`) is done except the deferred SQLite
-copy and write queue (phases C and D). M3.6 (first run and words, `PLAN_EXPERIENCE.md`) is in parallel; M4 (start a hero
-from a quest) is next. Themed words: `GLOSSARY.md`.
+Status: M0-M4 done. M3.5 (GitHub budget, scope and the `gh` shim, `PLAN_M3_5.md`) is done except the deferred SQLite
+copy and write queue (phases C and D). M3.6 (Stitch v4 cockpit shell, first run and words; `PLAN_EXPERIENCE.md`) and
+M4 (quest briefing, launch, and session linkage) are done. M4.5 attention signals are next, followed by M5a's
+sprite-backed graph in the reserved map area. The 15-creature roster and shared sprite art direction are in
+`design/quest-encounters/`;
+future creature art must follow `design/quest-encounters/ART_DIRECTION.md`. Themed words: `GLOSSARY.md`.
 
 ## Scope and principles
 
@@ -143,9 +146,10 @@ design so the work can start from a shared reference.
 
 ## Milestones
 
-M0 skeleton, M1 heroes and terminal, M2 campaigns, M3 GitHub quests, M4 briefing and launch from a quest, M5 spells, M6
-dungeon map, M7 hooks status and notifications, M8 packaging and release. Details in `PLAN.md` §11 and `PLAN_SKILLS.md`
-§7.
+M0 skeleton, M1 heroes and terminal, M2 campaigns, M3 GitHub quests, M3.5 GitHub scope and write guard, M3.6 Stitch
+cockpit shell and first run, M4 briefing and launch from a quest, M4.5 attention, M5a dungeon map, M5b spells, M6 map
+polish, M7 hooks status and notifications, M8 packaging and release. Details in `PLAN_EXPERIENCE.md` §4,
+`PLAN_SKILLS.md` §7 and `release/PLAN_RELEASE.md`.
 
 ## Verifications
 

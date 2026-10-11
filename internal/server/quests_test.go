@@ -47,6 +47,7 @@ type fakeQuests struct {
 	repo      quests.Repo
 	scope     campaign.Scope
 	number    int
+	getCalls  int
 }
 
 func (f *fakeQuests) set(list []quests.Quest, err error) {
@@ -81,6 +82,7 @@ func (f *fakeQuests) Get(_ context.Context, repo quests.Repo, n int) (quests.Det
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.repo, f.number = repo, n
+	f.getCalls++
 	d := f.detail
 	d.Number = n
 	return d, f.err
@@ -364,9 +366,15 @@ func TestQuestDetail(t *testing.T) {
 		CommentList: []quests.Comment{{Author: "bob", Body: "me too"}},
 	}
 	resp, out := e.req("GET", "/api/campaigns/"+e.campaign+"/quests/42", nil, nil)
-	var d quests.Detail
+	var d struct {
+		quests.Detail
+		Briefing struct {
+			Content       string `json:"content"`
+			CommentsShown int    `json:"commentsShown"`
+		} `json:"briefing"`
+	}
 	_ = json.Unmarshal(out, &d)
-	if resp.StatusCode != http.StatusOK || d.Number != 42 || d.Body == "" || len(d.CommentList) != 1 || e.gh.number != 42 {
+	if resp.StatusCode != http.StatusOK || d.Number != 42 || d.Body == "" || len(d.CommentList) != 1 || e.gh.number != 42 || !strings.Contains(d.Briefing.Content, "Fix it") || d.Briefing.CommentsShown != 1 {
 		t.Fatalf("%d %s", resp.StatusCode, out)
 	}
 	// Not found.

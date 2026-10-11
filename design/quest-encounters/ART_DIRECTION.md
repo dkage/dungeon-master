@@ -56,6 +56,14 @@ without rebuilding the layout.
   dark outline, cool edge light, controlled warm highlights, and a silhouette
   readable in roughly 58 × 70 px. The surrounding room can carry red jewel
   detail without making every creature red.
+- Match those references closely for every new sprite: one three-quarter side
+  view, consistent dark outline weight, cool blue ambient and rim light from
+  the same direction, restrained amber highlights, painterly pixel-art
+  influence, muted materials, and the same 2172 × 724 four-frame strip with
+  transparent background and shared baseline. Keep the character centered in
+  each 543 × 724 cell; use only the silhouette, anatomy, and idle motion to
+  distinguish species. Do not add a ground plane, scene lighting changes,
+  decorative particles, UI, text, or franchise-specific features.
 - Future low-tier creatures should vary in body shape and motion so common
   quests do not all look alike. Keep camera angle, lighting, frame size, and
   animation baseline consistent across the roster.
