@@ -30,6 +30,8 @@ Each is one sheet of four idle frames, transparent, 2172 × 724 px (cells 543 ×
 
 - [x] `quest-encounters/assets/stone-floor.png`: dark stone floor, 1254 × 1254, opaque. The dungeon view's backdrop.
 - [x] `stitch-prototype/assets/images/stone-floor.png`: the same floor at 512 × 512 (prototype copy).
+- [x] `stitch-prototype/assets/images/slate.png`: dark slate, 1254 × 1254, opaque, generated for this project. Panel
+  backgrounds in the prototype.
 - [x] `stitch-prototype/assets/images/6a8650faf410.png` and `97785ef87771.png`: one parchment texture, byte-identical,
   288 × 512, opaque. The terminal's page background. AI-generated (confirmed by the author).
 
@@ -45,8 +47,8 @@ Each is one sheet of four idle frames, transparent, 2172 × 724 px (cells 543 ×
 ### Removed
 
 - The slate texture (a screenshot from another project) and two screenshots of other projects' fantasy UI kits were
-  taken out of the prototype. Its pages now show their dark gradient without the texture layer. A new slate texture is
-  on the list below. The app itself never used any of them; it draws its panels with CSS only.
+  taken out of the prototype. The generated replacement slate is in (see Textures) and the pages use it again. The app
+  itself never used any of them; it draws its panels with CSS only.
 
 ## How to use the prompts
 
@@ -94,8 +96,9 @@ the scale and style stay consistent. A flicker of torchlight is done in code.
 
 ## To make: backgrounds, tileable, opaque
 
-- [ ] `slate-panel.jpg`, 512 × 512, seamless, JPG quality 85: replaces the removed slate texture, behind the side
-  panels.
+- [x] `stitch-prototype/assets/images/slate.png`, done: the slate that replaces the removed texture, behind the side
+  panels. It arrived as a 1254 × 1254 PNG of 3.5 MB instead of the planned 512 × 512 JPG; downscale it when the app
+  starts using it. Not yet checked for seamless tiling.
   > Seamless tileable texture, 512 × 512: dark slate rock, near black with a hint of warm brown, fine grain and a few
   > shallow cracks, low contrast, even light with no focal point, no text. Match the tone and lighting of the attached
   > stone floor (our own `stone-floor.png`, the only reference to attach). Original, not derived from any photograph
