@@ -21,6 +21,7 @@ const baseState: AppState = {
 function fakeClient(over: Partial<Client> = {}, state: Partial<AppState> = {}): Client {
   return {
     getState: vi.fn(async () => ({ ...baseState, ...state })),
+    getSessions: vi.fn(async () => []),
     createSession: vi.fn(async (req) => sess('s1', req.campaign, { kind: req.shell ? 'shell' : 'hero', quest: req.quest })),
     deleteSession: vi.fn(async () => undefined),
     addCampaign: vi.fn(async (i) => camp('cnew', { dir: i.dir, name: i.name ?? 'new' })),
@@ -718,5 +719,68 @@ describe('scope', () => {
     expect(await s.chooseScope({ mode: 'all', labels: [] })).toBe(false)
     await s.loadScopeOptions()
     expect(c.getScopeOptions).not.toHaveBeenCalled()
+  })
+})
+
+describe('session attention', () => {
+  const waiting = (id: string, over: Partial<SessionInfo> = {}) => sess(id, 'c1', { activity: 'needs-you', ...over })
+
+  it('merges activity into the sessions on screen and does not bring back closed ones', async () => {
+    const client = fakeClient({ getSessions: vi.fn(async () => [waiting('a'), waiting('closed')]) })
+    const s = new AppStore(client)
+    s.sessions = [sess('a', 'c1', { activity: 'working' }), sess('b', 'c1', { activity: 'working' })]
+    await s.refreshSessions()
+    expect(s.sessions.map((x) => [x.id, x.activity])).toEqual([['a', 'needs-you'], ['b', 'working']])
+    expect(s.attention.map((x) => x.id)).toEqual(['a'])
+  })
+
+  it('keeps a session ended in the terminal even if the list is a moment behind', async () => {
+    const s = new AppStore(fakeClient({ getSessions: vi.fn(async () => [sess('a')]) }))
+    s.sessions = [sess('a', 'c1', { exited: true, exitCode: 3 })]
+    await s.refreshSessions()
+    expect(s.sessions[0]).toMatchObject({ exited: true, exitCode: 3 })
+  })
+
+  it('clears the badge once the user looks at the session, and again when it asks anew', async () => {
+    const list = vi.fn(async () => [waiting('a')])
+    const s = new AppStore(fakeClient({ getSessions: list }))
+    s.sessions = [sess('a')]
+    s.activeId = 'a'
+    await s.refreshSessions()
+    expect(s.attention).toHaveLength(1)
+    s.attend(false) // another tab or window is in front
+    expect(s.attention).toHaveLength(1)
+    s.attend(true)
+    expect(s.attention).toHaveLength(0)
+    await s.refreshSessions() // still the same wait: stays cleared
+    expect(s.attention).toHaveLength(0)
+    list.mockResolvedValue([sess('a', 'c1', { activity: 'working' })])
+    await s.refreshSessions()
+    list.mockResolvedValue([waiting('a')])
+    await s.refreshSessions() // a new question
+    expect(s.attention).toHaveLength(1)
+  })
+
+  it('does not count a different session as looked at', async () => {
+    const s = new AppStore(fakeClient({ getSessions: vi.fn(async () => [waiting('a'), waiting('b')]) }))
+    s.sessions = [sess('a'), sess('b')]
+    s.activeId = 'a'
+    await s.refreshSessions()
+    s.attend(true)
+    expect(s.attention.map((x) => x.id)).toEqual(['b'])
+  })
+
+  it('shows the sign-in screen when the poll is refused', async () => {
+    const s = new AppStore(fakeClient({ getSessions: err(401, 'nope') }))
+    await s.refreshSessions()
+    expect(s.unauthorised).toBe(true)
+  })
+
+  it('ignores other poll failures and keeps what is on screen', async () => {
+    const s = new AppStore(fakeClient({ getSessions: err(500, 'down') }))
+    s.sessions = [sess('a', 'c1', { activity: 'idle' })]
+    await s.refreshSessions()
+    expect(s.unauthorised).toBe(false)
+    expect(s.sessions[0].activity).toBe('idle')
   })
 })

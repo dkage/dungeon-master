@@ -21,7 +21,7 @@ const sess = (id: string, campaign: string, over: Partial<SessionInfo> = {}): Se
 
 function store(setup: (s: AppStore) => void = () => {}) {
   const s = new AppStore({
-    getState: vi.fn(), createSession: vi.fn(), deleteSession: vi.fn(),
+    getState: vi.fn(), getSessions: vi.fn(async () => []), createSession: vi.fn(), deleteSession: vi.fn(),
     addCampaign: vi.fn(), updateCampaign: vi.fn(), removeCampaign: vi.fn(),
     getQuests: vi.fn(), getQuest: vi.fn(), previewQuestLaunch: vi.fn(async () => ({
       content: '# Task briefing\n\nReviewable context.', truncated: false, commentsShown: 1, commentsTotal: 1,

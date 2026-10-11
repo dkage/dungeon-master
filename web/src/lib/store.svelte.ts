@@ -3,10 +3,11 @@ import type {
   AppState, Campaign, CampaignInput, CampaignPatch, GithubStatus, Hero, HeroesConfig, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
   SessionInfo,
 } from './api'
+import { stillWaiting, unattended } from './attention'
 
 export type Client = Pick<
   typeof realApi,
-  | 'getState' | 'createSession' | 'deleteSession' | 'addCampaign' | 'updateCampaign' | 'removeCampaign'
+  | 'getState' | 'getSessions' | 'createSession' | 'deleteSession' | 'addCampaign' | 'updateCampaign' | 'removeCampaign'
   | 'getQuests' | 'getQuest' | 'previewQuestLaunch' | 'getGithub' | 'setScope' | 'getScopeOptions' | 'getProjectSuggestions' | 'createSampleCampaign'
   | 'adoptStarterHeroes' | 'getHeroesConfig' | 'saveHeroesConfig' | 'pickFolder' | 'openCampaignFolder'
 >
@@ -91,6 +92,8 @@ export class AppStore {
   sessions = $state<SessionInfo[]>([])
   campaignId = $state<string | null>(load(CAMPAIGN_KEY) || null)
   activeId = $state<string | null>(null)
+  /** Sessions whose current wait the user has already looked at. */
+  seen = $state<Set<string>>(new Set())
   error = $state<string | null>(null)
   busy = $state(false)
 
@@ -586,6 +589,36 @@ export class AppStore {
     if (this.activeId === id) {
       const after = campaign ? this.sessionsOf(campaign) : []
       this.activeId = after[Math.min(i, after.length - 1)]?.id ?? null
+    }
+  }
+
+  /** Live sessions waiting for the user that the user has not looked at. */
+  get attention(): SessionInfo[] {
+    return unattended(this.sessions, this.seen)
+  }
+
+  /**
+   * Reads every session's activity. Only sessions already on screen are
+   * updated, so a session closed a moment ago is not brought back.
+   */
+  async refreshSessions() {
+    try {
+      const fresh = new Map((await this.client.getSessions()).map((s) => [s.id, s]))
+      this.sessions = this.sessions.map((s) => {
+        const n = fresh.get(s.id)
+        return n ? { ...s, exited: s.exited || n.exited, exitCode: s.exited ? s.exitCode : n.exitCode, activity: n.activity, lost: n.lost } : s
+      })
+      this.seen = stillWaiting(this.sessions, this.seen)
+    } catch (e) {
+      if ((e as { status?: number }).status === 401) this.unauthorised = true
+    }
+  }
+
+  /** The user is looking at the open session: its wait no longer needs a badge. */
+  attend(viewing: boolean) {
+    const a = this.active
+    if (viewing && a && !a.exited && a.activity === 'needs-you' && !this.seen.has(a.id)) {
+      this.seen = new Set([...this.seen, a.id])
     }
   }
 

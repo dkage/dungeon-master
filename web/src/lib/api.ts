@@ -251,6 +251,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T 
   return data as T
 }
 
+export const getSessions = () => call<SessionInfo[]>('GET', '/api/sessions') as Promise<SessionInfo[]>
 export const getState = () => call<AppState>('GET', '/api/state') as Promise<AppState>
 export const getProjectSuggestions = () =>
   call<ProjectSuggestion[]>('GET', '/api/onboarding/suggestions') as Promise<ProjectSuggestion[]>
