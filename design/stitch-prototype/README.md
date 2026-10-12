@@ -4,8 +4,8 @@ The most recent full-window prototype of the cockpit, generated in Google Stitch
 Cockpit"). It is the visual baseline for the Dungeon pack, the default theme (`docs/design/ui.md` §6.5): left panel, terminal
 and right panel with the quest map and detail, in the gothic, Diablo-like style.
 
-It supersedes the first prototype, `design/quest-encounters/` (a right-panel study); that folder's `ART_DIRECTION.md`
-still describes the material and hierarchy rules.
+It supersedes the first prototype, `design/quest-encounters/` (a right-panel study). The material and hierarchy rules
+are in `docs/design/art-direction.md`.
 
 Open any `index.html` in a browser. The pages work offline: images and fonts live in `assets/`.
 
