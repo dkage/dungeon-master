@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -29,23 +28,8 @@ func (s *Server) handleQuests(w http.ResponseWriter, r *http.Request) {
 		questsErr(w, err, c.Repo)
 		return
 	}
-	var picks map[int]string
-	res.Quests, picks = quests.Annotate(res.Quests, c)
-	s.rememberCreatures(c.ID, picks)
+	res.Quests = quests.Annotate(res.Quests, c)
 	writeJSON(w, http.StatusOK, res)
-}
-
-// rememberCreatures stores first-time creature choices, which the design makes
-// the long-term source of truth (docs/design/creature-roster.md). Failing to
-// save is survivable, because the choice is deterministic and is made again
-// next time, but it is logged so a read-only state directory is not silent.
-func (s *Server) rememberCreatures(id string, picks map[int]string) {
-	if len(picks) == 0 {
-		return
-	}
-	if err := s.cfg.Campaigns.RememberCreatures(id, picks); err != nil && !errors.Is(err, campaign.ErrNotFound) {
-		log.Printf("could not save creature choices: %v", err)
-	}
 }
 
 // handleEffortLabels replaces the campaign's mapping from its own labels to
@@ -149,8 +133,7 @@ func (s *Server) handleQuest(w http.ResponseWriter, r *http.Request) {
 		questsErr(w, err, c.Repo)
 		return
 	}
-	d, picks := quests.AnnotateDetail(d, c)
-	s.rememberCreatures(c.ID, picks)
+	d = quests.AnnotateDetail(d, c)
 	writeJSON(w, http.StatusOK, struct {
 		quests.Detail
 		Briefing briefing.Result `json:"briefing"`

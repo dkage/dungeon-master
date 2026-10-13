@@ -111,7 +111,6 @@ func TestAnnotate(t *testing.T) {
 		ID: "c1", Repo: "acme/app",
 		EffortLabels:    map[string]string{"size/s": EffortLow},
 		EffortOverrides: map[int]string{3: EffortHigh},
-		Creatures:       map[int]string{1: "cave-slime", 2: "orc-raider"},
 	}
 	in := []Quest{
 		{Number: 1, Labels: labels("effort:trivial")},
@@ -120,21 +119,18 @@ func TestAnnotate(t *testing.T) {
 		{Number: 4, Labels: labels("bug")},
 		{Number: 5, Labels: labels("effort:low", "effort:high", "priority:urgent")},
 	}
-	out, picks := Annotate(in, c)
+	out := Annotate(in, c)
 	if in[0].Effort != "" || in[0].Creature != "" {
 		t.Fatal("Annotate changed its input, which may be cached")
 	}
-	if out[0].Creature != "cave-slime" {
-		t.Errorf("#1 should keep its stored creature: %s", out[0].Creature)
+	if want := CreatureFor(EffortTrivial, "acme/app", 1); out[0].Creature != want {
+		t.Errorf("#1 creature %s, want the stable choice %s", out[0].Creature, want)
 	}
 	if out[1].Effort != EffortLow || out[1].EffortSource != "mapping" || CreatureTier(out[1].Creature) != EffortLow {
-		t.Errorf("#2 stored creature is from another tier, so the tier wins: %+v", out[1])
+		t.Errorf("#2 mapped to low, so its creature is from the low tier: %+v", out[1])
 	}
-	if _, ok := picks[2]; ok {
-		t.Error("#2 already has a stored choice; it must not be replaced")
-	}
-	if out[2].Effort != EffortHigh || out[2].EffortSource != "override" || picks[3] != out[2].Creature {
-		t.Errorf("#3 override: %+v picks %v", out[2], picks)
+	if out[2].Effort != EffortHigh || out[2].EffortSource != "override" || CreatureTier(out[2].Creature) != EffortHigh {
+		t.Errorf("#3 override: %+v", out[2])
 	}
 	if out[3].Effort != "" || out[3].Creature != "" {
 		t.Errorf("#4 has no effort and must get no creature: %+v", out[3])
@@ -142,13 +138,10 @@ func TestAnnotate(t *testing.T) {
 	if out[4].Effort != "" || len(out[4].EffortConflict) != 2 || out[4].Creature != "" || out[4].Priority != "urgent" {
 		t.Errorf("#5 conflict: %+v", out[4])
 	}
-	if len(picks) != 1 {
-		t.Errorf("only #3 is a first-time choice: %v", picks)
-	}
 }
 
 func TestAnnotateWithoutARepoUsesTheCampaign(t *testing.T) {
-	a, _ := Annotate([]Quest{{Number: 7, Labels: labels("effort:high")}}, campaign.Campaign{ID: "one"})
+	a := Annotate([]Quest{{Number: 7, Labels: labels("effort:high")}}, campaign.Campaign{ID: "one"})
 	if a[0].Creature == "" || CreatureTier(a[0].Creature) != EffortHigh {
 		t.Fatalf("no creature for a campaign without a repository: %+v", a[0])
 	}

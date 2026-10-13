@@ -141,44 +141,30 @@ func CreatureTier(id string) string {
 }
 
 // Annotate fills each quest's effort, priority and creature from its labels
-// and the campaign's local settings. It returns new slices, never touching
-// the input (which may be cached), plus the creature choices made for the
-// first time, which the caller should remember.
-func Annotate(qs []Quest, c campaign.Campaign) ([]Quest, map[int]string) {
+// and the campaign's local settings. It returns a new slice, never touching
+// the input (which may be cached). Nothing is stored: the creature follows from
+// the tier, the repository and the issue number alone.
+func Annotate(qs []Quest, c campaign.Campaign) []Quest {
 	out := make([]Quest, len(qs))
-	picks := map[int]string{}
 	for i, q := range qs {
-		out[i] = annotate(q, c, picks)
+		out[i] = annotate(q, c)
 	}
-	return out, picks
+	return out
 }
 
 // AnnotateDetail is Annotate for one opened issue.
-func AnnotateDetail(d Detail, c campaign.Campaign) (Detail, map[int]string) {
-	picks := map[int]string{}
-	d.Quest = annotate(d.Quest, c, picks)
-	return d, picks
+func AnnotateDetail(d Detail, c campaign.Campaign) Detail {
+	d.Quest = annotate(d.Quest, c)
+	return d
 }
 
-func annotate(q Quest, c campaign.Campaign, picks map[int]string) Quest {
+func annotate(q Quest, c campaign.Campaign) Quest {
 	e := ResolveEffort(q.Labels, c.EffortLabels, c.EffortOverrides[q.Number])
 	q.Effort, q.EffortSource, q.EffortConflict = e.Tier, e.Source, e.Conflict
 	q.Priority, q.PriorityConflict = ResolvePriority(q.Labels)
 	q.Creature = ""
-	if e.Tier == "" {
-		return q
-	}
-	stored := c.Creatures[q.Number]
-	switch {
-	case stored != "" && CreatureTier(stored) == e.Tier:
-		q.Creature = stored
-	case stored != "":
-		// The tier changed since the choice was stored: follow the tier, and
-		// keep the stored choice for when it changes back.
+	if e.Tier != "" {
 		q.Creature = CreatureFor(e.Tier, repoKey(c), q.Number)
-	default:
-		q.Creature = CreatureFor(e.Tier, repoKey(c), q.Number)
-		picks[q.Number] = q.Creature
 	}
 	return q
 }

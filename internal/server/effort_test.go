@@ -35,10 +35,6 @@ func TestQuestsCarryEffortPriorityAndCreature(t *testing.T) {
 	if three := questByNumber(t, out, 3); three.Effort != "" || three.Creature != "" {
 		t.Fatalf("#3 has no effort label and must stay unknown: %+v", three)
 	}
-	// The first choice is remembered in local state only.
-	if c, _ := e.cfg.Campaigns.Get(e.campaign); c.Creatures[1] != one.Creature {
-		t.Fatalf("creature not remembered: %v", c.Creatures)
-	}
 
 	// Map the team's own label to a tier.
 	resp, body := e.req("PUT", "/api/campaigns/"+e.campaign+"/effort-labels", map[string]any{"labels": map[string]string{"size/s": "low"}}, nil)

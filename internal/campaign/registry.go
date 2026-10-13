@@ -60,9 +60,6 @@ type Campaign struct {
 	EffortLabels map[string]string `json:"effortLabels"`
 	// EffortOverrides sets an issue's effort tier locally, by issue number.
 	EffortOverrides map[int]string `json:"effortOverrides"`
-	// Creatures remembers which creature each issue was given, so the choice
-	// survives edits to the issue and additions to the roster. Local only.
-	Creatures map[int]string `json:"-"`
 }
 
 // Scope modes.
@@ -120,7 +117,6 @@ type record struct {
 
 	EffortLabels    map[string]string `json:"effortLabels,omitempty"`
 	EffortOverrides map[int]string    `json:"effortOverrides,omitempty"`
-	Creatures       map[int]string    `json:"creatures,omitempty"`
 }
 
 type file struct {
@@ -342,7 +338,6 @@ func (r *Registry) view(rec record) Campaign {
 		GitRoot: d.gitRoot, Repo: d.repo,
 		EffortLabels:    copyMap(rec.EffortLabels),
 		EffortOverrides: copyMap(rec.EffortOverrides),
-		Creatures:       copyMap(rec.Creatures),
 	}
 }
 

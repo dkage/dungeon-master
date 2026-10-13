@@ -2,6 +2,7 @@ package campaign
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -25,30 +26,15 @@ func TestEffortSettingsPersistAndAreCopied(t *testing.T) {
 	if _, err := r.SetEffortOverride(c.ID, 7, "high"); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.RememberCreatures(c.ID, map[int]string{7: "orc-raider"}); err != nil {
-		t.Fatal(err)
-	}
 
 	got, _ := r.Get(c.ID)
 	got.EffortLabels["size/s"] = "extreme" // a copy: must not reach the registry
-	got.Creatures[7] = "crypt-lich"
 
 	again := newReg(t, state, &fakeGit{})
 	re, ok := again.Get(c.ID)
 	if !ok || re.EffortLabels["size/s"] != "low" || re.EffortLabels["size/xl"] != "extreme" ||
-		re.EffortOverrides[7] != "high" || re.Creatures[7] != "orc-raider" {
+		re.EffortOverrides[7] != "high" {
 		t.Fatalf("reloaded: %+v", re)
-	}
-}
-
-func TestRememberCreaturesKeepsTheFirstChoice(t *testing.T) {
-	r := newReg(t, "", &fakeGit{})
-	c, _ := r.Add(context.Background(), Input{Dir: t.TempDir()})
-	_ = r.RememberCreatures(c.ID, map[int]string{1: "cave-bat"})
-	_ = r.RememberCreatures(c.ID, map[int]string{1: "dungeon-rat", 2: "cave-slime", 3: ""})
-	got, _ := r.Get(c.ID)
-	if got.Creatures[1] != "cave-bat" || got.Creatures[2] != "cave-slime" || len(got.Creatures) != 2 {
-		t.Fatalf("creatures: %v", got.Creatures)
 	}
 }
 
@@ -86,9 +72,6 @@ func TestEffortSettingsValidation(t *testing.T) {
 	if _, err := r.SetEffortLabels("nope", nil); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown campaign: %v", err)
 	}
-	if err := r.RememberCreatures("nope", map[int]string{1: "cave-bat"}); !errors.Is(err, ErrNotFound) {
-		t.Errorf("unknown campaign: %v", err)
-	}
 }
 
 func TestEffortSaveFailureKeepsTheOldValue(t *testing.T) {
@@ -118,4 +101,27 @@ func many(n int) map[string]string {
 		m[strings.Repeat("a", 1+i%40)+string(rune('a'+i%26))+string(rune('a'+i/26))] = "low"
 	}
 	return m
+}
+
+func TestAStateFileWithTheOldCreaturesKeyStillLoads(t *testing.T) {
+	state := filepath.Join(t.TempDir(), "campaigns.json")
+	r := newReg(t, state, &fakeGit{})
+	c, err := r.Add(context.Background(), Input{Dir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(state)
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["campaigns"].([]any)[0].(map[string]any)["creatures"] = map[string]string{"7": "cave-bat"}
+	raw, _ = json.Marshal(doc)
+	if err := os.WriteFile(state, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	again := newReg(t, state, &fakeGit{})
+	if _, ok := again.Get(c.ID); !ok {
+		t.Fatal("a state file saved by an earlier version must still load")
+	}
 }

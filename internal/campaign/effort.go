@@ -70,26 +70,6 @@ func (r *Registry) SetEffortOverride(id string, number int, tier string) (Campai
 	})
 }
 
-// RememberCreatures stores creature choices for issues that have none yet.
-// An issue keeps its first creature, so existing choices are never replaced.
-func (r *Registry) RememberCreatures(id string, picks map[int]string) error {
-	_, err := r.change(id, func(rec *record) bool {
-		changed := false
-		for n, c := range picks {
-			if _, ok := rec.Creatures[n]; ok || c == "" {
-				continue
-			}
-			if rec.Creatures == nil {
-				rec.Creatures = map[int]string{}
-			}
-			rec.Creatures[n] = c
-			changed = true
-		}
-		return changed
-	})
-	return err
-}
-
 // change applies fn to a copy of the campaign's record and saves it when fn
 // reports a change, restoring the old record if the save fails.
 func (r *Registry) change(id string, fn func(rec *record) bool) (Campaign, error) {
@@ -102,7 +82,6 @@ func (r *Registry) change(id string, fn func(rec *record) bool) (Campaign, error
 		rec := cur
 		rec.EffortLabels = copyMap(cur.EffortLabels)
 		rec.EffortOverrides = copyMap(cur.EffortOverrides)
-		rec.Creatures = copyMap(cur.Creatures)
 		if !fn(&rec) {
 			return r.view(cur), nil
 		}
