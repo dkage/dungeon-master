@@ -62,6 +62,13 @@
     ]).then(() => {
       term.options.fontFamily = terminalTypography().fontFamily + ' '
       term.options.fontFamily = terminalTypography().fontFamily
+      // The cell width changed but the frame did not, so the resize observer
+      // stays quiet: refit, or the last columns run under the frame.
+      try {
+        fit.fit()
+      } catch {
+        /* hidden or zero-sized: fit on the next resize */
+      }
     }).catch(() => {})
     const fit = new FitAddon()
     term.loadAddon(fit)
@@ -119,7 +126,11 @@
 </script>
 
 <div class="term-wrap">
-  <div class="term" bind:this={host} data-testid="terminal" data-term-theme={theme}></div>
+  <!-- The addon measures its parent's width and ignores that parent's padding, so xterm
+       lives in an unpadded host inside the padded frame. -->
+  <div class="term" data-testid="terminal" data-term-theme={theme}>
+    <div class="term-host" bind:this={host}></div>
+  </div>
   {#if status !== 'live'}
     <div class="term-status" data-status={status} role="status">
       {status === 'connecting' ? 'Connecting…' : status === 'exited' ? `Session ${detail}` : `Disconnected: ${detail}`}

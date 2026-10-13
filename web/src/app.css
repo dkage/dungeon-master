@@ -134,6 +134,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .term-wrap { position: relative; height: 100%; }
 .term { height: 100%; padding: 8px; }
+.term-host { height: 100%; }
 .term-status { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 12px; background: var(--panel); color: var(--muted); border-top: 1px solid var(--line); }
 .term-status[data-status='disconnected'] { color: var(--error); }
 

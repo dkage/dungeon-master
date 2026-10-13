@@ -208,6 +208,25 @@ test('launch a hero, see its output, type to it', async ({ page }) => {
   await expect(term).toContainText('echo:hello dungeon')
 })
 
+test('the terminal text stays inside its frame once the fonts have loaded', async ({ page }) => {
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  const pane = page.locator('.pane:not([hidden])')
+  await page.evaluate(() => document.fonts.ready)
+  // The screen must end before the frame's right padding starts.
+  await expect
+    .poll(async () =>
+      pane.evaluate((el) => {
+        const frame = el.querySelector('.term') as HTMLElement
+        const screen = el.querySelector('.xterm-screen') as HTMLElement
+        const pad = parseFloat(getComputedStyle(frame).paddingRight)
+        return Math.round(frame.getBoundingClientRect().right - pad - screen.getBoundingClientRect().right)
+      }),
+    )
+    .toBeGreaterThanOrEqual(-2)
+})
+
 test('the parchment shows behind output in Dungeon, a flat page in Neutral', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()
