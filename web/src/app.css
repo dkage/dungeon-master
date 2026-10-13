@@ -129,6 +129,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .stage { flex: 1; min-height: 0; position: relative; background: var(--term-bg); }
 .pane { position: absolute; inset: 0; }
+.backend-down { flex: none; padding: 4px 12px; font-size: 12px; color: #1b1205; background: #e0a82e; }
 .pane[hidden] { display: none; }
 .empty { color: var(--muted); padding: 32px; margin: 0; }
 

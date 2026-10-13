@@ -4,6 +4,8 @@
   import Sidebar from './lib/Sidebar.svelte'
   import Toolbar from './lib/Toolbar.svelte'
   import Terminal from './lib/Terminal.svelte'
+  import { connection, UNREACHABLE_NOTE } from './lib/connection.svelte'
+  import { pingBackend } from './lib/api'
   import QuestsPanel from './lib/QuestsPanel.svelte'
   import StartHere from './lib/StartHere.svelte'
   import SettingsDialog from './lib/SettingsDialog.svelte'
@@ -28,6 +30,7 @@
   const QUESTS_EVERY = 60_000
   // Sessions are local and cheap to read, so their activity is read often.
   const SESSIONS_EVERY = 2_000
+  const HEARTBEAT_EVERY = 4_000
   const BASE_TITLE = 'Dungeon Master'
 
   // Is the user really looking at this window? A visible tab in a background window is not.
@@ -99,6 +102,7 @@
     const sessions = setInterval(() => {
       if (!store.unauthorised && store.sessions.length > 0) void store.refreshSessions()
     }, SESSIONS_EVERY)
+    const heartbeat = setInterval(() => void pingBackend(), HEARTBEAT_EVERY)
     const budget = setInterval(() => visible() && store.loadGithub(), BUDGET_EVERY)
     const quests = setInterval(() => {
       if (visible() && store.campaignId && !store.unauthorised) void store.loadQuests(false, true)
@@ -112,6 +116,7 @@
     document.addEventListener('visibilitychange', onFocus)
     return () => {
       clearInterval(budget)
+      clearInterval(heartbeat)
       clearInterval(sessions)
       window.removeEventListener('focus', look)
       window.removeEventListener('blur', look)
@@ -226,6 +231,9 @@
         </p>
       {/if}
     </main>
+    {#if connection.unreachable}
+      <footer class="backend-down" role="status" data-testid="backend-down">{UNREACHABLE_NOTE}</footer>
+    {/if}
   </div>
   <QuestsPanel {store} />
   {#each ['sidebar', 'quests'] as const as edge (edge)}

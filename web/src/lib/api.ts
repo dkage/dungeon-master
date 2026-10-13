@@ -1,5 +1,6 @@
 // Typed client for the Dungeon Master server. Every write sends application/json,
 // which the server's guard requires.
+import { connection } from './connection.svelte'
 
 export interface Hero {
   id: string
@@ -242,12 +243,19 @@ export class ApiError extends Error {
 async function call<T>(method: string, path: string, body?: unknown): Promise<T | undefined> {
   const headers: Record<string, string> = {}
   if (method !== 'GET') headers['Content-Type'] = 'application/json'
-  const res = await fetch(path, {
-    method,
-    headers,
-    credentials: 'same-origin',
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+  let res: Response
+  try {
+    res = await fetch(path, {
+      method,
+      headers,
+      credentials: 'same-origin',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  } catch (e) {
+    connection.reportApi(false)
+    throw e
+  }
+  connection.reportApi(true) // any answer, even an error status, means the backend is there
   if (res.status === 204) return undefined
   let data: unknown
   try {
@@ -332,3 +340,15 @@ export interface AppearanceState {
 export const getAppearance = () => call<AppearanceState>('GET', '/api/appearance') as Promise<AppearanceState>
 export const saveAppearance = (settings: Partial<UISettings>) =>
   call<AppearanceState>('PUT', '/api/appearance', settings) as Promise<AppearanceState>
+
+/** A cheap request that only asks whether the backend answers; the result goes to the connection state. */
+export async function pingBackend(): Promise<boolean> {
+  try {
+    await fetch('/api/health', { credentials: 'same-origin' })
+    connection.reportApi(true)
+    return true
+  } catch {
+    connection.reportApi(false)
+    return false
+  }
+}
