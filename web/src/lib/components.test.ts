@@ -607,6 +607,18 @@ describe('QuestDetail', () => {
     }
   })
 
+  it('marks open prerequisites in the launch note and the jump list', async () => {
+    const d = detail({ state: 'locked', blockedBy: [{ number: 5, title: 'A', closed: false }, { number: 6, title: 'B', closed: false }] })
+    const { container } = render(QuestDetail, { store: open(d) })
+    const note = container.querySelector('.launch-note')!
+    expect([...note.querySelectorAll('.mark')].map((m) => m.textContent)).toEqual(['○', '○'])
+    for (const l of note.querySelectorAll('.link')) expect(l.textContent?.startsWith('#')).toBe(true)
+    await fireEvent.click(screen.getByRole('button', { name: /Jump to prerequisite/ }))
+    const item = within(screen.getByRole('list', { name: 'Prerequisites' })).getByRole('button', { name: /#5 A/ })
+    expect(item.textContent?.startsWith('#')).toBe(true)
+    expect(item.parentElement?.querySelector('.mark')?.textContent).toBe('○')
+  })
+
   it('never renders script from an issue body', () => {
     const { container } = render(QuestDetail, { store: open(detail()) })
     expect(container.querySelector('script')).toBeNull()

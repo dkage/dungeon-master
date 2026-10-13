@@ -203,6 +203,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .rel ul { list-style: none; margin: 0; padding: 0; }
 .mark { display: inline-block; width: 1.2em; color: var(--muted); }
 .mark.done { color: #2fb36a; }
+.mark.inline { width: auto; margin-right: .3em; }
 .md { overflow-wrap: anywhere; }
 .md :first-child { margin-top: 0; }
 /* Headings inside issue text are content, not the small section labels the global h2 style is for. */

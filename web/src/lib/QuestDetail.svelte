@@ -216,7 +216,7 @@
           {#if jumpOpen && openBlockers.length > 1}
             <ul class="jump-list" aria-label="Prerequisites">
               {#each openBlockers as b (b.number)}
-                <li><button type="button" class="link" onclick={() => { jumpOpen = false; void store.jumpToQuest(b.number) }}>#{b.number}{b.title ? ` ${b.title}` : ''}</button></li>
+                <li><span class="mark" class:done={b.closed}>{b.closed ? '✓' : '○'}</span><button type="button" class="link" onclick={() => { jumpOpen = false; void store.jumpToQuest(b.number) }}>#{b.number}{b.title ? ` ${b.title}` : ''}</button></li>
               {/each}
             </ul>
           {/if}
@@ -273,7 +273,7 @@
       {:else if d.state === 'locked'}
         <p class="launch-note">
           Blocked by
-          {#each openBlockers as b, i (b.number)}{i > 0 ? ', ' : ''}<button type="button" class="link" onclick={() => store.jumpToQuest(b.number)}>#{b.number}</button>{/each}.
+          {#each openBlockers as b, i (b.number)}{i > 0 ? ', ' : ''}<span class="mark inline" class:done={b.closed}>{b.closed ? '✓' : '○'}</span><button type="button" class="link" onclick={() => store.jumpToQuest(b.number)}>#{b.number}</button>{/each}.
           It can start once {openBlockers.length === 1 ? 'that is' : 'those are'} closed.
         </p>
       {:else if d.state === 'cleared'}<p class="launch-note">Closed issues cannot be started.</p>
