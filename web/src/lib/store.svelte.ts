@@ -10,6 +10,7 @@ import type {
 import { stillWaiting, unattended } from './attention'
 import { buildModel, placeOf, type MapModel } from './map/model'
 import { pickToNotify } from './notify'
+import { TERMINAL_ACTION } from './termSearch'
 
 export type Client = Pick<
   typeof realApi,
@@ -240,6 +241,11 @@ export class AppStore {
       case 'show-map': this.reveal('map'); return this.setPanelView('map')
       case 'show-list': this.reveal('map'); return this.setPanelView('list')
       case 'open-settings': return openSettings()
+      case 'search-terminal':
+      case 'terminal-latest':
+        // The visible terminal listens; this is not layout state.
+        if (this.active && !this.active.lost) window.dispatchEvent(new CustomEvent(TERMINAL_ACTION, { detail: id }))
+        return
       case 'next-session':
       case 'previous-session': {
         const mine = this.campaignId ? this.sessionsOf(this.campaignId).filter((s) => !s.lost) : []

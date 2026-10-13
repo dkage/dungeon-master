@@ -83,7 +83,7 @@ Initial actions: expand each of the four regions, restore split, show map, show 
 session. A command palette can use the same action registry later; do not show nonfunctional palette or launch actions.
 
 Implemented defaults: Ctrl+Shift+1 through 4 for expansion (Control, not Cmd, on macOS, where Cmd+Shift+3/4 are
-screenshots), Ctrl+Shift+0 to restore, Mod+, (Cmd on macOS) for Settings, and Ctrl+PageDown/PageUp for session navigation where the host permits them.
+screenshots), Ctrl+Shift+0 to restore, Mod+, (Cmd on macOS) for Settings, and Ctrl+PageDown/PageUp for session navigation where the host permits them. Terminal output search is Ctrl+Shift+F and jumping to the latest output is Ctrl+Shift+End (#91); plain Ctrl+F and Ctrl+End stay with the agent.
 Use platform labels and record native-shell alternatives separately; desktop/browser conflicts need practical checks.
 Settings must explain when the browser or operating system owns a proposed key and keep the button alternative.
 Do not intercept browser close/quit/reload keys, unmodified typing or standard clipboard shortcuts.

@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import { Terminal } from '@xterm/xterm'
   import { FitAddon } from '@xterm/addon-fit'
+  import { SearchAddon } from '@xterm/addon-search'
   import '@xterm/xterm/css/xterm.css'
   import './terminal.css'
   import { termUrl, uploadToSession } from './api'
@@ -9,6 +10,7 @@
   import { TERM_THEMES, dimStyles } from './termTheme'
   import { terminalTypography } from './termOptions'
   import { keyInput } from './termKeys'
+  import { SEARCH_DECORATIONS, TERMINAL_ACTION, matchLabel, scrolledUp } from './termSearch'
   import { fileToBase64, filesOf, pathsText, refusal } from './termUpload'
 
   let {
@@ -25,6 +27,13 @@
   // A short message about a refused paste or drop, and whether a drag is over the terminal.
   let note = $state('')
   let dropping = $state(false)
+  // Scrollback search (#91): the bar, the query and the addon's own count.
+  let searching = $state(false)
+  let query = $state('')
+  let hit = $state({ index: -1, count: 0 })
+  let latest = $state(false)
+  let searchInput: HTMLInputElement | undefined = $state()
+  let search: SearchAddon | undefined
   let noteTimer: ReturnType<typeof setTimeout> | undefined
 
   $effect(() => {
@@ -33,6 +42,45 @@
   $effect(() => {
     if (terminal) terminal.options.theme = TERM_THEMES[theme]
   })
+
+  const options = { decorations: SEARCH_DECORATIONS }
+  function find(forward: boolean, incremental = false) {
+    if (!search) return
+    if (!query) {
+      search.clearDecorations()
+      hit = { index: -1, count: 0 }
+      return
+    }
+    if (forward) search.findNext(query, { ...options, incremental })
+    else search.findPrevious(query, options)
+  }
+  function openSearch() {
+    searching = true
+    void tick().then(() => {
+      searchInput?.focus()
+      searchInput?.select()
+    })
+  }
+  function closeSearch() {
+    searching = false
+    search?.clearDecorations()
+    hit = { index: -1, count: 0 }
+    terminal?.focus()
+  }
+  function toLatest() {
+    terminal?.scrollToBottom()
+    latest = false
+  }
+  function searchKey(ev: KeyboardEvent) {
+    if (ev.key === 'Escape') {
+      ev.preventDefault()
+      ev.stopPropagation()
+      closeSearch()
+    } else if (ev.key === 'Enter') {
+      ev.preventDefault()
+      find(!ev.shiftKey)
+    }
+  }
 
   onMount(() => {
     // One shared sheet of readable dim colours for every terminal.
@@ -49,6 +97,8 @@
       scrollback: 5000,
       // The Dungeon appearance shows the parchment through the terminal.
       allowTransparency: true,
+      // Search highlights are decorations, which xterm still gates behind this flag.
+      allowProposedApi: true,
       // Lift any text colour the agent picks (its grays) that would read below
       // WCAG AA against the theme background, the parchment tone in Dungeon.
       // xterm halves the target for dim text, so dimStyles() covers dim.
@@ -78,6 +128,9 @@
     }).catch(() => {})
     const fit = new FitAddon()
     term.loadAddon(fit)
+    search = new SearchAddon()
+    term.loadAddon(search)
+    const found = search.onDidChangeResults((r) => (hit = { index: r.resultIndex, count: r.resultCount }))
     term.open(host)
 
     // Copy the selection with Cmd+C (macOS) or Ctrl+Shift+C. Plain Ctrl+C is
@@ -172,6 +225,18 @@
     host.addEventListener('dragleave', onDragLeave)
     host.addEventListener('drop', onDrop)
 
+    const sync = () => (latest = scrolledUp(term.buffer.active))
+    const scrolled = term.onScroll(sync)
+    const parsed = term.onWriteParsed(sync)
+    const onAction = (ev: Event) => {
+      // Only the terminal the user can see answers.
+      if (!host.offsetParent) return
+      const id = (ev as CustomEvent<string>).detail
+      if (id === 'search-terminal') openSearch()
+      else if (id === 'terminal-latest') toLatest()
+    }
+    window.addEventListener(TERMINAL_ACTION, onAction)
+
     const data = term.onData((d) => sock.sendInput(d))
     const resized = term.onResize(({ cols, rows }) => sock.resize(cols, rows))
     // One fit per frame, so dragging a column border does not flood the session with resizes.
@@ -191,6 +256,10 @@
 
     return () => {
       ro.disconnect()
+      window.removeEventListener(TERMINAL_ACTION, onAction)
+      scrolled.dispose()
+      parsed.dispose()
+      found.dispose()
       clearTimeout(noteTimer)
       host.removeEventListener('paste', onPaste, true)
       host.removeEventListener('dragover', onDragOver)
@@ -211,6 +280,29 @@
   <div class="term" data-testid="terminal" data-term-theme={theme} data-dropping={dropping}>
     <div class="term-host" bind:this={host}></div>
   </div>
+  <div class="term-tools">
+    {#if latest}
+      <button type="button" class="term-tool" onclick={toLatest} aria-label="Jump to latest output">Latest ↓</button>
+    {/if}
+    <button type="button" class="term-tool" onclick={() => (searching ? closeSearch() : openSearch())} aria-label="Search output" aria-pressed={searching}>Search</button>
+  </div>
+  {#if searching}
+    <div class="term-search" role="search">
+      <input
+        bind:this={searchInput}
+        bind:value={query}
+        type="search"
+        placeholder="Search output"
+        aria-label="Search terminal output"
+        oninput={() => find(true, true)}
+        onkeydown={searchKey}
+      />
+      <span class="term-count" role="status" aria-live="polite">{matchLabel(query, hit.index, hit.count)}</span>
+      <button type="button" class="term-tool" onclick={() => find(false)} aria-label="Previous match" disabled={hit.count === 0}>↑</button>
+      <button type="button" class="term-tool" onclick={() => find(true)} aria-label="Next match" disabled={hit.count === 0}>↓</button>
+      <button type="button" class="term-tool" onclick={closeSearch} aria-label="Close search">✕</button>
+    </div>
+  {/if}
   {#if note}
     <div class="term-note" role="status">{note}</div>
   {/if}

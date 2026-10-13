@@ -266,6 +266,54 @@ test('a pasted image or dropped file arrives as its stored path, text paste is u
   await expect(note).toContainText('empty.png is empty')
 })
 
+test('search finds matches in the scrollback, steps through them and jumps back to the latest output', async ({ page }) => {
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await page.locator('.pane:not([hidden]) .xterm').click()
+  for (let i = 1; i <= 60; i++) {
+    await page.keyboard.type(`line-${i}`)
+    await page.keyboard.press('Enter')
+  }
+  await expect(screenText(page)).toContainText('echo:line-60')
+
+  const pane = page.locator('.pane:not([hidden])')
+  const count = pane.locator('.term-count')
+  const latest = pane.getByRole('button', { name: 'Jump to latest output' })
+  await expect(latest).toHaveCount(0)
+
+  // The shortcut opens the bar with the cursor in it; the agent keeps every other key.
+  await page.keyboard.press('Control+Shift+F')
+  const box = pane.getByRole('searchbox', { name: 'Search terminal output' })
+  await expect(box).toBeFocused()
+  await box.fill('echo:line-1')
+  await expect(count).toHaveText(/ of 11$/)
+  const first = await count.textContent()
+  await box.press('Enter')
+  await expect(count).not.toHaveText(first!)
+  await pane.getByRole('button', { name: 'Previous match' }).click()
+  await expect(count).toHaveText(first!)
+
+  await box.fill('no such text anywhere')
+  await expect(count).toHaveText('No matches')
+  await expect(pane.getByRole('button', { name: 'Next match' })).toBeDisabled()
+
+  // A match far up scrolls the view away from the newest output; one click returns.
+  await box.fill('echo:line-1')
+  await expect(count).toHaveText(/ of 11$/)
+  await expect(latest).toBeVisible()
+  await latest.click()
+  await expect(latest).toHaveCount(0)
+  await expect(screenText(page)).toContainText('echo:line-60')
+
+  // Closing the search returns the keyboard to the session without changing it.
+  await box.press('Escape')
+  await expect(box).toHaveCount(0)
+  await page.keyboard.type('after')
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('echo:after')
+})
+
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()

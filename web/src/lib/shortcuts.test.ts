@@ -63,6 +63,11 @@ describe('routing', () => {
     expect(press({ key: '!', code: 'Digit1', ctrlKey: true, shiftKey: true })).toBe('expand-projects')
     expect(press({ key: 'PageDown', code: 'PageDown', ctrlKey: true })).toBe('next-session')
     expect(press({ key: ',', code: 'Comma', ctrlKey: true })).toBe('open-settings')
+    expect(press({ key: 'F', code: 'KeyF', ctrlKey: true, shiftKey: true })).toBe('search-terminal')
+    expect(press({ key: 'End', code: 'End', ctrlKey: true, shiftKey: true })).toBe('terminal-latest')
+    // Plain Ctrl+F and Ctrl+End stay with the agent.
+    expect(press({ key: 'f', code: 'KeyF', ctrlKey: true })).toBeNull()
+    expect(press({ key: 'End', code: 'End', ctrlKey: true })).toBeNull()
   })
   it('ignores composition, repeat, dialogs, plain typing and unknown keys', () => {
     const k = { key: '!', code: 'Digit1', ctrlKey: true, shiftKey: true }

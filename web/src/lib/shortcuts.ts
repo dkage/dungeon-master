@@ -6,6 +6,7 @@
 export type ActionId =
   | 'expand-projects' | 'expand-terminal' | 'expand-map' | 'expand-detail' | 'restore-split'
   | 'show-map' | 'show-list' | 'open-settings' | 'next-session' | 'previous-session'
+  | 'search-terminal' | 'terminal-latest'
 
 export type Action = { id: ActionId; label: string; default: string | null }
 
@@ -24,6 +25,8 @@ export const ACTIONS: readonly Action[] = [
   { id: 'open-settings', label: 'Open settings', default: 'Mod+,' },
   { id: 'next-session', label: 'Next session', default: 'Ctrl+PageDown' },
   { id: 'previous-session', label: 'Previous session', default: 'Ctrl+PageUp' },
+  { id: 'search-terminal', label: 'Search terminal output', default: 'Ctrl+Shift+F' },
+  { id: 'terminal-latest', label: 'Jump to latest output', default: 'Ctrl+Shift+End' },
 ]
 
 export type Platform = 'mac' | 'other'
