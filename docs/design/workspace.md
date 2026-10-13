@@ -1,7 +1,7 @@
 ---
 status: planned
 milestone: workspace usability
-github_issues: [63, 64, 65, 78]
+github_issues: [63, 64, 65, 78, 84, 87]
 tracking: in-gh-issues
 next: reload decision record (#87) and restore (#84), then configurable shortcuts (#65)
 verified: 2026-10-13
@@ -54,6 +54,23 @@ The three columns (projects/sessions, terminal, right panel) are resized by drag
 - Column widths are remembered per browser next to the map/detail split. Saved widths that no longer fit the window
   fall back to defaults; below the drawer breakpoint the narrow layout applies and saved widths never hide a panel.
 - The saved column widths are the split geometry that Restore split (§Panel expansion) returns to.
+
+## Remembering place across reloads
+
+Decision (#87, chosen by the project owner): keep "where was I" in **both the address-bar hash and browser
+storage**.
+
+- The hash carries identifiers only: `#c=<campaign>&s=<session>&q=<issue number>&v=map|list&l=<map level>`
+  (`l` is `t` for the Tavern or `d<epic number>`; the world level is omitted). It never carries the access token, issue
+  text or scrollback. Reload, back/forward and a link copied to another window all work.
+- `localStorage` (`dungeon.place`) holds the same string, used only when the URL has no hash, so a bare URL returns
+  to the last place. The hash wins when both exist.
+- Campaign, session and issue changes push a history entry; view and map-level changes replace the current one.
+- Fallback: each field is validated on its own. An unknown campaign, an ended or lost session, or an issue that no
+  longer loads is dropped silently and the default applies; malformed or unreadable data is ignored. Restoring never
+  starts, restarts or ends a session; it reconnects the terminal of a session that is still live.
+- Rejected: storage only (no deep links, back/forward or sharing a link) and address bar only (a bare URL always lands
+  on the default view).
 
 ## Shortcuts settings
 
