@@ -610,17 +610,6 @@ describe('QuestDetail', () => {
     expect(screen.getByText('Closed issues cannot be started.')).toBeInTheDocument()
   })
 
-  it('shows loading and error states, with retry', async () => {
-    const { unmount } = render(QuestDetail, { store: open(null) })
-    expect(screen.getByRole('status')).toHaveTextContent('Loading #3…')
-    unmount()
-    const s = open(null, (st) => (st.detailError = { code: 'not_found', message: 'That issue was not found.' }))
-    const select = vi.spyOn(s, 'selectQuest').mockResolvedValue()
-    render(QuestDetail, { store: s })
-    expect(screen.getByRole('alert')).toHaveTextContent('That issue was not found.')
-    await fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(select).toHaveBeenCalledWith(3)
-  })
   it('blocks a second launch in a busy working tree unless the project allows several', () => {
     const busy = (s: AppStore) => { s.sessions = [sess('s9', 'c1', { quest: 9, title: '#9 Other' })] }
     const { unmount } = render(QuestDetail, { store: open(detail({ state: 'open', blockedBy: [] }), busy) })
@@ -632,6 +621,17 @@ describe('QuestDetail', () => {
     expect(screen.queryByText(/already running in this working tree/)).not.toBeInTheDocument()
   })
 
+  it('shows loading and error states, with retry', async () => {
+    const { unmount } = render(QuestDetail, { store: open(null) })
+    expect(screen.getByRole('status')).toHaveTextContent('Loading #3…')
+    unmount()
+    const s = open(null, (st) => (st.detailError = { code: 'not_found', message: 'That issue was not found.' }))
+    const select = vi.spyOn(s, 'selectQuest').mockResolvedValue()
+    render(QuestDetail, { store: s })
+    expect(screen.getByRole('alert')).toHaveTextContent('That issue was not found.')
+    await fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(select).toHaveBeenCalledWith(3)
+  })
 })
 
 describe('Toolbar quests toggle', () => {
