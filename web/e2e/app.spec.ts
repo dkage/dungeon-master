@@ -525,8 +525,11 @@ test('a campaign with a running expedition cannot be removed', async ({ page }) 
   await expect(page.locator('p[role="alert"]')).toContainText('running sessions')
   await expect(nav(page).getByRole('button', { name: /^busy/ })).toBeVisible()
 
-  // Close the expedition, then removal succeeds.
+  // Close the expedition, then removal succeeds. The row disappears only once the
+  // server has ended the process, which takes longer on Windows; removing earlier
+  // would still be refused.
   await page.getByRole('button', { name: closeSession }).click()
+  await expect(expeditions(page, 'busy')).toHaveCount(0)
   await requestCampaignRemoval(page, 'busy')
   await confirmCampaignRemoval(page, 'busy')
   await expect(nav(page).getByRole('button', { name: /^busy/ })).toHaveCount(0)
