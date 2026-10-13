@@ -34,11 +34,14 @@
 
   const levelKey = $derived(level.kind === 'dungeon' ? `d${level.id}` : level.kind)
   const measured = $derived(viewWidth > 0)
-  // Each level opens fitted to the panel's width; resizing the panel later
-  // keeps the zoom the user chose.
+  // A number, so a rebuilt layout of the same width (every session refresh
+  // rebuilds it) does not count as a change.
+  const contentWidth = $derived(size.width)
+  // Each level opens fitted to the panel's width; resizing the panel or a
+  // background refresh keeps the zoom the user chose.
   $effect(() => {
     void levelKey
-    void size.width
+    void contentWidth
     if (measured) untrack(fit)
   })
 

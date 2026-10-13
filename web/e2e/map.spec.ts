@@ -124,6 +124,29 @@ test('selects on the map and starts only from the footer; a locked quest cannot 
   await expect(map(page).getByRole('button', { name: /^#3 Build the signup form, Ready/ })).toBeVisible()
 })
 
+test('keeps the chosen zoom while sessions refresh in the background', async ({ page }) => {
+  await openSample(page)
+  await map(page).getByRole('button', { name: /^Dungeon #1 / }).dblclick()
+  await map(page).getByRole('button', { name: /^#3 Build the signup form/ }).click()
+  await detail(page).getByRole('button', { name: 'Review launch' }).click()
+  await page.getByRole('dialog', { name: 'Review launch plan' }).getByRole('button', { name: 'Start expedition' }).click()
+  await expect(page.locator('.quest-session-chip')).toHaveText('#3')
+
+  const svg = map(page).locator('svg[role="group"]')
+  const width = () => svg.evaluate((e) => Number(e.getAttribute('width')))
+  const fitted = await width()
+  await map(page).getByRole('button', { name: 'Zoom in' }).click()
+  await map(page).getByRole('button', { name: 'Zoom in' }).click()
+  const zoomed = await width()
+  expect(zoomed).toBeGreaterThan(fitted)
+  await map(page).locator('.viewport').evaluate((e) => e.scrollBy(40, 40))
+  await page.waitForTimeout(4500) // two session refreshes
+  expect(await width()).toBe(zoomed)
+
+  await nav(page).getByRole('button', { name: /^Close #3 Build the signup form/ }).click()
+  await expect(map(page).getByRole('button', { name: /^#3 Build the signup form, Ready/ })).toBeVisible()
+})
+
 test('jumps to a prerequisite in another dungeon, and the list shares the selection', async ({ page }) => {
   await openSample(page)
   await map(page).getByRole('button', { name: /^Dungeon #11/ }).dblclick()
