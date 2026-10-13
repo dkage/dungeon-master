@@ -136,6 +136,16 @@ describe('first-run terminology and appearance', () => {
     expect(onclose).toHaveBeenCalled()
   })
 
+  it('scrolls only the body, so the header, footer and frame stay still', () => {
+    render(SettingsDialog, { store: store(), onclose: vi.fn() })
+    const body = screen.getByTestId('settings-body')
+    const dialog = body.closest('dialog')!
+    expect(body.querySelectorAll('section').length).toBeGreaterThan(1)
+    expect(dialog.querySelector('header')!.parentElement).toBe(dialog)
+    expect(dialog.querySelector('footer')!.parentElement).toBe(dialog)
+    expect(body.contains(dialog.querySelector('header'))).toBe(false)
+  })
+
   it('loads and edits local hero settings without exposing saved environment values', async () => {
     const s = store()
     const save = vi.spyOn(s, 'saveHeroesConfig').mockResolvedValue(true)

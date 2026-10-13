@@ -233,6 +233,40 @@ test('Getting started opens the guide over a session, after dismissal and after 
   await expect(guide).toHaveCount(0)
 })
 
+test('the settings dialog scrolls its body with a steady scroll bar and a fixed frame', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 520 })
+  await open(page)
+  await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+  const body = settings.getByTestId('settings-body')
+  await expect(body).toBeVisible()
+  const measure = () =>
+    settings.evaluate((dialog) => {
+      const b = dialog.querySelector('[data-testid="settings-body"]') as HTMLElement
+      const top = (sel: string) => Math.round(dialog.querySelector(sel)!.getBoundingClientRect().top)
+      return {
+        dialogOverflow: dialog.scrollHeight - dialog.clientHeight,
+        scrollable: b.scrollHeight - b.clientHeight,
+        bar: b.offsetWidth - b.clientWidth,
+        header: top('header'),
+        footer: top('footer'),
+      }
+    })
+  const before = await measure()
+  expect(before.scrollable).toBeGreaterThan(0)
+  // The dialog itself never scrolls and the bar takes real room, so it cannot fade away.
+  expect(before.dialogOverflow).toBeLessThanOrEqual(1)
+  expect(before.bar).toBeGreaterThan(0)
+
+  await body.evaluate((el) => (el.scrollTop = el.scrollHeight))
+  const after = await measure()
+  expect(after.header).toBe(before.header)
+  expect(after.footer).toBe(before.footer)
+  expect(after.bar).toBe(before.bar)
+  await expect(settings.getByRole('button', { name: 'Done' })).toBeVisible()
+  await settings.getByRole('button', { name: 'Done' }).click()
+})
+
 test('the terminal text stays inside its frame once the fonts have loaded', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()

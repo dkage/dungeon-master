@@ -176,6 +176,7 @@
     <button type="button" class="close" aria-label="Close settings" onclick={close}>×</button>
   </header>
 
+  <div class="body" data-testid="settings-body">
   <section aria-labelledby="appearance-title">
     <h2 id="appearance-title">Appearance & words</h2>
     <label class="field">
@@ -278,14 +279,23 @@
       </label>
     {/each}
   </section>
+  </div>
 
   <footer><p>Changes apply immediately and stay on this computer.</p><button type="button" onclick={close}>Done</button></footer>
 </dialog>
 
 <style>
-  .settings { width: min(620px, calc(100vw - 32px)); max-height: min(88vh, 800px); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 24px 80px #0009; }
-  .settings::backdrop { background: #0009; backdrop-filter: blur(3px); }
-  header, footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 22px; }
+  .settings { width: min(620px, calc(100vw - 32px)); max-height: min(88vh, 800px); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 24px 80px #0009; overflow: hidden; }
+  .settings[open] { display: flex; flex-direction: column; }
+  /* Only the body scrolls, so the rounded frame, shadow and backdrop are never repainted by the scroll. The bar is
+     drawn by the page, not the overlay kind, so it stays put instead of fading in and out. */
+  .body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  .body::-webkit-scrollbar { width: 12px; }
+  .body::-webkit-scrollbar-track { background: var(--bg); }
+  .body::-webkit-scrollbar-thumb { border: 3px solid var(--bg); border-radius: 8px; background: var(--muted); }
+  @supports not selector(::-webkit-scrollbar) { .body { scrollbar-color: var(--muted) var(--bg); } }
+  .settings::backdrop { background: #0009; }
+  header, footer { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 22px; }
   header { border-bottom: 1px solid var(--line); }
   h1, h2, p { margin: 0; }
   h1 { font-size: 24px; }
