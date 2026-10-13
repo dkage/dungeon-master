@@ -226,8 +226,8 @@ renderer, not a later portrait pass.
 - If no reliable tier is available, use the neutral room fallback; do not guess from the title. Unknown effort must
   remain obvious in the room and detail.
 - Choose a creature deterministically from the selected tier using the stable issue key described in
-  `docs/design/creature-roster.md`. Persist the chosen creature ID in user state so content edits and
-  later roster additions do not remap an issue. Never write this assignment to the repository or GitHub.
+  `docs/design/creature-roster.md`. The assignment is computed, not stored, so reading an issue never writes state;
+  a roster change ships as a new revision. Never write it to the repository or GitHub.
 - At readable zoom, show the four-frame idle strip in the creature window. With reduced motion, show a fixed frame.
   Below the readable zoom threshold, simplify rooms to their state mark and number rather than drawing tiny art.
 - In List mode, keep the same selected issue and may show its small creature marker beside the effort label; the list

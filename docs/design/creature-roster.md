@@ -4,7 +4,7 @@ milestone: M5a
 github_issues: [28, 44]
 tracking: in-gh-issues
 next: use as the source for M5a sprite mapping; delete when M5a closes
-verified: 2026-10-11
+verified: 2026-10-13
 ---
 
 # Quest creature roster
@@ -38,13 +38,11 @@ choose from that tier's roster using the first 64 bits (big-endian) of
 IDs in that tier. Use the canonical repository identity and issue number; never
 use a random choice, title text, current time, or login session as the seed.
 
-Persist the chosen creature ID with the project's local issue metadata when
-first assigned. This makes the choice survive issue edits and roster changes.
-Treat each roster revision as additive: existing persisted IDs remain valid,
-and adding creatures affects only issues first assigned under the new roster.
-Keep a stable ordering and a roster revision ID for reproducible assignments
-that have not yet been persisted. Hashing is a fallback; stored assignment is
-the long-term source of truth.
+Nothing is stored: the hash is the whole assignment, so reading an issue never writes local state. The seed carries a
+roster revision (`creature-assignment-v1`). Treat the roster as append-only within a revision; adding or reordering
+creatures in a tier changes the modulo, so it ships as a new revision, and the revision change is the one moment some
+issues get a different creature. Effort, and so the tier, never changes with it. State files saved by an earlier
+version may hold a `creatures` key; it is ignored and dropped on the next save.
 
 If effort is unknown, use the neutral room mark rather than guessing from an
 issue title. A parent issue with children may use a larger room frame while its
