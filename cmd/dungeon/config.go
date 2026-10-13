@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/dkage/dungeon-master/internal/appearance"
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/gatekeeper"
 	"github.com/dkage/dungeon-master/internal/history"
@@ -136,6 +137,8 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 
 		Campaigns: campaigns,
 		History:   hist,
+
+		Appearance: appearance.Open(filepath.Join(dir, "appearance.json")),
 		Quests:    qsvc,
 
 		Quartermaster: qm,

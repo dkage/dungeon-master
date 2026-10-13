@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dkage/dungeon-master/internal/appearance"
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/fsutil"
 	"github.com/dkage/dungeon-master/internal/gatekeeper"
@@ -73,6 +74,8 @@ type Config struct {
 	Campaigns *campaign.Registry
 	// History records sessions across restarts. In-memory when nil.
 	History *history.Store
+	// Appearance keeps the look-and-feel choices; in memory when nil.
+	Appearance *appearance.Store
 	// Quests supplies issues. When nil, only the demo quests are available.
 	Quests *quests.Service
 	// Quartermaster is the gatekeeper for GitHub traffic; its status is
@@ -196,6 +199,9 @@ func withDefaults(cfg Config) Config {
 	}
 	if cfg.History == nil {
 		cfg.History, _ = history.Open("") // in-memory: cannot fail
+	}
+	if cfg.Appearance == nil {
+		cfg.Appearance = appearance.Open("")
 	}
 	if cfg.Gatekeeper != nil && cfg.Gatekeeper.Tokens == nil {
 		g := *cfg.Gatekeeper

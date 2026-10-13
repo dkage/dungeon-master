@@ -36,6 +36,8 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/heroes/config", s.handleHeroesConfig)
 	mux.HandleFunc("PUT /api/heroes/config", s.handleSaveHeroesConfig)
 	mux.HandleFunc("POST /api/heroes/adopt-starters", s.handleAdoptStarterHeroes)
+	mux.HandleFunc("GET /api/appearance", s.handleAppearance)
+	mux.HandleFunc("PUT /api/appearance", s.handleSaveAppearance)
 	mux.HandleFunc("GET /api/github", s.handleGitHub)
 	mux.HandleFunc("GET /api/onboarding/suggestions", s.handleSuggestions)
 	mux.HandleFunc("POST /api/onboarding/sample", s.handleSampleCampaign)
