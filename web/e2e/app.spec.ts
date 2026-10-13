@@ -697,7 +697,10 @@ test('a campaign without a GitHub repository can open the separate sample projec
   await expect(launchPlan.getByText('Evaluate rate-limit libraries')).toBeVisible()
   await captureMilestoneScreen(page, 'launch-preview')
   await launchPlan.getByRole('button', { name: 'Start expedition' }).click()
-  await expect(screenText(page)).toContainText('arg=[--append-system-prompt]')
+  // The long appended prompt fills the screen at the 1.3 line height, so the
+  // flag name itself has scrolled off; its closing text and the briefing
+  // argument that follows are still visible.
+  await expect(screenText(page)).toContainText('stop and tell the user.]')
   await expect(screenText(page)).toContainText('task briefing file at')
   await expect(screenText(page)).toContainText('sample-workspace')
   await expect(page.locator('.quest-session-chip')).toHaveText('#9')
