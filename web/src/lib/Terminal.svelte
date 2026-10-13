@@ -55,8 +55,11 @@
     })
     terminal = term
     // xterm measures cells with whatever font is ready; remeasure once the
-    // bundled Fira Code has loaded.
-    void document.fonts?.load('13px "Fira Code"').then(() => {
+    // bundled Fira Code and symbols font have loaded, so columns do not shift.
+    void Promise.all([
+      document.fonts?.load('13px "Fira Code"'),
+      document.fonts?.load('13px "Dungeon Symbols"', '\ue0b0\uf015'),
+    ]).then(() => {
       term.options.fontFamily = terminalTypography().fontFamily + ' '
       term.options.fontFamily = terminalTypography().fontFamily
     }).catch(() => {})

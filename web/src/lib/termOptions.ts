@@ -4,12 +4,16 @@
 
 // Nerd Font names come first so prompt icons (Starship, Powerline) render
 // when one is installed. The bundled Fira Code follows, then the usual
-// system monospace fallback. The interface serif never enters this stack.
+// system monospace. The bundled symbols-only font comes last before the generic
+// fallback, so it supplies only glyphs the primary fonts lack. The interface
+// serif never enters this stack.
+export const SYMBOLS_FONT = '"Dungeon Symbols"'
 export const FONT_STACK = [
   '"JetBrainsMono Nerd Font"', '"JetBrainsMono NF"', '"MesloLGS NF"', '"MesloLGS Nerd Font"',
   '"FiraCode Nerd Font"', '"Hack Nerd Font"', '"Symbols Nerd Font Mono"',
   '"Fira Code"',
-  'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace',
+  'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas',
+  '"Dungeon Symbols"', 'monospace',
 ].join(', ')
 
 // Extra row height. The reference uses 1.7, which costs a third of the rows a

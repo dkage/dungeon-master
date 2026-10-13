@@ -21,6 +21,8 @@
 @font-face { font-family: 'Alegreya'; src: url('./assets/fonts/Alegreya-Italic.ttf') format('truetype'); font-style: italic; font-display: swap; }
 @font-face { font-family: 'Cinzel'; src: url('./assets/fonts/Cinzel.ttf') format('truetype'); font-style: normal; font-display: swap; }
 @font-face { font-family: 'Fira Code'; src: url('./assets/fonts/FiraCode.ttf') format('truetype'); font-style: normal; font-display: swap; }
+/* Symbols only (Nerd Fonts, MIT). A distinct family name so it never shadows an installed Nerd Font. */
+@font-face { font-family: 'Dungeon Symbols'; src: url('./assets/fonts/SymbolsNerdFontMono.ttf') format('truetype'); font-style: normal; font-display: swap; }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #101014;
