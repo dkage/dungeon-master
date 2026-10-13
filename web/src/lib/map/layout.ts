@@ -9,7 +9,7 @@ import { longestChain } from './model'
 export const ROOM = { w: 112, h: 124 }
 export const NODE = { w: 168, h: 176 }
 export const STUB = { w: 132, h: 44 }
-const GAP_X = 64
+const GAP_X = 88
 const GAP_Y = 26
 const PAD = 28
 const HALL_HEAD = 30
@@ -126,21 +126,41 @@ function bezier(p0: Pt, p1: Pt, p2: Pt, p3: Pt, t: number): Pt {
   return { x: f(p0.x, p1.x, p2.x, p3.x), y: f(p0.y, p1.y, p2.y, p3.y) }
 }
 
-const GATE_T = 0.82
+/** How far a gate's centre stands from the room it guards: half the gate (18 px) plus a margin, so the room never clips its arch. */
+const GATE_CLEAR = 36
 
-/** Where the gate stands on the line `curve` draws, a little before the blocked room. */
-function curveGate(x1: number, y1: number, x2: number, y2: number): Pt {
+/** The point on the cubic through p0..p3 that is nearest to GATE_CLEAR from its end, walking back from the end. */
+function gateOn(p0: Pt, p1: Pt, p2: Pt, p3: Pt): Pt {
+  let at = bezier(p0, p1, p2, p3, 0.5)
+  for (let t = 0.99; t >= 0.2; t -= 0.01) {
+    at = bezier(p0, p1, p2, p3, t)
+    if (Math.hypot(at.x - p3.x, at.y - p3.y) >= GATE_CLEAR) break
+  }
+  return at
+}
+
+/** Where the gate stands on the line `curve` draws, clear of the blocked room. */
+function curveGate(x1: number, y1: number, x2: number, y2: number, fromStart = false): Pt {
+  let c: [Pt, Pt, Pt, Pt]
   if (x2 > x1 + 8) {
     const mx = (x1 + x2) / 2
-    return bezier({ x: x1, y: y1 }, { x: mx, y: y1 }, { x: mx, y: y2 }, { x: x2, y: y2 }, GATE_T)
+    c = [{ x: x1, y: y1 }, { x: mx, y: y1 }, { x: mx, y: y2 }, { x: x2, y: y2 }]
+  } else {
+    const dip = Math.max(y1, y2) + ROOM.h * 0.75
+    c = [{ x: x1, y: y1 }, { x: x1 + 60, y: dip }, { x: x2 - 60, y: dip }, { x: x2, y: y2 }]
   }
-  const dip = Math.max(y1, y2) + ROOM.h * 0.75
-  return bezier({ x: x1, y: y1 }, { x: x1 + 60, y: dip }, { x: x2 - 60, y: dip }, { x: x2, y: y2 }, GATE_T)
+  // A line that skips a column keeps its gate beside the blocker, so it never lands on the gate of the line that ends at the room in between.
+  return fromStart ? gateOn(c[3], c[2], c[1], c[0]) : gateOn(...c)
+}
+
+/** Spreads the `k` lines that meet one side of a room over its edge, so parallel lines and their gates do not stack. */
+function port(i: number, k: number): number {
+  return k <= 1 ? 0 : (i - (k - 1) / 2) * Math.min(16, 56 / (k - 1))
 }
 
 /** The same for the line from an outskirts stub at (sx, sy) up to a room's entrance. */
 function stubGate(sx: number, sy: number, tx: number, ty: number): Pt {
-  return bezier({ x: sx, y: sy }, { x: sx, y: sy - 40 }, { x: tx - 40, y: ty }, { x: tx, y: ty }, GATE_T)
+  return gateOn({ x: sx, y: sy }, { x: sx, y: sy - 40 }, { x: tx - 40, y: ty }, { x: tx, y: ty })
 }
 
 function curve(x1: number, y1: number, x2: number, y2: number): string {
@@ -270,17 +290,25 @@ function finish(model: MapModel, boxes: RoomBox[], halls: HallBox[], width: numb
     stubAt.set(n, s)
     return s
   }
+  // How many lines leave each room, and which one this is, for spreading them.
+  const outTotal = new Map<number, number>()
+  const outSeen = new Map<number, number>()
+  for (const b of boxes) for (const blocker of model.quests.get(b.n)!.blockers) if (at.has(blocker)) outTotal.set(blocker, (outTotal.get(blocker) ?? 0) + 1)
   for (const b of [...boxes].sort((x, y) => x.n - y.n)) {
     const v = model.quests.get(b.n)!
     const tx = b.x
+    const inRoom = v.blockers.filter((n) => at.has(n)).sort((p, q) => at.get(p)!.y - at.get(q)!.y || p - q)
     const ty = b.y + b.h / 2
     for (const blocker of v.blockers) {
       const src = at.get(blocker)
       const bv = model.quests.get(blocker)!
       if (src) {
+        const sy = src.y + src.h / 2 + port(outSeen.get(blocker) ?? 0, outTotal.get(blocker) ?? 1)
+        outSeen.set(blocker, (outSeen.get(blocker) ?? 0) + 1)
+        const ey = ty + port(inRoom.indexOf(blocker), inRoom.length)
         links.push({
           from: blocker, to: b.n, kind: 'block', open: bv.quest.closed, cycle: cycle.has(`${blocker}>${b.n}`),
-          d: curve(src.x + src.w, src.y + src.h / 2, tx, ty), gate: curveGate(src.x + src.w, src.y + src.h / 2, tx, ty),
+          d: curve(src.x + src.w, sy, tx, ey), gate: curveGate(src.x + src.w, sy, tx, ey, b.layer - src.layer > 1),
         })
       } else {
         const s = stubFor(blocker, bv.quest.title, bv.quest.closed, bv.place)
@@ -343,7 +371,8 @@ export function layoutWorld(model: MapModel): WorldLayout {
     const y1 = a.y + a.h / 2
     const x2 = b.x
     const y2 = b.y + b.h / 2
-    return { ...l, d: curve(x1, y1, x2, y2), gate: curveGate(x1, y1, x2, y2), label: { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 10 } }
+    const gate = curveGate(x1, y1, x2, y2)
+    return { ...l, d: curve(x1, y1, x2, y2), gate, label: { x: (x1 + gate.x) / 2, y: (y1 + y2) / 2 - 10 } }
   })
   const width = Math.max(...nodes.map((n) => n.x + n.w), NODE.w) + PAD
   const height = Math.max(...nodes.map((n) => n.y + n.h), NODE.h) + PAD

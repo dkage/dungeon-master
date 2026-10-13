@@ -48,6 +48,15 @@ describe('layoutDungeon', () => {
     expect(layoutDungeon(m, 1).rooms.filter((r) => r.boss).map((r) => r.n)).toEqual([4])
   })
 
+  it('keeps the gate of a line that skips a column away from the gate of the line into the room between', () => {
+    const m = dungeon(quest(2), quest(3, { blockedBy: blocked(2) }), quest(4, { blockedBy: blocked(2, 3) }))
+    const l = layoutDungeon(m, 1)
+    const gate = (a: number, b: number) => l.links.find((k) => k.from === a && k.to === b)!.gate
+    expect(Math.hypot(gate(2, 4).x - gate(3, 4).x, gate(2, 4).y - gate(3, 4).y)).toBeGreaterThan(60)
+    const room = (n: number) => l.rooms.find((r) => r.n === n)!
+    expect(gate(2, 4).x).toBeLessThan(room(3).x)
+  })
+
   it('has no boss for a chain shorter than three', () => {
     const l = layoutDungeon(dungeon(quest(2), quest(3, { blockedBy: blocked(2) })), 1)
     expect(l.rooms.some((r) => r.boss)).toBe(false)
@@ -83,6 +92,8 @@ describe('layoutDungeon', () => {
       const room = layoutDungeon(m, 1).rooms.find((r) => r.n === k.to)!
       expect(k.gate.x).toBeLessThan(room.x)
       expect(k.gate.x).toBeGreaterThan(room.x - 60)
+      // The 36 px wide gate (18 px each side) must not reach into the room.
+      expect(room.x - k.gate.x).toBeGreaterThanOrEqual(18)
       expect(Math.abs(k.gate.y - (room.y + room.h / 2))).toBeLessThan(40)
     }
   })
