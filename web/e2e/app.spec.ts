@@ -241,6 +241,7 @@ async function sendTransfer(page: Page, kind: 'paste' | 'drop', file: { name: st
     host.querySelector('textarea')!.dispatchEvent(ev)
   }, { kind, file })
 }
+const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0]
 
 test('a pasted image or dropped file arrives as its stored path, text paste is unchanged, refusals are explained', async ({ page }) => {
@@ -612,8 +613,11 @@ test('a copy of a session whose scrollback overflowed starts with the cut-off no
   // What the user sees: scrolling all the way up never reaches the marker, which was dropped.
   const view = pane.locator('.xterm')
   await view.hover()
-  await page.mouse.wheel(0, -2_000_000)
-  await expect(pane.getByRole('button', { name: 'Jump to latest output' })).toBeVisible()
+  // Output may still be arriving (slower on Windows), which pulls the view down again: scroll until it stays up.
+  await expect(async () => {
+    await page.mouse.wheel(0, -2_000_000)
+    await expect(pane.getByRole('button', { name: 'Jump to latest output' })).toBeVisible({ timeout: 1_000 })
+  }).toPass({ timeout: 20_000 })
   await expect(screenText(page)).not.toContainText('flood-6000')
   await expect(screenText(page)).not.toContainText('FIRST-MARKER')
   await expect(screenText(page)).not.toContainText('flood-1 ')
@@ -626,6 +630,24 @@ test('a copy of a session whose scrollback overflowed starts with the cut-off no
   // The oldest output is what was dropped.
   expect(text).not.toMatch(/flood-1\n/)
   expect(text).not.toContain('FIRST-MARKER')
+})
+
+test('the paste key (Cmd+V on macOS, Ctrl+V elsewhere) sends an image on the real clipboard as a stored path', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await page.locator('.pane:not([hidden]) .xterm').click()
+  // A real one-pixel PNG on the system clipboard, not a synthetic event.
+  await page.evaluate(async (b64) => {
+    const png = new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type: 'image/png' })
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
+  }, PNG_BASE64)
+  await page.keyboard.press('ControlOrMeta+V')
+  await expect(screenText(page)).toContainText('uploads')
+  await expect(screenText(page)).toContainText('.png')
+  // Nothing was submitted by pasting.
+  await expect(screenText(page)).not.toContainText('echo:')
 })
 
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
