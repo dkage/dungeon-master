@@ -455,13 +455,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .state.locked { border-color: #b18146; }
 .detail, .detail-empty { min-height: 0; overflow: hidden; background: linear-gradient(180deg, #160609, #100507); }
 .detail .qhead { position: sticky; top: 0; }
-/* Slate behind both side panels in Dungeon only, under a dark shade (contrast is checked in slate.test.ts). */
+/* Slate behind both side panels in Dungeon only. The panel itself has no red; only the cards, fields and headers
+   inside it do. A light neutral dim keeps muted text readable on the brightest grain (checked in slate.test.ts). */
 .app[data-theme='dungeon'] {
-  --slate-shade: rgb(16 5 7 / .82);
+  --slate-shade: rgb(0 0 0 / .4);
 }
 .app[data-theme='dungeon'] .sidebar,
 .app[data-theme='dungeon'] .quests {
-  background: linear-gradient(var(--slate-shade), var(--slate-shade)), #100507 url('./assets/slate.jpg') 0 0 / 256px 256px repeat;
+  background: linear-gradient(var(--slate-shade), var(--slate-shade)), #141312 url('./assets/slate.jpg') 0 0 / 256px 256px repeat;
 }
 .app[data-theme='dungeon'] .quest-browser:not(.mapmode),
 .app[data-theme='dungeon'] .detail,

@@ -15,21 +15,25 @@ const hex = (h: string): RGB => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2),
 const shade = /--slate-shade:\s*rgb\((\d+) (\d+) (\d+) \/ ([\d.]+)\)/.exec(css)!
 const rgb = [1, 2, 3].map((i) => Number(shade[i])) as RGB
 const alpha = Number(shade[4])
-// Whatever the texture holds, no pixel can be lighter than pure white under the shade.
-const lightest = rgb.map((c) => Math.round(255 * (1 - alpha) + c * alpha)) as RGB
+// Brightest pixel of assets/slate.jpg (the browser test re-measures the asset, so a new texture cannot slip past this).
+const SLATE_BRIGHTEST: RGB = [86, 85, 83]
+const lightest = SLATE_BRIGHTEST.map((s, i) => Math.round(s * (1 - alpha) + rgb[i] * alpha)) as RGB
 
 // Text colours the side panels draw directly on the slate (no card or button behind them).
 const text = ['#f0e6d6', '#e2d3bc', '#eadbc5', '#ad9a88', '#bea98e', '#c6a56b', '#e5cfaa', '#d9c7aa']
 
 describe('slate behind the Dungeon side panels', () => {
   it('declares the shade and applies the texture only in Dungeon', () => {
-    expect(alpha).toBeGreaterThan(0.5)
+    // A neutral dim, not a red wash: the red belongs to the cards and fields inside the panels.
+    expect(rgb[0]).toBe(rgb[1])
+    expect(rgb[1]).toBe(rgb[2])
+    expect(alpha).toBeLessThanOrEqual(0.5)
     const rule = /\.app\[data-theme='dungeon'\] \.sidebar,\s*\.app\[data-theme='dungeon'\] \.quests \{([^}]*)\}/.exec(css)!
     expect(rule[1]).toContain('slate.jpg')
     expect(css.match(/slate\.jpg/g)).toHaveLength(1)
   })
 
-  it.each(text)('%s reads at 4.5:1 on the lightest possible shaded tone', (c) => {
+  it.each(text)('%s reads at 4.5:1 on the brightest shaded grain', (c) => {
     expect(contrast(hex(c), lightest)).toBeGreaterThanOrEqual(4.5)
   })
 })
