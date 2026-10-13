@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { inflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
-import { PARCHMENT_ZOOM, TERM_THEMES } from './termTheme'
+import {
+  ANSI_NAMES, MIN_CONTRAST, PARCHMENT_TONE, PARCHMENT_ZOOM, TERM_BACKDROP, TERM_THEMES, contrast, dimColour, dimStyles,
+  hexRGB as hex, luminance, type RGB,
+} from './termTheme'
 
 // Decodes the 8-bit RGB, non-interlaced PNG the texture is shipped as.
 function decodePng(buf: Buffer) {
@@ -45,15 +48,6 @@ function decodePng(buf: Buffer) {
   return { width, height, rgb: out }
 }
 
-type RGB = [number, number, number]
-const lin = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
-const luminance = ([r, g, b]: RGB) => 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
-const contrast = (a: RGB, b: RGB) => {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
-  return (hi + 0.05) / (lo + 0.05)
-}
-const hex = (h: string): RGB => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as RGB
-
 // The darkest 8x8 average inside the crop of the texture that shows behind the terminal.
 function darkestTone(): RGB {
   const { width, height, rgb } = decodePng(readFileSync('src/assets/parchment.png'))
@@ -76,11 +70,15 @@ function darkestTone(): RGB {
 describe('Dungeon terminal palette on the parchment', () => {
   const dark = darkestTone()
   const t = TERM_THEMES.dungeon
-  const colours = ['foreground', 'cursor', 'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
-    'brightBlack', 'brightRed', 'brightGreen', 'brightYellow', 'brightBlue', 'brightMagenta', 'brightCyan', 'brightWhite'] as const
+  const colours = ['foreground', 'cursor', ...ANSI_NAMES] as const
 
   it('finds a texture tone that is not near-black', () => {
     expect(luminance(dark)).toBeGreaterThan(0.3)
+  })
+
+  it('measures contrast against that darkest tone', () => {
+    expect(hex(PARCHMENT_TONE)).toEqual(dark)
+    expect(TERM_BACKDROP.dungeon).toBe(PARCHMENT_TONE)
   })
 
   it.each(colours)('%s reads at 4.5:1 on the darkest tone', (name) => {
@@ -94,8 +92,57 @@ describe('Dungeon terminal palette on the parchment', () => {
     expect(contrast(hex(t.foreground!), sel)).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('is transparent in Dungeon and opaque in Neutral', () => {
-    expect(t.background).toBe('rgba(0, 0, 0, 0)')
-    expect(TERM_THEMES.neutral.background).toMatch(/^#/)
+  // The background is painted transparent, but xterm's minimumContrastRatio
+  // reads its colour channels and ignores the alpha.
+  it('is transparent in Dungeon, tinted with the parchment tone, and opaque in Neutral', () => {
+    const m = /^rgba\((\d+), (\d+), (\d+), 0\)$/.exec(t.background!)!
+    expect(m).not.toBeNull()
+    expect([1, 2, 3].map((i) => Number(m[i]))).toEqual(dark)
+    expect(TERM_THEMES.neutral.background).toBe(TERM_BACKDROP.neutral)
+  })
+})
+
+describe('gray and dimmed text in both appearances', () => {
+  // Claude Code prints hints and placeholders as dim (SGR 2) text or in
+  // bright black; both must reach WCAG AA on each background.
+  describe.each(['dungeon', 'neutral'] as const)('%s', (name) => {
+    const t = TERM_THEMES[name]
+    const bg = hex(TERM_BACKDROP[name])
+
+    it('gives every ANSI colour explicitly', () => {
+      for (const key of ANSI_NAMES) expect(t[key]).toMatch(/^#[0-9a-f]{6}$/)
+    })
+
+    it('shows bright black at 4.5:1, apart from the foreground', () => {
+      expect(contrast(hex(t.brightBlack!), bg)).toBeGreaterThanOrEqual(MIN_CONTRAST)
+      expect(contrast(hex(t.brightBlack!), hex(t.foreground!))).toBeGreaterThan(1.5)
+    })
+
+    it.each(['foreground', ...ANSI_NAMES] as const)('dims %s no lower than 4.5:1', (key) => {
+      const colour = t[key]!
+      const dim = dimColour(colour, TERM_BACKDROP[name])
+      // A colour already under the target (black in Neutral) is left alone;
+      // xterm's minimumContrastRatio lifts it.
+      const floor = Math.min(MIN_CONTRAST, contrast(hex(colour), bg))
+      expect(contrast(hex(dim), bg)).toBeGreaterThanOrEqual(floor)
+    })
+
+    it('keeps dimmed default text distinguishable from normal text', () => {
+      const dim = hex(dimColour(t.foreground!, TERM_BACKDROP[name]))
+      expect(contrast(dim, hex(t.foreground!))).toBeGreaterThan(1.5)
+    })
+
+    it('replaces xterm\'s half-opacity dim rules for this theme', () => {
+      const css = dimStyles()
+      expect(css).toContain(`[data-term-theme="${name}"] .xterm .xterm-rows span.xterm-dim:not([class*="xterm-fg-"]) { color: ${dimColour(t.foreground!, TERM_BACKDROP[name])}; }`)
+      expect(css).toContain(`[data-term-theme="${name}"] .xterm .xterm-rows span.xterm-fg-8.xterm-dim { color: ${dimColour(t.brightBlack!, TERM_BACKDROP[name])}; }`)
+    })
+  })
+
+  it('fades only as far as the target allows', () => {
+    // Half opacity reads well enough on Neutral's white.
+    expect(dimColour('#ffffff', '#000000')).toBe('#808080')
+    // A colour at the limit cannot fade at all.
+    expect(dimColour(TERM_THEMES.dungeon.brightBlack!, PARCHMENT_TONE)).toBe(TERM_THEMES.dungeon.brightBlack)
   })
 })

@@ -6,7 +6,7 @@
   import './terminal.css'
   import { termUrl } from './api'
   import { TermSocket } from './termsocket'
-  import { TERM_THEMES } from './termTheme'
+  import { TERM_THEMES, dimStyles } from './termTheme'
 
   let {
     sessionId,
@@ -36,6 +36,13 @@
   })
 
   onMount(() => {
+    // One shared sheet of readable dim colours for every terminal.
+    if (!document.getElementById('term-dim-colours')) {
+      const style = document.createElement('style')
+      style.id = 'term-dim-colours'
+      style.textContent = dimStyles()
+      document.head.append(style)
+    }
     const term = new Terminal({
       cursorBlink: true,
       fontFamily: FONT_STACK,
@@ -43,8 +50,9 @@
       scrollback: 5000,
       // The Dungeon appearance shows the parchment through the terminal.
       allowTransparency: true,
-      // Lift any text colour (the agent's grays and dim text) that would read
-      // below WCAG AA against its background; xterm halves the target for dim.
+      // Lift any text colour the agent picks (its grays) that would read below
+      // WCAG AA against the theme background, the parchment tone in Dungeon.
+      // xterm halves the target for dim text, so dimStyles() covers dim.
       minimumContrastRatio: 4.5,
       // Agents such as Claude turn on mouse reporting, which stops plain
       // drags from selecting. Shift-drag always selects; on macOS so does
@@ -109,7 +117,7 @@
 </script>
 
 <div class="term-wrap">
-  <div class="term" bind:this={host} data-testid="terminal"></div>
+  <div class="term" bind:this={host} data-testid="terminal" data-term-theme={theme}></div>
   {#if status !== 'live'}
     <div class="term-status" data-status={status} role="status">
       {status === 'connecting' ? 'Connecting…' : status === 'exited' ? `Session ${detail}` : `Disconnected: ${detail}`}
