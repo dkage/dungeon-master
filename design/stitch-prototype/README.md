@@ -1,6 +1,6 @@
 # Stitch prototype: Gothic Codex (v4)
 
-The most recent full-window prototype of the cockpit, generated in Google Stitch (project "Dungeon Master Desktop
+A frozen, one-off full-window prototype of the cockpit, generated in Google Stitch (project "Dungeon Master Desktop
 Cockpit"). It is the visual baseline for the Dungeon pack, the default theme (`docs/design/ui.md` §6.5): left panel, terminal
 and right panel with the quest map and detail, in the gothic, Diablo-like style.
 
@@ -34,4 +34,5 @@ against.
   licence text (`*-OFL.txt`). The parchment text falls back to Georgia, which cannot ship; see `docs/design/ui.md` §9, open question 3.
 - `assets/manifest.json`: each local file and the URL it was downloaded from.
 
-Exported on 2026-10-09. The Stitch project keeps evolving; re-export into a new folder rather than editing these files.
+Exported on 2026-10-09. Stitch is no longer used, so there will be no further exports; do not edit these files. New
+design work goes through the Claude Design project kept in sync by `.design-sync/`.

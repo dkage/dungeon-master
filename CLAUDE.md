@@ -17,9 +17,10 @@ those files starts with front-matter properties (`status`, `milestone`, `github_
 `verified`); update them when its state changes. When a milestone closes, delete its design doc (git keeps the history).
 The history of the project's design references and visual assets lives in
 [`design/index.md`](design/index.md). It lists each design folder and the
-commit dates when its asset batches were first recorded. The latest and most
-up-to-date frontend prototype is the Google Stitch export in
-`design/stitch-prototype/`.
+commit dates when its asset batches were first recorded. The Google Stitch export in
+`design/stitch-prototype/` is a frozen, one-off prototype of the target look; Stitch is no longer used, and the plans
+and the app win where they differ. New design work goes through the Claude Design project kept in sync by
+`.design-sync/` (styles-only, since the frontend is Svelte; see `.design-sync/NOTES.md`).
 
 Creature map guidance: `docs/design/creature-roster.md` and `docs/design/art-direction.md`; source sprites and the
 historical right-panel study remain in `design/quest-encounters/`. Current map assets are indexed in
