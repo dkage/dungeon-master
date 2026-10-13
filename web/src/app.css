@@ -455,6 +455,17 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .state.locked { border-color: #b18146; }
 .detail, .detail-empty { min-height: 0; overflow: hidden; background: linear-gradient(180deg, #160609, #100507); }
 .detail .qhead { position: sticky; top: 0; }
+/* Slate behind both side panels in Dungeon only, under a dark shade (contrast is checked in slate.test.ts). */
+.app[data-theme='dungeon'] {
+  --slate-shade: rgb(16 5 7 / .82);
+}
+.app[data-theme='dungeon'] .sidebar,
+.app[data-theme='dungeon'] .quests {
+  background: linear-gradient(var(--slate-shade), var(--slate-shade)), #100507 url('./assets/slate.jpg') 0 0 / 256px 256px repeat;
+}
+.app[data-theme='dungeon'] .quest-browser:not(.mapmode),
+.app[data-theme='dungeon'] .detail,
+.app[data-theme='dungeon'] .detail-empty { background: transparent; }
 .detail article { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 14px 20px; }
 .dtitle { color: #f2e1c1; font-family: 'Cinzel', var(--reading-font, serif); font-size: 17px; }
 .dmeta, .detail .meta, .detail .rel { color: #bea98e; }

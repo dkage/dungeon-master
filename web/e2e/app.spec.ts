@@ -257,6 +257,36 @@ test('the parchment shows behind output in Dungeon, a flat page in Neutral', asy
   await expect(term).toContainText('echo:line-59')
 })
 
+test('the slate shows behind both side panels in Dungeon, not in Neutral', async ({ page }) => {
+  await open(page)
+  const panels = [page.locator('.sidebar'), page.locator('.quests')]
+  const image = (loc: (typeof panels)[number]) => loc.evaluate((el) => getComputedStyle(el).backgroundImage)
+
+  for (const panel of panels) expect(await image(panel)).toContain('slate')
+  // The texture must actually load (CSP, path), not just be declared.
+  const loaded = await page.evaluate(async (css) => {
+    const src = /url\("?([^")]+)"?\)/.exec(css)![1]
+    return new Promise<boolean>((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve(img.naturalWidth > 0)
+      img.onerror = () => resolve(false)
+      img.src = src
+    })
+  }, await image(panels[0]))
+  expect(loaded).toBe(true)
+
+  await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+  await settings.getByLabel(/^Theme/).selectOption('neutral')
+  await settings.getByRole('button', { name: 'Close settings' }).click()
+  for (const panel of panels) expect(await image(panel)).toBe('none')
+
+  await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
+  await settings.getByLabel(/^Theme/).selectOption('dungeon')
+  await settings.getByRole('button', { name: 'Close settings' }).click()
+  for (const panel of panels) expect(await image(panel)).toContain('slate')
+})
+
 test('two expeditions are independent and a shell exit is shown in the list', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()

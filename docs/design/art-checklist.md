@@ -107,8 +107,10 @@ generated in one session; all six were checked together at 512 × 512. A flicker
 ## To make: backgrounds, tileable, opaque
 
 - [x] `design/stitch-prototype/assets/images/slate.png`, done: the slate that replaces the removed texture, behind the side
-  panels. It arrived as a 1254 × 1254 PNG of 3.5 MB instead of the planned 512 × 512 JPG; downscale it when the app
-  starts using it. Not yet checked for seamless tiling. #74 does both and applies it.
+  panels. It arrived as a 1254 × 1254 PNG of 3.5 MB. The app copy is `web/src/assets/slate.jpg`: 512 × 512 JPG, quality
+  85, 41 KB, shown at 256 px under a dark shade in Dungeon only (#74). The source did not tile (mean edge step 13 to 15
+  against 7 inside the image), so the copy is the source folded into a mirrored 2 × 2 and scaled back to 512; checked as
+  a 2 × 2 repeat, the edge step is 0 to 0.15 against 4 inside, so no seam shows.
   > Seamless tileable texture, 512 × 512: dark slate rock, near black with a hint of warm brown, fine grain and a few
   > shallow cracks, low contrast, even light with no focal point, no text. Match the tone and lighting of the attached
   > stone floor (our own `stone-floor.png`, the only reference to attach). Original, not derived from any photograph
