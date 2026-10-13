@@ -416,6 +416,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .term-wrap { padding: 18px 16px; background: radial-gradient(ellipse at 50% 20%, #321215, #100607 80%); }
 .term {
   overflow: hidden;
+  padding: 22px 28px; /* FRAME_PADDING.dungeon in termOptions.ts */
   border: 1px solid #9b6538;
   border-radius: 6px;
   /* The page behind the transparent terminal; zoom matches PARCHMENT_ZOOM in termTheme.ts. */
@@ -506,7 +507,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .app[data-theme='neutral'] .hero, .app[data-theme='neutral'] .shell, .app[data-theme='neutral'] .quests-toggle { border-color: var(--line); background: var(--panel); color: var(--text); box-shadow: none; }
 .app[data-theme='neutral'] .hero { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
 .app[data-theme='neutral'] .stage, .app[data-theme='neutral'] .term-wrap { background: var(--term-bg); }
-.app[data-theme='neutral'] .term { border-color: var(--line); background: var(--term-bg) none; box-shadow: none; }
+.app[data-theme='neutral'] .term { padding: 8px; border-color: var(--line); background: var(--term-bg) none; box-shadow: none; }
 .app[data-theme='neutral'] .term-status { background: var(--panel); color: var(--muted); border-color: var(--line); }
 .app[data-theme='neutral'] .quests, .app[data-theme='neutral'] .quest-browser, .app[data-theme='neutral'] .detail, .app[data-theme='neutral'] .detail-empty { background: var(--panel); border-color: var(--line); }
 .app[data-theme='neutral'] .qhead { background: var(--panel); border-color: var(--line); }

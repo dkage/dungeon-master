@@ -7,6 +7,7 @@
   import { termUrl } from './api'
   import { TermSocket } from './termsocket'
   import { TERM_THEMES, dimStyles } from './termTheme'
+  import { terminalTypography } from './termOptions'
 
   let {
     sessionId,
@@ -14,14 +15,6 @@
     theme = 'dungeon',
     onexit,
   }: { sessionId: string; fontSize?: number; theme?: 'dungeon' | 'neutral'; onexit: (code: number) => void } = $props()
-
-  // Nerd Font names come first so prompt icons (Starship, Powerline) render
-  // when one is installed; the rest is the usual monospace fallback.
-  const FONT_STACK = [
-    '"JetBrainsMono Nerd Font"', '"JetBrainsMono NF"', '"MesloLGS NF"', '"MesloLGS Nerd Font"',
-    '"FiraCode Nerd Font"', '"Hack Nerd Font"', '"Symbols Nerd Font Mono"',
-    'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace',
-  ].join(', ')
 
   let host: HTMLDivElement
   let terminal = $state.raw<Terminal>()
@@ -45,7 +38,7 @@
     }
     const term = new Terminal({
       cursorBlink: true,
-      fontFamily: FONT_STACK,
+      ...terminalTypography(),
       fontSize,
       scrollback: 5000,
       // The Dungeon appearance shows the parchment through the terminal.
@@ -61,6 +54,12 @@
       theme: TERM_THEMES[theme],
     })
     terminal = term
+    // xterm measures cells with whatever font is ready; remeasure once the
+    // bundled Fira Code has loaded.
+    void document.fonts?.load('13px "Fira Code"').then(() => {
+      term.options.fontFamily = terminalTypography().fontFamily + ' '
+      term.options.fontFamily = terminalTypography().fontFamily
+    }).catch(() => {})
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(host)

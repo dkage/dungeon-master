@@ -317,6 +317,36 @@ test('gray and dimmed agent text reads at WCAG AA in both appearances', async ({
   await expectReadable([20, 20, 26], 'neutral-gray-text')
 })
 
+test('the terminal keeps its monospace stack, line height and frame padding across fonts and appearances', async ({ page }) => {
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  const pane = page.locator('.pane:not([hidden])')
+  const rows = pane.locator('.xterm-rows')
+  await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+
+  const expectTypography = async (padding: string) => {
+    const family = await rows.evaluate((e) => getComputedStyle(e).fontFamily)
+    expect(family).toContain('Fira Code')
+    expect(family).toMatch(/monospace$/)
+    expect(family).not.toMatch(/Almendra|Garamond|Alegreya|Georgia|serif/i)
+    // xterm sizes each row to fontSize x lineHeight (13px x 1.3).
+    const rowHeight = await rows.locator('> div').first().evaluate((e) => e.getBoundingClientRect().height)
+    expect(rowHeight).toBeGreaterThan(13 * 1.2)
+    await expect(pane.locator('.term')).toHaveCSS('padding', padding)
+  }
+
+  for (const theme of ['dungeon', 'neutral']) {
+    await settings.getByLabel(/^Theme/).selectOption(theme)
+    for (const font of ['almendra', 'eb-garamond', 'alegreya']) {
+      await settings.getByLabel('Reading font').selectOption(font)
+      await expect(page.locator('.app')).toHaveAttribute('data-font', font)
+      await expectTypography(theme === 'dungeon' ? '22px 28px' : '8px')
+    }
+  }
+})
+
 test('the slate shows behind both side panels in Dungeon, not in Neutral', async ({ page }) => {
   await open(page)
   const panels = [page.locator('.sidebar'), page.locator('.quests')]
@@ -464,7 +494,8 @@ test('the terminal renders with its own font, colours and selection (CSP must al
   await expect(screenText(page)).toContainText('RED-TEXT plain-text', { timeout: process.platform === 'win32' ? 25_000 : 5_000 })
 
   const font = await screenText(page).evaluate((e) => getComputedStyle(e).fontFamily)
-  expect(font).toMatch(/monospace|Menlo/)
+  expect(font).toContain('Fira Code')
+  expect(font).toMatch(/monospace$/)
 
   const colour = (text: RegExp) =>
     page.locator('.pane:not([hidden]) .xterm-rows span').filter({ hasText: text }).last()
