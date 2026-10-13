@@ -182,7 +182,7 @@ describe('App', () => {
     const list = screen.getByRole('list', { name: 'Expeditions in demo' })
     await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(2))
 
-    const [first, second] = within(list).getAllByRole('button', { name: /Opus|shell/ }).filter((b) => b.classList.contains('pick'))
+    const [first, second] = within(list).getAllByRole('button', { name: /Opus|Scratch terminal/ }).filter((b) => b.classList.contains('pick'))
     expect(second).toHaveAttribute('aria-current', 'true')
     await fireEvent.click(first)
     expect(first).toHaveAttribute('aria-current', 'true')

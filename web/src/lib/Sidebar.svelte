@@ -38,6 +38,9 @@
     if (await store.updateCampaign(id, { name: renameName.trim() })) renameFor = null
   }
 
+  /** The hero behind a session, shown beside its quest or scratch terminal. */
+  const heroName = (s: SessionInfo) => (s.hero ? (store.heroes.find((h) => h.id === s.hero)?.label ?? s.hero) : '')
+
   const status = (s: SessionInfo) => sessionStatus(s, store.appearance.wordMode)
 </script>
 
@@ -49,7 +52,7 @@
   <label class="sidebar-search">
     <span class="sr">Search projects and sessions</span>
     <span aria-hidden="true">⌕</span>
-    <input type="search" bind:value={search} placeholder="Search projects and sessions…" />
+    <input type="search" bind:value={search} placeholder="Jump to project or session…" />
   </label>
   <nav aria-label={wordLabel('campaign', store.appearance.wordMode, true)}>
     <h2 class="sidebar-heading"><Term word="campaign" mode={store.appearance.wordMode} /><span class="section-rule" aria-hidden="true"></span><button type="button" class="heading-add" aria-label="Add project" onclick={() => { adding = true }}>＋</button></h2>
@@ -68,9 +71,8 @@
               title={c.dir}
               onclick={() => store.selectCampaign(c.id)}
             >
-              <span class="cname">{c.name}</span>
+              <span class="cline"><span class="cname">{c.name}</span>{#if c.sample}<span class="campaign-badge">Sample</span>{/if}</span>
               <span class="repo" class:none={!c.repo}>{c.repo ?? 'no GitHub repo'}</span>
-              {#if c.sample}<span class="campaign-badge">Sample</span>{/if}
             </button>
             {#if c.sample}
               <button type="button" class="ghost" aria-label="Remove sample project" onclick={() => (confirming = c.id)}>×</button>
@@ -120,7 +122,7 @@
                     onclick={() => store.selectSession(s.id)}
                   >
                     <span class="dot {st.kind}" aria-hidden="true">{st.glyph}</span>
-                    <span class="stitle">{s.title}</span>
+                    <span class="stitle">{s.kind === 'shell' && !s.quest ? 'Scratch terminal' : s.title}{#if s.quest && heroName(s)}{' '}<span class="hero-tag">({heroName(s)})</span>{/if}</span>
                     <span class="sr">{st.label}</span>
                     {#if st.kind === 'needs'}<span class="badge needs" aria-hidden="true">{st.label}</span>{/if}
                     {#if s.exited && !s.lost}<span class="badge">exit {s.exitCode}</span>{/if}
@@ -158,7 +160,7 @@
   <div class="sidebar-footer">
     <button type="button" class="settings-button add-project" onclick={() => (adding = !adding)}>{adding ? '× Cancel' : '＋ Add project'}</button>
     <button type="button" class="settings-button" onclick={onsettings}>⚙ Settings</button>
-    <button type="button" class="settings-button" onclick={onwords}>Word guide</button>
-    <button type="button" class="settings-button" onclick={() => { store.openFirstRun(); void store.loadSuggestions() }}>Getting started</button>
+    <button type="button" class="settings-button minor" onclick={onwords}>Word guide</button>
+    <button type="button" class="settings-button minor" onclick={() => { store.openFirstRun(); void store.loadSuggestions() }}>Getting started</button>
   </div>
 </aside>

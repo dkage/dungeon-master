@@ -600,3 +600,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .app[data-theme='dungeon'] .launch-footer select { border-color: #70402e; border-radius: 4px; background: #0d0405; }
 .app[data-theme='dungeon'] .launch-button { padding: 9px 22px; border: 2px solid var(--brass); border-radius: 4px; background: linear-gradient(180deg, #8f2725, #5a0e15); color: #f7e6c2; font: 700 14px 'Cinzel', var(--reading-font, serif); letter-spacing: .1em; text-transform: uppercase; box-shadow: inset 0 1px #e4bd7640, 0 2px 6px #0009; }
 .app[data-theme='dungeon'] .launch-button:hover:not(:disabled) { filter: brightness(1.12); border-color: var(--brass-bright); }
+
+/* --- left panel (#98): reference grouping --- */
+.cline { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; }
+.cline .campaign-badge { flex: none; margin: 0; padding: 1px 6px; border: 1px solid var(--line); border-radius: 3px; }
+.hero-tag { color: var(--muted); }
+.sidebar-footer { grid-template-columns: 1fr 1fr; }
+.sidebar-footer .settings-button { text-align: center; }
+.sidebar-footer .settings-button.minor { padding: 3px 8px; font-size: 12px; text-align: center; background: transparent; border-color: transparent; }
+.app[data-theme='dungeon'] .sidebar-footer .settings-button:not(.minor) { padding: 10px 8px; font: 600 14px 'Cinzel', var(--reading-font, serif); letter-spacing: .06em; text-transform: uppercase; border: 1px solid #70402e; background: linear-gradient(180deg, #381116, #21090d); color: #e8d6b8; box-shadow: inset 0 1px #e4bd7626, 0 2px 5px #0007; }
+.app[data-theme='dungeon'] .sidebar-footer .settings-button:not(.minor):hover { border-color: #d8a04b; filter: brightness(1.12); }
+.app[data-theme='dungeon'] .sidebar-footer .settings-button.minor { color: var(--muted); }
+.app[data-theme='dungeon'] .sidebar-footer .settings-button.minor:hover { color: var(--text); background: transparent; }

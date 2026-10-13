@@ -443,7 +443,7 @@ test('two expeditions are independent and a shell exit is shown in the list', as
   await expect(screenText(page)).not.toContainText('shell-only-marker')
 
   // Exit the shell: it is marked in the list and keeps its scrollback.
-  await expeditions(page).getByRole('button', { name: /^shell/ }).click()
+  await expeditions(page).getByRole('button', { name: /^Scratch terminal/ }).click()
   await page.locator('.pane:not([hidden]) .xterm').click()
   await page.keyboard.type('exit 3')
   await page.keyboard.press('Enter')
@@ -732,6 +732,8 @@ test('a campaign without a GitHub repository can open the separate sample projec
   await expect(screenText(page)).toContainText('task briefing file at')
   await expect(screenText(page)).toContainText('sample-workspace')
   await expect(page.locator('.quest-session-chip')).toHaveText('#9')
+  // The sidebar names the expedition by its issue and the hero running it.
+  await expect(expeditions(page, 'Sample (not a real project)').getByRole('button', { name: /^#9 Evaluate rate-limit libraries \(Opus\)/ })).toBeVisible()
   await expect(launchDetail.getByRole('button', { name: 'Go to session' })).toBeVisible()
   await expect(launchDetail.getByRole('button', { name: 'Review launch' })).toBeDisabled()
   const linkedRows = nav(page).getByRole('list', { name: /Expeditions in Sample/ })

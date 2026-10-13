@@ -220,6 +220,35 @@ describe('Sidebar', () => {
     expect(s.activeId).toBe('e')
   })
 
+  it('names a quest session by its issue and hero, and a shell as a scratch terminal', () => {
+    const s = store((st) => {
+      st.sessions = [
+        sess('q', 'c1', { quest: 7, hero: 'sonnet', title: '#7 Signup form' }),
+        sess('f', 'c1', { kind: 'shell', title: 'shell' }),
+        sess('o', 'c1', { hero: 'opus', title: 'Opus' }),
+      ]
+    })
+    render(Sidebar, { store: s })
+    const list = screen.getByRole('list', { name: 'Expeditions in Camp c1' })
+    expect(within(list).getByRole('button', { name: /^#7 Signup form \(Sonnet\)/ })).toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: /^Scratch terminal/ })).toBeInTheDocument()
+    // A free hero session keeps its own title and does not repeat the hero.
+    expect(within(list).getByRole('button', { name: /^Opus/ })).not.toHaveTextContent('(Opus)')
+    expect(within(list).getByRole('button', { name: 'Close shell' })).toBeInTheDocument()
+  })
+
+  it('puts the sample badge beside the project name and the footer actions in two columns', () => {
+    const s = store((st) => {
+      st.campaigns = [{ id: 'c1', name: 'Demo', dir: '/d', sample: true } as never]
+    })
+    render(Sidebar, { store: s })
+    const line = screen.getByText('Demo').closest('.cline')!
+    expect(line).toHaveTextContent('Sample')
+    const footer = document.querySelector('.sidebar-footer')!
+    expect(within(footer as HTMLElement).getAllByRole('button').map((b) => b.textContent)).toEqual(['＋ Add project', '⚙ Settings', 'Word guide', 'Getting started'])
+    expect(screen.getByPlaceholderText('Jump to project or session…')).toBeInTheDocument()
+  })
+
   it('closes an expedition from its row', async () => {
     const s = store((st) => (st.sessions = [sess('a', 'c1')]))
     const close = vi.spyOn(s, 'close').mockResolvedValue()
