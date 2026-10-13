@@ -107,6 +107,8 @@ Still to come (see `docs/architecture.md` §4): `spells`.
 make check     # go vet + go test -race + frontend type check and unit tests (what CI runs)
 make build     # build the frontend, then bin/dungeon (CGO_ENABLED=0)
 make run       # build and serve on 127.0.0.1:7878 (macOS/Linux)
+make dev       # Vite HMR on 5173 + stable Go backend on 7878
+make dev-watch # also restart Go on edits; terminates active agent sessions
 .\run.ps1     # build and serve in Windows PowerShell
 make web       # build the frontend into web/dist
 make test-linux # Go tests in a Linux container (needs Docker); PTY behaviour differs from macOS
@@ -114,7 +116,12 @@ make test-e2e  # browser tests against bin/dungeon (needs `npx playwright instal
 ```
 
 `go build` and `go test` must work on a fresh clone with no frontend toolchain (the server falls back to a built-in
-page). Frontend dev: run `dungeon serve`, open its URL once (sets the cookie), then `cd web && npm run dev` and browse
+page). Development: `make dev` runs Vite HMR with a stable backend. `make dev-watch` uses pinned MIT-licensed wgo
+to additionally restart Go on edits and ends active agent sessions; never use it for an
+agent editing this project from inside Dungeon. Open the backend's printed token URL once, then browse
+http://127.0.0.1:5173.
+For frontend-only work with a stable backend, run `dungeon serve`, open its URL once (sets the cookie), then
+`cd web && npm run dev` and browse
 http://127.0.0.1:5173 (the Vite proxy forwards /api and websockets). The future native webview shell needs cgo and is
 built separately, never by the portable build.
 
