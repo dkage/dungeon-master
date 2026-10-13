@@ -3,7 +3,7 @@ status: current
 milestone: all
 github_issues: [28, 72, 63, 78, 79, 43, 45, 67, 68, 61, 69, 70, 71, 44, 58, 35, 36, 37, 38, 39]
 tracking: in-gh-issues
-next: review and publish the committed map increment, then workspace focus and source-backed skill launch
+next: push the M5a review fixes and close #28, then workspace focus and source-backed skill launch
 verified: 2026-10-13
 ---
 
@@ -17,12 +17,13 @@ checks, committed/published code and a closed milestone. Keep existing issue num
 
 - M0 through M4.5 are delivered; #7, #19 and #23 and their implementation children are closed. M4.5's old
   "closes when pushed" status was stale.
-- M5a (#28) is open. Its implementation, assets, shared model/layout, effort APIs and tests are committed locally
-  across five commits: a1676ae, 4f5b6f9, 7a25fbd, 01a461a and 808573b. There are no remaining implementation changes
-  in the working tree; the roadmap/design/skill reset is maintained separately from those implementation commits.
-- At the implementation audit, after fetching origin and before committing the planning reset, `master` was five
-  commits ahead of `origin/master` (0 behind). The implementation is committed
-  but unpublished. This supersedes the earlier same-day observation that the branches matched before these commits.
+- M5a (#28) is open. Its implementation, assets, shared model/layout, effort APIs and tests are published: the five
+  commits a1676ae, 4f5b6f9, 7a25fbd, 01a461a and 808573b are in `origin/master`, and CI passed on 0daab09.
+- A code review of those commits (recorded as a comment on #28) found ten issues. Five fix commits (a861531, c20e963,
+  6fa3c7e, 7242750, 0b988d5) cover #123, #124, #125, the label-collision half of #126, part of #127 and a gate/layout
+  rework. They are committed locally and not yet pushed. Open: #126 (whether reads may save the creature choice is a
+  design decision) and the rest of #127 (layout rebuilt on each sessions poll; neutral names for the creature choice).
+- The map is left as is until v2 reworks the whole view (#44).
 - `make check` passed on macOS against the local tree: Go vet/race tests, frontend check (zero diagnostics), and
   322 frontend tests. All 33 Playwright browser tests passed, including seven map scenarios. These are stub/fake-based
   checks, not proof of real-CLI, real-GitHub or other-platform behavior.
@@ -44,7 +45,7 @@ checks, committed/published code and a closed milestone. Keep existing issue num
 
 | Order | Increment | Status | Issues | Design |
 |---|---|---|---|---|
-| 1 | M5a: review and publish the map/list implementation | five local commits; checks passed; milestone open | #28 (#24–#27, #59, #60, #62) | `docs/design/map.md` |
+| 1 | M5a: push the review fixes and close the map/list milestone | published; five review-fix commits local; #126 and #127 open | #28 (#24–#27, #59, #60, #62) | `docs/design/map.md` |
 | 2 | Dungeon visual baseline: parchment terminal, slate panels, framed detail/list/headers | done; differences recorded in `docs/design/art-direction.md` | #72 (#73–#77, #93, #96–#99) | `docs/design/art-direction.md` |
 | 3 | Workspace focus: resizable columns, expand/restore panels and configurable shortcuts | planned | #63 (#78, #64, #65) | `docs/design/workspace.md` |
 | 4 | Parallel work: several issue sessions of one project, each in its own working copy, with session tabs | research, then implementation | #79 (#80 → #81, #82) | `docs/design/sessions.md` |

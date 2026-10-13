@@ -181,8 +181,10 @@ detail footer. So a locked quest can always be opened and read, it just cannot b
   assigned elsewhere, `×` closed, `?` needs you. The prototype also puts `!` on the quest that has a running session;
   that is a prototype shortcut. A running quest shows the hero token and warm light from §3 States, so state and
   effort stay separate.
-- A **gate** marker sits on a blocked-by line next to the blocked room; it opens (or the line fades) when the blocker
-  closes.
+- A **gate** marker sits on a blocked-by line, about 36 by 60 px, 36 px from the blocked room so the room never clips
+  it; it opens (or the line fades) when the blocker closes. A line that skips a column keeps its gate beside its blocker,
+  and lines meeting one side of a room are spread over its edge. Lines are not routed around intermediate rooms; that is
+  left for the v2 rework (#44).
 - The selected room gets a bright outline; the rest dims only a little so the map stays readable.
 
 ## 4. Visual directions
