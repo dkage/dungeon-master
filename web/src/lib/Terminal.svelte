@@ -43,6 +43,9 @@
       scrollback: 5000,
       // The Dungeon appearance shows the parchment through the terminal.
       allowTransparency: true,
+      // Lift any text colour (the agent's grays and dim text) that would read
+      // below WCAG AA against its background; xterm halves the target for dim.
+      minimumContrastRatio: 4.5,
       // Agents such as Claude turn on mouse reporting, which stops plain
       // drags from selecting. Shift-drag always selects; on macOS so does
       // Option-drag.
