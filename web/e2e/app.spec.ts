@@ -347,6 +347,39 @@ test('the text size can be changed from the terminal, resizes the session, keeps
   await expect(pane.getByRole('button', { name: /Reset text size/ })).toHaveCount(0)
 })
 
+test('the whole output can be copied and saved as plain text', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await page.locator('.pane:not([hidden]) .xterm').click()
+  for (let i = 1; i <= 50; i++) {
+    await page.keyboard.type(`row-${i}`)
+    await page.keyboard.press('Enter')
+  }
+  await expect(screenText(page)).toContainText('echo:row-50')
+
+  const pane = page.locator('.pane:not([hidden])')
+  await pane.getByRole('button', { name: 'Copy output as text' }).click()
+  await expect(pane.locator('.term-note')).toHaveText('Output copied.')
+  const copied = await page.evaluate(() => navigator.clipboard.readText())
+  // Rows scrolled out of view are included, and no control sequences are.
+  expect(copied).toContain('FAKE-CLAUDE')
+  expect(copied).toContain('echo:row-1\n')
+  expect(copied).toContain('echo:row-50')
+  // eslint-disable-next-line no-control-regex
+  expect(copied).not.toMatch(/[\u0000-\u0008\u000b-\u001f\u007f]/)
+  expect(copied).not.toContain('Earlier output is not included')
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    pane.getByRole('button', { name: 'Save output as a text file' }).click(),
+  ])
+  expect(download.suggestedFilename()).toMatch(/^session-[A-Za-z0-9_-]+-output\.txt$/)
+  const path = await download.path()
+  expect(readFileSync(path, 'utf8')).toBe(copied + '\n')
+})
+
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()

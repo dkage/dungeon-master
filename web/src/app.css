@@ -145,7 +145,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .term-search { position: absolute; right: 22px; top: 40px; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); z-index: 3; box-shadow: 0 6px 20px #0005; }
 .term-search input { width: 180px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--text); font: inherit; font-size: 13px; }
 .term-count { min-width: 64px; font-size: 12px; color: var(--muted); white-space: nowrap; }
-.term-note { position: absolute; left: 12px; right: 12px; top: 8px; padding: 6px 12px; border-radius: 6px; background: var(--panel); color: var(--error); border: 1px solid var(--line); z-index: 2; }
+.term-note[data-kind='info'] { color: var(--text); }
+.term-note { position: absolute; left: 12px; right: 12px; bottom: 8px; padding: 6px 12px; border-radius: 6px; background: var(--panel); color: var(--error); border: 1px solid var(--line); z-index: 2; }
 .term[data-dropping='true'] { outline: 2px dashed var(--accent); outline-offset: -4px; }
 
 /* --- quests panel --- */

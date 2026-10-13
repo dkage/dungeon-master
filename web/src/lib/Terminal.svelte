@@ -11,6 +11,7 @@
   import { terminalTypography } from './termOptions'
   import { keyInput } from './termKeys'
   import { DEFAULT_TERMINAL_SIZE, MAX_SIZE, MIN_SIZE, type Zoom } from './termSize'
+  import { bufferText, outputFileName, wasCut, type BufferLine } from './termText'
   import { SEARCH_DECORATIONS, TERMINAL_ACTION, matchLabel, scrolledUp } from './termSearch'
   import { fileToBase64, filesOf, pathsText, refusal } from './termUpload'
 
@@ -28,6 +29,7 @@
     onzoom?: (step: Zoom) => void
   } = $props()
 
+  const SCROLLBACK = 5000
   let host: HTMLDivElement
   let terminal = $state.raw<Terminal>()
   let status = $state<'connecting' | 'live' | 'exited' | 'disconnected'>('connecting')
@@ -42,6 +44,7 @@
   let latest = $state(false)
   let searchInput: HTMLInputElement | undefined = $state()
   let search: SearchAddon | undefined
+  let noteKind = $state<'info' | 'error'>('error')
   let noteTimer: ReturnType<typeof setTimeout> | undefined
 
   let refit: (() => void) | undefined
@@ -80,6 +83,42 @@
     hit = { index: -1, count: 0 }
     terminal?.focus()
   }
+  // The whole scrollback as plain text: what the terminal holds, never what it was sent.
+  function outputText(): string {
+    const buf = terminal!.buffer.active
+    const lines: BufferLine[] = []
+    for (let y = 0; y < buf.length; y++) {
+      const l = buf.getLine(y)
+      if (l) lines.push({ text: l.translateToString(true), wrapped: l.isWrapped })
+    }
+    return bufferText(lines, wasCut(buf.length, terminal!.rows, SCROLLBACK))
+  }
+  function inform(msg: string, kind: 'info' | 'error' = 'info') {
+    noteKind = kind
+    note = msg
+    clearTimeout(noteTimer)
+    noteTimer = setTimeout(() => (note = ''), 4000)
+  }
+  async function copyOutput() {
+    if (!terminal) return
+    const text = outputText()
+    try {
+      await navigator.clipboard.writeText(text)
+      inform(text ? 'Output copied.' : 'There is no output to copy.')
+    } catch {
+      inform('The browser did not allow copying. Use Save output instead.', 'error')
+    }
+  }
+  function saveOutput() {
+    if (!terminal) return
+    const url = URL.createObjectURL(new Blob([outputText() + '\n'], { type: 'text/plain;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = outputFileName(sessionId)
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    inform('Output saved.')
+  }
   function toLatest() {
     terminal?.scrollToBottom()
     latest = false
@@ -107,7 +146,7 @@
       cursorBlink: true,
       ...terminalTypography(),
       fontSize,
-      scrollback: 5000,
+      scrollback: SCROLLBACK,
       // The Dungeon appearance shows the parchment through the terminal.
       allowTransparency: true,
       // Search highlights are decorations, which xterm still gates behind this flag.
@@ -194,6 +233,7 @@
     // cursor through xterm's paste so the agent sees one paste and nothing
     // is submitted. Plain text pastes are left to xterm.
     function tell(msg: string) {
+      noteKind = 'error'
       note = msg
       clearTimeout(noteTimer)
       noteTimer = setTimeout(() => (note = ''), 6000)
@@ -312,6 +352,8 @@
     {#if latest}
       <button type="button" class="term-tool" onclick={toLatest} aria-label="Jump to latest output">Latest ↓</button>
     {/if}
+    <button type="button" class="term-tool" onclick={copyOutput} aria-label="Copy output as text">Copy</button>
+    <button type="button" class="term-tool" onclick={saveOutput} aria-label="Save output as a text file">Save</button>
     <button type="button" class="term-tool" onclick={() => (searching ? closeSearch() : openSearch())} aria-label="Search output" aria-pressed={searching}>Search</button>
   </div>
   {#if searching}
@@ -332,7 +374,7 @@
     </div>
   {/if}
   {#if note}
-    <div class="term-note" role="status">{note}</div>
+    <div class="term-note" data-kind={noteKind} role="status">{note}</div>
   {/if}
   {#if status !== 'live'}
     <div class="term-status" data-status={status} role="status">
