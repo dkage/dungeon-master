@@ -1511,19 +1511,26 @@ test('a desktop notification fires once for a session that asks while the window
 
 // --- Terminal connection ---
 
-// Passes every terminal websocket through to the real server, and lets a test cut or refuse them.
+// Records the page's terminal websockets so a test can cut one the way a network drop would, and
+// refuses new ones when asked (the close then looks like the server turned the page away).
 async function watchTerminals(page: Page) {
-  const state = { refuse: false, live: [] as Array<{ close(): void }>, opened: 0 }
-  await page.routeWebSocket(/\/api\/sessions\/[^/]+\/term$/, (ws) => {
-    state.opened++
-    if (state.refuse) {
-      ws.close({ code: 1006 })
-      return
-    }
-    ws.connectToServer()
-    state.live.push(ws)
+  await page.addInitScript(() => {
+    const Real = window.WebSocket
+    const w = window as unknown as { __terms: WebSocket[]; __refuse: boolean }
+    w.__terms = []
+    w.__refuse = false
+    window.WebSocket = class extends Real {
+      constructor(url: string | URL, protocols?: string | string[]) {
+        super(w.__refuse && String(url).includes('/term') ? 'ws://127.0.0.1:1/refused' : url, protocols)
+        if (String(url).includes('/term')) w.__terms.push(this)
+      }
+    } as typeof WebSocket
   })
-  return state
+  return {
+    cut: () => page.evaluate(() => (window as unknown as { __terms: WebSocket[] }).__terms.at(-1)?.close(4000)),
+    refuse: () => page.evaluate(() => ((window as unknown as { __refuse: boolean }).__refuse = true)),
+    opened: () => page.evaluate(() => (window as unknown as { __terms: WebSocket[] }).__terms.length),
+  }
 }
 
 async function startShell(page: Page) {
@@ -1541,8 +1548,8 @@ test('a dropped terminal connection reattaches by itself, typing works and nothi
   await page.keyboard.press('Enter')
   await expect(screenText(page)).toContainText('ONE-MARK-111')
 
-  sockets.live.forEach((ws) => ws.close())
-  await expect.poll(() => sockets.opened, { timeout: 15_000 }).toBeGreaterThan(1)
+  await sockets.cut()
+  await expect.poll(sockets.opened, { timeout: 15_000 }).toBeGreaterThan(1)
   await expect(page.locator('.pane:not([hidden]) .term-status')).toHaveCount(0, { timeout: 15_000 })
 
   await page.keyboard.type('echo TWO-MARK-222')
@@ -1558,13 +1565,13 @@ test('a refused reconnect says the sign-in changed and stops retrying', async ({
   const sockets = await watchTerminals(page)
   await startShell(page)
   await page.route(/\/api\/sessions\/[^/]+\/term$/, (route) => route.fulfill({ status: 401, body: '{}' }))
-  sockets.refuse = true
-  sockets.live.forEach((ws) => ws.close())
+  await sockets.refuse()
+  await sockets.cut()
   const status = page.locator('.pane:not([hidden]) .term-status')
   await expect(status).toContainText('access token changed', { timeout: 15_000 })
-  const opened = sockets.opened
+  const opened = await sockets.opened()
   await page.waitForTimeout(2500)
-  expect(sockets.opened).toBe(opened) // no more attempts
+  expect(await sockets.opened()).toBe(opened) // no more attempts
   await expect(status).not.toContainText(url.split('token=')[1] ?? 'no-token')
 })
 
