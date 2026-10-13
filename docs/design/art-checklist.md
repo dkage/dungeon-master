@@ -53,6 +53,9 @@ Each is one sheet of four idle frames, transparent, 2172 × 724 px (cells 543 ×
 ### Fonts
 
 - [x] Cinzel, Almendra, EB Garamond, Alegreya, Fira Code, bundled in `web/src/assets/fonts/` (M3.6).
+- [x] Symbols Nerd Font Mono (Nerd Fonts, MIT, `symbolsnerdfont-MIT.txt`), bundled as `SymbolsNerdFontMono.ttf` and
+  loaded as `Dungeon Symbols`. Last in the terminal stack before `monospace`, so it only supplies prompt-icon and
+  powerline glyphs the primary font lacks (#97).
 
 ### Removed
 
