@@ -370,7 +370,9 @@ test('gray and dimmed agent text reads at WCAG AA in both appearances', async ({
       const lum = (c: number[]) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
       const out: Record<string, number> = {}
       for (const text of ['dim-sample', 'gray-sample', 'dimgray-sample']) {
-        const span = [...el.querySelectorAll('.xterm-rows span')].find((s) => s.textContent === text)!
+        // Windows' console drops "dim", so a sample can share a span with the spaces around it.
+        const spans = [...el.querySelectorAll('.xterm-rows span')]
+        const span = spans.find((s) => s.textContent?.trim() === text) ?? spans.find((s) => s.textContent?.includes(text))!
         const [r, g, b, a = 1] = getComputedStyle(span).color.match(/[\d.]+/g)!.map(Number)
         const c = [r, g, b].map((v, i) => bg[i] + (v - bg[i]) * a)
         const [hi, lo] = [lum(c), lum(bg)].sort((x, y) => y - x)
