@@ -370,16 +370,17 @@ func (s *Server) handleOpenFolder(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleCampaignUpdate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name   *string         `json:"name"`
-		Remote *string         `json:"remote"`
-		Scope  *campaign.Scope `json:"scope"`
-		Demo   *bool           `json:"demo"`
+		Name           *string         `json:"name"`
+		Remote         *string         `json:"remote"`
+		Scope          *campaign.Scope `json:"scope"`
+		Demo           *bool           `json:"demo"`
+		ParallelQuests *bool           `json:"parallelQuests"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
 	c, err := s.cfg.Campaigns.Update(r.Context(), r.PathValue("id"), campaign.Patch{
-		Name: req.Name, Remote: req.Remote, Scope: req.Scope, Demo: req.Demo,
+		Name: req.Name, Remote: req.Remote, Scope: req.Scope, Demo: req.Demo, ParallelQuests: req.ParallelQuests,
 	})
 	if err != nil {
 		campaignErr(w, err)
@@ -524,7 +525,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 				httpErrCode(w, http.StatusConflict, "quest_not_startable", reason)
 				return
 			}
-			if existing := s.activeQuestSessionFor(camp); existing != nil {
+			if existing := s.activeQuestSessionFor(camp); existing != nil && !camp.ParallelQuests {
 				httpErrCode(w, http.StatusConflict, "quest_session_active", fmt.Sprintf("%s is already working in this Git working tree.", existing.Title))
 				return
 			}

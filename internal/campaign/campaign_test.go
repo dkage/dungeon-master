@@ -489,3 +489,28 @@ func TestExecGitDoesNotHangOnStrayChildren(t *testing.T) {
 		t.Fatalf("hung for %v", time.Since(start))
 	}
 }
+
+func TestParallelQuestsPersistsAndUpdates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.json")
+	r := newReg(t, path, &fakeGit{})
+	c, _ := r.Add(context.Background(), Input{Dir: t.TempDir()})
+	if c.ParallelQuests {
+		t.Fatal("one quest per working tree is the default")
+	}
+	on := true
+	u, err := r.Update(context.Background(), c.ID, Patch{ParallelQuests: &on})
+	if err != nil || !u.ParallelQuests {
+		t.Fatalf("%+v %v", u, err)
+	}
+	if got, _ := newReg(t, path, &fakeGit{}).Get(c.ID); !got.ParallelQuests {
+		t.Fatal("setting not persisted")
+	}
+	name := "x"
+	if u, _ := r.Update(context.Background(), c.ID, Patch{Name: &name}); !u.ParallelQuests {
+		t.Fatal("unrelated update cleared the setting")
+	}
+	off := false
+	if u, _ := r.Update(context.Background(), c.ID, Patch{ParallelQuests: &off}); u.ParallelQuests {
+		t.Fatal("could not switch it back off")
+	}
+}

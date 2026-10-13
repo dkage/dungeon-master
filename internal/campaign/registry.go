@@ -48,6 +48,9 @@ type Campaign struct {
 	Demo bool `json:"demo"`
 	// Sample marks the built-in, throwaway onboarding campaign.
 	Sample bool `json:"sample,omitempty"`
+	// ParallelQuests allows a second quest session while one already runs in
+	// the same Git working tree. Off by default: agents share one checkout.
+	ParallelQuests bool `json:"parallelQuests"`
 	// Derived from git on registration and update; empty when the directory
 	// is not in a repository or the remote is not on github.com.
 	GitRoot string `json:"gitRoot,omitempty"`
@@ -96,6 +99,8 @@ type Patch struct {
 	Remote *string
 	Scope  *Scope
 	Demo   *bool
+	// ParallelQuests lets several quest sessions run in one working tree.
+	ParallelQuests *bool
 }
 
 type record struct {
@@ -110,6 +115,8 @@ type record struct {
 	Demo   bool      `json:"demo,omitempty"`
 	Sample bool      `json:"sample,omitempty"`
 	Added  time.Time `json:"added"`
+
+	ParallelQuests bool `json:"parallelQuests,omitempty"`
 
 	EffortLabels    map[string]string `json:"effortLabels,omitempty"`
 	EffortOverrides map[int]string    `json:"effortOverrides,omitempty"`
@@ -281,6 +288,9 @@ func (r *Registry) Update(ctx context.Context, id string, p Patch) (Campaign, er
 	if p.Demo != nil {
 		rec.Demo = *p.Demo
 	}
+	if p.ParallelQuests != nil {
+		rec.ParallelQuests = *p.ParallelQuests
+	}
 	d := r.resolve(ctx, rec)
 
 	r.mu.Lock()
@@ -328,7 +338,7 @@ func (r *Registry) view(rec record) Campaign {
 		scope = &sc
 	}
 	return Campaign{
-		ID: rec.ID, Name: rec.Name, Dir: rec.Dir, Remote: rec.Remote, Scope: scope, Demo: rec.Demo, Sample: rec.Sample,
+		ID: rec.ID, Name: rec.Name, Dir: rec.Dir, Remote: rec.Remote, Scope: scope, Demo: rec.Demo, Sample: rec.Sample, ParallelQuests: rec.ParallelQuests,
 		GitRoot: d.gitRoot, Repo: d.repo,
 		EffortLabels:    copyMap(rec.EffortLabels),
 		EffortOverrides: copyMap(rec.EffortOverrides),

@@ -69,7 +69,7 @@ func (s *Server) handleQuestLaunchPreview(w http.ResponseWriter, r *http.Request
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
-	if existing := s.activeQuestSessionFor(c); existing != nil {
+	if existing := s.activeQuestSessionFor(c); existing != nil && !c.ParallelQuests {
 		out.ExistingSession = existing
 		out.Reason = existing.Title + " is already working in this Git working tree."
 		writeJSON(w, http.StatusOK, out)
