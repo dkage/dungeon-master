@@ -7,7 +7,7 @@
   import './terminal.css'
   import { termUrl, uploadToSession } from './api'
   import { TermSocket } from './termsocket'
-  import { TERM_THEMES, dimStyles } from './termTheme'
+  import { TERM_THEMES, dimStyles, type TermThemeName } from './termTheme'
   import { terminalTypography } from './termOptions'
   import { keyInput } from './termKeys'
   import { DEFAULT_TERMINAL_SIZE, MAX_SIZE, MIN_SIZE, type Zoom } from './termSize'
@@ -28,7 +28,7 @@
     fontSize?: number
     fontFamily?: string
     lineHeight?: number
-    theme?: 'dungeon' | 'neutral'
+    theme?: TermThemeName
     onexit: (code: number) => void
     onzoom?: (step: Zoom) => void
   } = $props()

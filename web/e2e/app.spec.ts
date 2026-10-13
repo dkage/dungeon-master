@@ -461,6 +461,49 @@ test('the terminal font and line height change on a live session, refit it, and 
   await other.close()
 })
 
+test('the terminal colour scheme recolours a live session without restarting it, and is kept across a reload', async ({ page }) => {
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  const pane = page.locator('.pane:not([hidden])')
+  const term = pane.getByTestId('terminal')
+  const screenBg = () => pane.locator('.xterm-scrollable-element').evaluate((e) => getComputedStyle(e).backgroundColor)
+  const textColour = () => pane.locator('.xterm-rows').evaluate((e) => getComputedStyle(e).color)
+
+  // Default in Dungeon: the parchment shows through a clear terminal.
+  await expect(term).toHaveAttribute('data-term-theme', 'dungeon')
+  await expect.poll(screenBg).toBe('rgba(237, 175, 83, 0)')
+
+  await page.getByRole('button', { name: 'Settings' }).first().click()
+  const colours = page.getByRole('dialog', { name: 'Settings' }).getByLabel('Terminal colours')
+
+  await colours.selectOption('high-contrast')
+  await expect(term).toHaveAttribute('data-term-theme', 'high-contrast')
+  await expect.poll(screenBg).toBe('rgb(0, 0, 0)')
+  await expect.poll(textColour).toBe('rgb(255, 255, 255)')
+  await expect(term).toHaveCSS('background-color', 'rgb(0, 0, 0)')
+  await expect(term).toHaveCSS('background-image', 'none')
+
+  await colours.selectOption('light')
+  await expect.poll(screenBg).toBe('rgb(251, 248, 239)')
+  await expect(term).toHaveCSS('background-color', 'rgb(251, 248, 239)')
+  // The same session throughout: its output is still there.
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+
+  await expect.poll(async () => (await (await page.request.get('/api/appearance')).json()).settings.terminalColors).toBe('light')
+  await page.reload()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await expect.poll(screenBg).toBe('rgb(251, 248, 239)')
+
+  // A scheme ignores the appearance; Default follows it again.
+  await page.getByRole('button', { name: 'Settings' }).first().click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+  await settings.getByLabel(/^Theme/).selectOption('neutral')
+  await expect.poll(screenBg).toBe('rgb(251, 248, 239)')
+  await settings.getByLabel('Terminal colours').selectOption('default')
+  await expect.poll(screenBg).toBe('rgb(20, 20, 26)')
+})
+
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()

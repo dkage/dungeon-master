@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { inflateSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import {
-  ANSI_NAMES, MIN_CONTRAST, PARCHMENT_TONE, PARCHMENT_ZOOM, TERM_BACKDROP, TERM_THEMES, contrast, dimColour, dimStyles,
+  ANSI_NAMES, MIN_CONTRAST, PARCHMENT_TONE, PARCHMENT_ZOOM, TERM_BACKDROP, TERM_THEMES, contrast, dimColour, dimStyles, schemeFor,
   hexRGB as hex, luminance, type RGB,
 } from './termTheme'
 
@@ -105,7 +105,7 @@ describe('Dungeon terminal palette on the parchment', () => {
 describe('gray and dimmed text in both appearances', () => {
   // Claude Code prints hints and placeholders as dim (SGR 2) text or in
   // bright black; both must reach WCAG AA on each background.
-  describe.each(['dungeon', 'neutral'] as const)('%s', (name) => {
+  describe.each(['dungeon', 'neutral', 'high-contrast', 'light'] as const)('%s', (name) => {
     const t = TERM_THEMES[name]
     const bg = hex(TERM_BACKDROP[name])
 
@@ -144,5 +144,47 @@ describe('gray and dimmed text in both appearances', () => {
     expect(dimColour('#ffffff', '#000000')).toBe('#808080')
     // A colour at the limit cannot fade at all.
     expect(dimColour(TERM_THEMES.dungeon.brightBlack!, PARCHMENT_TONE)).toBe(TERM_THEMES.dungeon.brightBlack)
+  })
+})
+
+describe('terminal colour schemes (#154)', () => {
+  const opaque = ['high-contrast', 'light'] as const
+
+  it.each(opaque)('%s paints an opaque background that matches its backdrop', (name) => {
+    expect(TERM_THEMES[name].background).toBe(TERM_BACKDROP[name])
+  })
+
+  it.each(opaque)('%s shows the foreground and every colour at WCAG AA', (name) => {
+    const bg = hex(TERM_BACKDROP[name])
+    for (const key of ['foreground', 'cursor', ...ANSI_NAMES] as const) {
+      expect(contrast(hex(TERM_THEMES[name][key]!), bg), `${name} ${key}`).toBeGreaterThanOrEqual(MIN_CONTRAST)
+    }
+  })
+
+  it('reaches AAA (7:1) for everything in high contrast', () => {
+    const bg = hex(TERM_BACKDROP['high-contrast'])
+    for (const key of ['foreground', ...ANSI_NAMES] as const) {
+      expect(contrast(hex(TERM_THEMES['high-contrast'][key]!), bg), key).toBeGreaterThanOrEqual(7)
+      expect(contrast(hex(dimColour(TERM_THEMES['high-contrast'][key]!, TERM_BACKDROP['high-contrast'])), bg), `dim ${key}`).toBeGreaterThanOrEqual(MIN_CONTRAST)
+    }
+  })
+
+  it('keeps selected text readable in each scheme', () => {
+    const hc = TERM_THEMES['high-contrast']
+    expect(contrast(hex(hc.selectionForeground!), hex(hc.selectionBackground!))).toBeGreaterThanOrEqual(7)
+    const light = TERM_THEMES.light
+    const m = /rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/.exec(light.selectionBackground!)!
+    const a = Number(m[4]), bg = hex(TERM_BACKDROP.light)
+    const sel = [1, 2, 3].map((i) => Math.round(Number(m[i]) * a + bg[i - 1] * (1 - a))) as RGB
+    expect(contrast(hex(light.foreground!), sel)).toBeGreaterThanOrEqual(MIN_CONTRAST)
+  })
+
+  it('follows the appearance unless a scheme is chosen, and ignores it otherwise', () => {
+    expect(schemeFor('default', 'dungeon')).toBe('dungeon')
+    expect(schemeFor('default', 'neutral')).toBe('neutral')
+    for (const appearance of ['dungeon', 'neutral'] as const) {
+      expect(schemeFor('high-contrast', appearance)).toBe('high-contrast')
+      expect(schemeFor('light', appearance)).toBe('light')
+    }
   })
 })

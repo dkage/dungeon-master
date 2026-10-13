@@ -17,9 +17,12 @@ export const PARCHMENT_TONE = '#edaf53'
 // The contrast every text colour, dimmed or not, must reach (WCAG AA).
 export const MIN_CONTRAST = 4.5
 
-export type TermThemeName = 'dungeon' | 'neutral'
+export type TermThemeName = 'dungeon' | 'neutral' | 'high-contrast' | 'light'
 
 export const TERM_THEMES: Record<TermThemeName, ITheme> = {
+  // Filled in below, after the constants they use.
+  'high-contrast': {},
+  light: {},
   dungeon: {
     background: 'rgba(237, 175, 83, 0)', foreground: '#1a140e', cursor: '#841818', cursorAccent: '#f3ebd8',
     selectionBackground: 'rgba(132, 24, 24, 0.24)', selectionInactiveBackground: 'rgba(132, 24, 24, 0.12)',
@@ -36,8 +39,28 @@ export const TERM_THEMES: Record<TermThemeName, ITheme> = {
   },
 }
 
-// The colour text sits on in each appearance, for contrast checks.
-export const TERM_BACKDROP: Record<TermThemeName, string> = { dungeon: PARCHMENT_TONE, neutral: '#14141a' }
+// The colour text sits on in each scheme, for contrast checks.
+export const TERM_BACKDROP: Record<TermThemeName, string> = {
+  dungeon: PARCHMENT_TONE, neutral: '#14141a', 'high-contrast': '#000000', light: '#fbf8ef',
+}
+
+// The "Terminal colours" setting (#154). Default follows the appearance; the
+// other two schemes are opaque and ignore it, so they read the same in both.
+export function schemeFor(colours: 'default' | 'high-contrast' | 'light', appearance: 'dungeon' | 'neutral'): TermThemeName {
+  return colours === 'default' ? appearance : colours
+}
+
+// Every colour reaches at least 7:1 (WCAG AAA) on black, bright black and the
+// ANSI black included, and the selection inverts to black on white.
+TERM_THEMES['high-contrast'] = {
+  background: '#000000', foreground: '#ffffff', cursor: '#ffffff', cursorAccent: '#000000',
+  selectionBackground: '#ffffff', selectionForeground: '#000000', selectionInactiveBackground: '#8c8c8c',
+  black: '#a8a8a8', red: '#ff7b72', green: '#5df06a', yellow: '#ffe45c', blue: '#7fb4ff', magenta: '#ff8bff', cyan: '#4ff0f0', white: '#e6e6e6',
+  brightBlack: '#b8b8b8', brightRed: '#ff9a92', brightGreen: '#8bff93', brightYellow: '#fff085', brightBlue: '#a5ccff', brightMagenta: '#ffb0ff', brightCyan: '#85ffff', brightWhite: '#ffffff',
+}
+
+// The Dungeon palette was made for light parchment, so it serves a plain light page too.
+TERM_THEMES.light = { ...TERM_THEMES.dungeon, background: '#fbf8ef' }
 
 export const ANSI_NAMES = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
   'brightBlack', 'brightRed', 'brightGreen', 'brightYellow', 'brightBlue', 'brightMagenta', 'brightCyan', 'brightWhite'] as const

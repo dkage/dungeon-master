@@ -3,7 +3,7 @@
   import type { AppStore, ReadingFont, WordMode, ThemePack } from './store.svelte'
   import type { HeroConfig, HeroesConfig } from './api'
   import { wordLabel } from './words'
-  import type { TerminalFontChoice } from './appearance'
+  import type { TerminalColours, TerminalFontChoice } from './appearance'
   import { PLAIN_FONT_NAME } from './termOptions'
   import ShortcutsSettings from './ShortcutsSettings.svelte'
   import { permission as notifyPermission, requestPermission } from './notify'
@@ -97,6 +97,9 @@
   }
   function setLineHeight(event: Event) {
     store.updateAppearance({ terminalLineHeight: Number((event.currentTarget as HTMLSelectElement).value) })
+  }
+  function setTerminalColours(event: Event) {
+    store.updateAppearance({ terminalColors: (event.currentTarget as HTMLSelectElement).value as TerminalColours })
   }
   function setTheme(event: Event) {
     store.updateAppearance({ theme: (event.currentTarget as HTMLSelectElement).value as ThemePack })
@@ -338,6 +341,14 @@
         <option value={1.15}>Denser</option>
         <option value={1.3}>Default</option>
         <option value={1.5}>Airier</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Terminal colours</span>
+      <select value={store.appearance.terminalColors} onchange={setTerminalColours}>
+        <option value="default">Follow the appearance</option>
+        <option value="high-contrast">High contrast (dark)</option>
+        <option value="light">Light</option>
       </select>
     </label>
   </section>

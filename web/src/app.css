@@ -438,6 +438,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   background: #f3ebd8 url('./assets/parchment.png') center / 140% 140% no-repeat;
   box-shadow: inset 0 0 0 3px #2b0b0e, inset 0 0 0 4px #bd8b4c, 0 6px 20px #0009;
 }
+/* The opaque colour schemes replace the parchment (Dungeon) and the slate (Neutral) behind the terminal. */
+.app .term[data-term-theme='high-contrast'] { background: #000 none; border-color: #fff; box-shadow: none; }
+.app .term[data-term-theme='light'] { background: #fbf8ef none; border-color: #9b9484; box-shadow: none; }
 .term-status, .term-note, .term-tool, .term-search { background: #2a0b0f; color: #d8c29e; border-color: #70402e; }
 
 .quests {
