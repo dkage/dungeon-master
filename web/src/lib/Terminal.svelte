@@ -5,6 +5,7 @@
   import '@xterm/xterm/css/xterm.css'
   import { termUrl } from './api'
   import { TermSocket } from './termsocket'
+  import { TERM_THEMES } from './termTheme'
 
   let {
     sessionId,
@@ -20,19 +21,6 @@
     '"FiraCode Nerd Font"', '"Hack Nerd Font"', '"Symbols Nerd Font Mono"',
     'ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', 'monospace',
   ].join(', ')
-
-  const TERM_THEMES = {
-    dungeon: {
-      background: '#f3ebd8', foreground: '#1a140e', cursor: '#841818', cursorAccent: '#f3ebd8',
-      selectionBackground: 'rgba(132, 24, 24, 0.24)', selectionInactiveBackground: 'rgba(132, 24, 24, 0.12)',
-      black: '#342417', red: '#841818', green: '#1c4e2b', yellow: '#895c20', blue: '#315c78', magenta: '#70416f', cyan: '#286c69', white: '#6e5944',
-      brightBlack: '#8f7962', brightRed: '#a52b24', brightGreen: '#2a6a3c', brightYellow: '#a9762f', brightBlue: '#3d7595', brightMagenta: '#885389', brightCyan: '#358b86', brightWhite: '#1a140e',
-    },
-    neutral: {
-      background: '#14141a', foreground: '#e8e8e4', cursor: '#e8e8e4', cursorAccent: '#14141a',
-      selectionBackground: 'rgba(143, 120, 255, 0.45)', selectionInactiveBackground: 'rgba(143, 120, 255, 0.25)',
-    },
-  }
 
   let host: HTMLDivElement
   let terminal: Terminal | undefined
@@ -52,6 +40,8 @@
       fontFamily: FONT_STACK,
       fontSize,
       scrollback: 5000,
+      // The Dungeon appearance shows the parchment through the terminal.
+      allowTransparency: true,
       // Agents such as Claude turn on mouse reporting, which stops plain
       // drags from selecting. Shift-drag always selects; on macOS so does
       // Option-drag.

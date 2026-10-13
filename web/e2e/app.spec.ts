@@ -201,6 +201,62 @@ test('launch a hero, see its output, type to it', async ({ page }) => {
   await expect(term).toContainText('echo:hello dungeon')
 })
 
+test('the parchment shows behind output in Dungeon, a flat page in Neutral', async ({ page }) => {
+  await open(page)
+  await hero(page, 'Opus').click()
+  const term = screenText(page)
+  await expect(term).toContainText('FAKE-CLAUDE')
+  const pane = page.locator('.pane:not([hidden])')
+  const page_ = pane.locator('.term')
+  const image = (loc: typeof page_) => loc.evaluate((el) => getComputedStyle(el).backgroundImage)
+  const screenBg = () => pane.locator('.xterm-screen canvas, .xterm-rows').first().evaluate((el) => getComputedStyle(el).backgroundColor)
+
+  expect(await image(page_)).toContain('parchment')
+  // The image must actually load (CSP, path), not just be declared.
+  const loaded = await page.evaluate(async (css) => {
+    const src = /url\("?([^")]+)"?\)/.exec(css)![1]
+    return new Promise<boolean>((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve(img.naturalWidth > 0)
+      img.onerror = () => resolve(false)
+      img.src = src
+    })
+  }, await image(page_))
+  expect(loaded).toBe(true)
+  expect(['rgba(0, 0, 0, 0)', 'transparent']).toContain(await screenBg())
+
+  await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+  await settings.getByLabel(/^Theme/).selectOption('neutral')
+  await settings.getByRole('button', { name: 'Close settings' }).click()
+  expect(await image(page_)).toBe('none')
+  expect(await page_.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(20, 20, 26)')
+  await expect(term).toContainText('FAKE-CLAUDE')
+
+  // Output still arrives and scrolls after the switch.
+  await pane.locator('.xterm').click()
+  for (let i = 0; i < 60; i++) {
+    await page.keyboard.type(`line-${i}`)
+    await page.keyboard.press('Enter')
+  }
+  await expect(term).toContainText('echo:line-59')
+  await pane.locator('.xterm').hover()
+  await expect(async () => {
+    await page.mouse.wheel(0, -2000)
+    await expect(term).not.toContainText('echo:line-59', { timeout: 500 })
+  }).toPass({ timeout: 10000 })
+  await expect(async () => {
+    await page.mouse.wheel(0, 20000)
+    await expect(term).toContainText('echo:line-59', { timeout: 500 })
+  }).toPass({ timeout: 10000 })
+
+  await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
+  await settings.getByLabel(/^Theme/).selectOption('dungeon')
+  await settings.getByRole('button', { name: 'Close settings' }).click()
+  expect(await image(page_)).toContain('parchment')
+  await expect(term).toContainText('echo:line-59')
+})
+
 test('two expeditions are independent and a shell exit is shown in the list', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()
