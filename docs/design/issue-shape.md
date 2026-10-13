@@ -1,10 +1,10 @@
 ---
 status: current
-milestone: M5a
-github_issues: [28, 24, 27, 61, 62]
+milestone: map and campaign workflow
+github_issues: [28, 24, 27, 61, 62, 67, 68]
 tracking: in-gh-issues
-next: keep until the map is built; then fold what remains into the issue-writing skill
-verified: 2026-10-11
+next: keep the contract while map validation and issue-writing work remain open
+verified: 2026-10-13
 ---
 
 # Issue shape: what the map reads from GitHub
@@ -25,11 +25,12 @@ same query returns.
 | Order of work | "Blocked by" links between issues | Lines and gates; lines between dungeons are derived from them |
 | No epic | An issue with no parent and no sub-issues | The Tavern |
 | Effort tier | A label `effort:trivial`, `effort:low`, `effort:moderate`, `effort:high` or `effort:extreme` | Picks the creature (3 per tier in `docs/design/creature-roster.md`) |
-| In the app's scope | The scope label (`tracked` by default) | Whether the issue is shown or is an out-of-scope stub |
+| In the app's scope | Selected query mode: all, existing labels or assignee; local pins are planned in #40 | Whether the issue is shown or is an out-of-scope stub |
 | Who holds it | Assignees | The assigned-elsewhere marker |
 | Priority | A label `priority:low`, `priority:normal`, `priority:high` or `priority:urgent` | High (amber) and urgent (red) draw a small jewel on the room |
 | Intent to be an epic | A label `epic` or `initiative` (a hint only) | A hint when it has no sub-issues (see Epic hint labels) |
-| Closed | Issue state | Cleared, greyed with a green check |
+| Closed | Issue state and close reason | Today all closed issues appear cleared; #67 separates completed and canceled work |
+| Work method | Optional `type:task`, `type:research`, `type:prototype` or `type:decision` | #43/#67 use it for method suggestions; it never changes effort or readiness |
 
 ## Worked example
 
@@ -107,7 +108,9 @@ The labels `epic` and `initiative` are optional hints for a person planning ahea
 | Case | What the map does |
 |---|---|
 | Blocker cycle (A blocks B blocks A) | Draw both lines, mark the quests as a loop in the detail, and lay them out without failing; none of them can be started |
-| A blocker that is already closed | The gate is open (or the line fades); the quest is not locked by it |
+| A completed blocker | The gate is open (or the line fades); #67 preserves explicit completion reasons |
+| A blocker closed as not planned | Today closure clears it; #67 requires explicitly reviewing/replacing/removing the prerequisite edge |
+| A missing or inaccessible blocker | #67 treats satisfaction as unknown; never infer that missing means completed |
 | An epic with one sub-issue | Still a dungeon, with one room |
 | Nesting deeper than two levels | A top-level epic is the dungeon; every deeper parent is a hall inside it |
 | A sub-issue in another repository | Shown as an external stub, as an out-of-scope quest |
@@ -131,3 +134,51 @@ repository uses one. It writes through the `gh` shim, one issue at a time, never
 for this repository's own issues; shipping it to users as a spell comes after the map works (GitHub issue #61). The
 worked example above doubles as the sample campaign's fixture and as the skill's template, so there is one source for
 all three.
+
+## Issue bodies and methods
+
+New and substantively revised work uses `## Goal`, `## Scope`, and `## Done when`, followed by an existing design-file
+reference (`Plan: docs/...` or `Plan: release/...`). Goal states a concrete result or question. Scope bounds the work.
+Done when states observable evidence, including unit and real-behavior checks for implementation. Optional Context,
+Out of scope and Open questions sections belong only where useful. Ordinary user repositories need not adopt this
+body shape or these labels for the app to show their issues.
+
+| Method label | Defines completion | Boundary |
+|---|---|---|
+| `type:task` | Behavior implemented or verification performed, with evidence | Do not silently broaden scope |
+| `type:research` | A precise question answered with sources or dated execution evidence | Investigation need not implement the result |
+| `type:prototype` | A disposable artifact and feedback resolve a specific uncertainty | Not production acceptance or shipping code |
+| `type:decision` | The operator settles a stated choice after seeing tradeoffs/evidence | The agent cannot invent human approval |
+
+Exactly one method label applies to authored executable work. Epics may carry `type:task` as an organizational hint,
+but selecting an epic does not automatically execute all children. Existing generic `bug`/`enhancement` labels remain
+category hints; method labels guide work, while native dependencies and local occupancy determine launch availability.
+The picker must allow a method override without silently substituting the selected source. Runtime method parsing is
+planned in #43/#67; new labels alone do not imply implementation.
+
+## Plans, decisions and outcomes
+
+An epic should explain its completion boundary, constraints and exclusions. Native sub-issues and dependency links
+provide the current work graph; do not maintain a second authoritative list of open work or progress counts in prose.
+Use linked decision/result summaries when they carry context, not a manually maintained status board. Existing child
+lists are navigation aids during this migration and must agree with native links.
+
+Keep issue identity stable through replanning. Use native dependency links for true prerequisites and roadmap order
+for priority. Parent membership does not imply execution order. A cross-repository reference needs repository identity;
+unknown relationships stay visible as diagnostics. A later decision that invalidates earlier work is explicitly linked
+and reviewed; an additional invalidation graph or automatic reopening is outside this increment.
+
+On resolution, record the actual result or decision, evidence (tests, dated probes, PR/artifact links), and caveats.
+Close as completed only for achieved acceptance; close as not planned for an explicit cancellation with rationale.
+A successful agent exit or merged unrelated PR is insufficient. Changing scope preserves existing comments and decisions.
+
+## Audit checklist
+
+Before publishing: inspect relevant existing issues, confirm real prerequisite edges, reject cycles/self-links, check
+exactly one effort tier and method on changed executable items, and prepare reviewable bodies. After publishing: verify
+native links and report partial failures. Search before recreating an item after an uncertain response. Keep each write
+in a local operation journal; the app's durable bulk queue remains conditional (#42).
+
+The stricter close-reason, qualified-reference and launch validation rules are future #67 work. The current model stores
+`Closed` on references and derives readiness from open/closed state. Do not document the stronger behavior as shipped
+until the API, model and launch checks have both unit and feature coverage.
