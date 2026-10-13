@@ -1103,7 +1103,7 @@ test('a campaign without a GitHub repository can open the separate sample projec
   const blockedDetail = panel.getByRole('region', { name: 'Selected issue detail' })
   // A locked quest cannot be started: the button is disabled and says why.
   await expect(blockedDetail.getByRole('button', { name: 'Review launch' })).toBeDisabled()
-  await expect(blockedDetail.locator('.launch-note')).toContainText('Blocked by #4, #7.')
+  await expect(blockedDetail.locator('.launch-note')).toContainText('Blocked by ○#4, ○#7.')
   await blockedDetail.getByRole('button', { name: /← Quests/ }).click()
   await panel.getByRole('region', { name: 'Quest browser' }).getByRole('button', { name: /#2 Design the welcome screen/ }).click()
   const closedDetail = panel.getByRole('region', { name: 'Selected issue detail' })

@@ -103,7 +103,7 @@ test('selects on the map and starts only from the footer; a locked quest cannot 
   await map(page).getByRole('button', { name: /^#4 Validate email addresses/ }).click()
   await expect(detail(page).getByRole('heading', { name: /#4 Validate email addresses/ })).toBeVisible()
   await expect(detail(page).getByRole('button', { name: 'Review launch' })).toBeDisabled()
-  await expect(detail(page).locator('.launch-note')).toContainText('Blocked by #3.')
+  await expect(detail(page).locator('.launch-note')).toContainText('Blocked by ○#3.')
 
   // Double-click on a room only selects: no session starts.
   const room = map(page).getByRole('button', { name: /^#3 Build the signup form/ })
@@ -175,6 +175,9 @@ test('still works with every image blocked', async ({ page }) => {
   await page.route(/\.(png|jpe?g)(\?.*)?$/, (route) => route.abort())
   await openSample(page)
   await map(page).getByRole('button', { name: /^Dungeon #1 / }).dblclick()
+  // The map fits the whole dungeon first, which draws rooms as bare numbers; zoom in to see their detail.
+  await map(page).getByRole('button', { name: 'Zoom in' }).click()
+  await map(page).getByRole('button', { name: 'Zoom in' }).click()
   const room = map(page).getByRole('button', { name: /^#3 Build the signup form, .*Moderate effort/ })
   await expect(room).toBeVisible()
   await expect(room).toContainText('#3 · Moderate')
@@ -231,6 +234,9 @@ test('keeps creatures still when the system asks for reduced motion', async ({ p
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await openSample(page)
   await map(page).getByRole('button', { name: /^Dungeon #1 / }).dblclick()
+  // Creatures are drawn only once the map is zoomed in far enough to show room detail.
+  await map(page).getByRole('button', { name: 'Zoom in' }).click()
+  await map(page).getByRole('button', { name: 'Zoom in' }).click()
   const strip = map(page).locator('image.strip').first()
   await expect(strip).toBeVisible()
   expect(await strip.evaluate((e) => getComputedStyle(e).animationName)).toBe('none')
