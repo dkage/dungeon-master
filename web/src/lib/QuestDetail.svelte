@@ -259,7 +259,7 @@
       {/if}
     </article>
     <footer class="launch-footer">
-      <label for="quest-hero">Launch with</label>
+      <label class="hero-label" for="quest-hero">Hero</label>
       <select id="quest-hero" value={selectedHero} onchange={(event) => changeHero(event.currentTarget.value)} disabled={store.heroes.length === 0 || store.busy}>
         {#if store.heroes.length === 0}<option value="">No heroes configured</option>{/if}
         {#each store.heroes as h (h.id)}<option value={h.id}>{h.label}</option>{/each}
@@ -325,13 +325,14 @@
   .jump { margin: 8px 0 0; }
   .jump-button { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 6px; background: transparent; color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; }
   .jump-list { margin: 4px 0 0; padding-left: 16px; }
-  .launch-footer { flex: 0 0 auto; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--panel); }
-  .launch-footer label { color: var(--muted); font-size: 11px; }
-  .launch-footer select { min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: var(--bg); color: var(--text); font: inherit; }
-  .launch-button { border: 1px solid #a34c39; border-radius: 7px; padding: 7px 12px; background: linear-gradient(#8b3025, #5d1718); color: #f4dfbd; font: inherit; cursor: pointer; }
+  /* Two columns: the hero on the left, a place kept free on the right for the skill selector (#50). */
+  .launch-footer { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'hlabel slabel' 'hero skill' 'note go'; align-items: center; gap: 4px 12px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--panel); }
+  .launch-footer label { grid-area: hlabel; color: var(--muted); font-size: 11px; }
+  .launch-footer select { grid-area: hero; min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: var(--bg); color: var(--text); font: inherit; }
+  .launch-button { grid-area: go; justify-self: end; border: 1px solid #a34c39; border-radius: 7px; padding: 7px 12px; background: linear-gradient(#8b3025, #5d1718); color: #f4dfbd; font: inherit; cursor: pointer; }
   .launch-button:disabled { opacity: .5; cursor: not-allowed; }
-  .go-session { border: 1px solid var(--accent); border-radius: 7px; padding: 6px 10px; background: transparent; color: var(--accent); cursor: pointer; }
-  .launch-note { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 11px; }
+  .go-session { grid-column: 1 / -1; justify-self: end; border: 1px solid var(--accent); border-radius: 7px; padding: 6px 10px; background: transparent; color: var(--accent); cursor: pointer; }
+  .launch-note { grid-area: note; margin: 0; color: var(--muted); font-size: 11px; }
   .brief-dialog { width: min(820px, calc(100vw - 32px)); max-height: min(88vh, 880px); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 24px 80px #0009; overflow: auto; }
   .brief-dialog::backdrop { background: #0009; backdrop-filter: blur(3px); }
   .brief-dialog > header { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }

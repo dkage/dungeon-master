@@ -562,7 +562,7 @@ describe('QuestDetail', () => {
     })
     const start = vi.spyOn(s, 'launchQuest').mockResolvedValue(true)
     render(QuestDetail, { store: s })
-    expect(screen.getByLabelText('Launch with')).toHaveValue('opus')
+    expect(screen.getByLabelText('Hero')).toHaveValue('opus')
     await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
     expect(preview).toHaveBeenCalledWith(3, 'opus')
     expect(screen.getByRole('dialog', { name: 'Review launch plan' })).toBeInTheDocument()
