@@ -15,8 +15,8 @@ makes relationships understandable; the theme represents real work and never sub
 
 ## 1. Baseline and evidence
 
-The cockpit shell, first-run flow, issue launch and heuristic attention are delivered through M4.5. The map is published; review fixes are committed locally,
-with automated checks passed, and #28 remains open pending #126 and #127. Read `docs/roadmap.md` for the dated status audit. Earlier descriptions of an
+The cockpit shell, first-run flow, issue launch and heuristic attention are delivered through M4.5. The map and its review fixes are published,
+with automated checks passed; #28 remains open pending its closure. Read `docs/roadmap.md` for the dated status audit. Earlier descriptions of an
 empty launcher, a missing map scheduled last, or milestones waiting for a push were historical and are superseded.
 The Stitch v4 assets remain the visual baseline; behavior is specified by current design docs rather than generated HTML.
 
