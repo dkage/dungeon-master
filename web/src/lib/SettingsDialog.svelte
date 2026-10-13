@@ -3,6 +3,8 @@
   import type { AppStore, ReadingFont, WordMode, ThemePack } from './store.svelte'
   import type { HeroConfig, HeroesConfig } from './api'
   import { wordLabel } from './words'
+  import type { TerminalFontChoice } from './appearance'
+  import { PLAIN_FONT_NAME } from './termOptions'
   import ShortcutsSettings from './ShortcutsSettings.svelte'
   import { permission as notifyPermission, requestPermission } from './notify'
 
@@ -65,6 +67,36 @@
         ? 'This browser cannot show desktop notifications.'
         : 'Notifications are blocked for this site. Allow them in the browser settings, then try again.'
     }
+  }
+  // Terminal typography (#150, #153). A typed font name is only applied once it is a plain name.
+  // What the user is choosing or typing right now; until then the saved values show.
+  let choosing = $state<TerminalFontChoice | null>(null)
+  let typing = $state<string | null>(null)
+  const fontChoice = $derived(choosing ?? store.appearance.terminalFont)
+  const fontName = $derived(typing ?? store.appearance.terminalFontName)
+  let fontNameError = $state('')
+  function applyFontName() {
+    const name = fontName.trim()
+    typing = name
+    if (!PLAIN_FONT_NAME.test(name)) {
+      fontNameError = name ? 'Use only letters, digits, spaces, dots, dashes and underscores.' : 'Type the name of an installed font.'
+      return
+    }
+    fontNameError = ''
+    store.updateAppearance({ terminalFont: 'custom', terminalFontName: name })
+  }
+  function setTerminalFont(event: Event) {
+    const next = (event.currentTarget as HTMLSelectElement).value as TerminalFontChoice
+    choosing = next
+    fontNameError = ''
+    if (next === 'custom') {
+      if (fontName.trim()) applyFontName()
+    } else {
+      store.updateAppearance({ terminalFont: next })
+    }
+  }
+  function setLineHeight(event: Event) {
+    store.updateAppearance({ terminalLineHeight: Number((event.currentTarget as HTMLSelectElement).value) })
   }
   function setTheme(event: Event) {
     store.updateAppearance({ theme: (event.currentTarget as HTMLSelectElement).value as ThemePack })
@@ -279,6 +311,35 @@
         />
       </label>
     {/each}
+  </section>
+
+  <section aria-labelledby="terminal-title">
+    <h2 id="terminal-title">Terminal</h2>
+    <label class="field">
+      <span>Terminal font</span>
+      <select value={fontChoice} onchange={setTerminalFont}>
+        <option value="stack">Default (Nerd Font if installed, then Fira Code)</option>
+        <option value="bundled">Fira Code only</option>
+        <option value="system">System monospace</option>
+        <option value="custom">An installed font…</option>
+      </select>
+    </label>
+    <small class="hint">Always a fixed-width font: proportional fonts would break the columns that tables and box drawing rely on.</small>
+    {#if fontChoice === 'custom'}
+      <label class="field">
+        <span>Installed font name</span>
+        <input type="text" value={fontName} oninput={(e) => (typing = e.currentTarget.value)} placeholder="JetBrains Mono" maxlength="64" autocomplete="off" spellcheck="false" onchange={applyFontName} aria-invalid={fontNameError ? 'true' : undefined} />
+        {#if fontNameError}<small class="hint warn" role="alert">{fontNameError}</small>{/if}
+      </label>
+    {/if}
+    <label class="field">
+      <span>Line height</span>
+      <select value={store.appearance.terminalLineHeight} onchange={setLineHeight}>
+        <option value={1.15}>Denser</option>
+        <option value={1.3}>Default</option>
+        <option value={1.5}>Airier</option>
+      </select>
+    </label>
   </section>
 
   <ShortcutsSettings {store} />

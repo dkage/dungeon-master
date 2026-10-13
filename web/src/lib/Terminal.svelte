@@ -18,12 +18,16 @@
   let {
     sessionId,
     fontSize = 13,
+    fontFamily = terminalTypography().fontFamily,
+    lineHeight = terminalTypography().lineHeight,
     theme = 'dungeon',
     onexit,
     onzoom,
   }: {
     sessionId: string
     fontSize?: number
+    fontFamily?: string
+    lineHeight?: number
     theme?: 'dungeon' | 'neutral'
     onexit: (code: number) => void
     onzoom?: (step: Zoom) => void
@@ -51,6 +55,8 @@
   $effect(() => {
     if (!terminal) return
     terminal.options.fontSize = fontSize
+    terminal.options.fontFamily = fontFamily
+    terminal.options.lineHeight = lineHeight
     // The cells changed size but the frame did not, so refit: the new
     // columns and rows reach the session and the scrollback stays.
     requestAnimationFrame(() => refit?.())
@@ -145,6 +151,8 @@
     const term = new Terminal({
       cursorBlink: true,
       ...terminalTypography(),
+      fontFamily,
+      lineHeight,
       fontSize,
       scrollback: SCROLLBACK,
       // The Dungeon appearance shows the parchment through the terminal.
@@ -168,8 +176,8 @@
       document.fonts?.load('13px "Fira Code"'),
       document.fonts?.load('13px "Dungeon Symbols"', '\ue0b0\uf015'),
     ]).then(() => {
-      term.options.fontFamily = terminalTypography().fontFamily + ' '
-      term.options.fontFamily = terminalTypography().fontFamily
+      term.options.fontFamily = fontFamily + ' '
+      term.options.fontFamily = fontFamily
       // The cell width changed but the frame did not, so the resize observer
       // stays quiet: refit, or the last columns run under the frame.
       try {

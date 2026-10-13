@@ -1,6 +1,7 @@
 // The look-and-feel choices and how they are checked. The server keeps the
 // authoritative copy (internal/appearance); the same allowed values are
 // applied here so a bad stored or received value falls back to its default.
+import { PLAIN_FONT_NAME as FONT_NAME } from './termOptions'
 import { DEFAULT_TERMINAL_SIZE, clampSize } from './termSize'
 
 export type ReadingFont = 'almendra' | 'eb-garamond' | 'alegreya'
@@ -26,8 +27,6 @@ export interface UISettings {
 }
 
 export const LINE_HEIGHTS = [1.15, 1.3, 1.5] as const
-/** A plain font name; no quotes, commas or slashes, so it cannot leave the font list it is put in. */
-export const FONT_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$/
 
 export const DEFAULT_SETTINGS: UISettings = {
   font: 'almendra', sidebarSize: 14, terminalSize: DEFAULT_TERMINAL_SIZE, questsSize: 14, wordMode: 'hints', theme: 'dungeon',

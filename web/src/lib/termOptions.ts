@@ -29,10 +29,42 @@ export const FONT_WEIGHT_BOLD = 'bold'
 // Neutral appearance keeps the compact padding.
 export const FRAME_PADDING = { dungeon: '22px 28px', neutral: '8px' } as const
 
-export function terminalTypography() {
+// The other choices of the "Terminal font" setting (#150). Every one ends with
+// the symbols font and the generic fallback, so prompt icons always render.
+export const BUNDLED_STACK = ['"Fira Code"', SYMBOLS_FONT, 'monospace'].join(', ')
+export const SYSTEM_STACK = ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Consolas', SYMBOLS_FONT, 'monospace'].join(', ')
+
+export interface TypographyChoice {
+  terminalFont?: 'stack' | 'bundled' | 'system' | 'custom'
+  terminalFontName?: string
+  terminalLineHeight?: number
+}
+
+/** A plain font name only: this is what keeps a typed name from leaving the quotes it is put in. */
+export const PLAIN_FONT_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$/
+
+/** The font-family list for a choice. A custom name goes first, quoted; a bad one falls back to the default list. */
+export function fontFamilyFor(choice: Pick<TypographyChoice, 'terminalFont' | 'terminalFontName'> = {}): string {
+  switch (choice.terminalFont) {
+    case 'bundled': return BUNDLED_STACK
+    case 'system': return SYSTEM_STACK
+    case 'custom': {
+      const name = choice.terminalFontName ?? ''
+      return PLAIN_FONT_NAME.test(name) ? `"${name}", ${FONT_STACK}` : FONT_STACK
+    }
+    default: return FONT_STACK
+  }
+}
+
+/** The font family a custom name resolves to when it is not installed: the list after it. */
+export function fallbackFontName(choice: Pick<TypographyChoice, 'terminalFont'>): string {
+  return choice.terminalFont === 'system' ? 'system monospace' : 'Fira Code'
+}
+
+export function terminalTypography(choice: TypographyChoice = {}) {
   return {
-    fontFamily: FONT_STACK,
-    lineHeight: LINE_HEIGHT,
+    fontFamily: fontFamilyFor(choice),
+    lineHeight: choice.terminalLineHeight ?? LINE_HEIGHT,
     fontWeight: FONT_WEIGHT,
     fontWeightBold: FONT_WEIGHT_BOLD,
   } as const

@@ -12,6 +12,7 @@
   import { route as routeShortcut } from './lib/shortcuts'
   import { PLACE_KEY, parse as parsePlace, type Place } from './lib/place'
   import { keyWidth, DEFAULTS, limits, type Edge } from './lib/columns'
+  import { fontFamilyFor } from './lib/termOptions'
   import { escapeRestores } from './lib/workspace'
   import { notificationText, permission } from './lib/notify'
 
@@ -140,6 +141,7 @@
 
   // Sessions of every campaign stay mounted (hidden) so switching is instant
   // and their terminals keep their state; lost sessions have no terminal.
+  const terminalFamily = $derived(fontFamilyFor(store.appearance))
   const live = $derived(store.sessions.filter((s) => !s.lost))
 
   // Looking at a session that waits counts as having seen it.
@@ -209,7 +211,7 @@
     <main class="stage">
       {#each live as s (s.id)}
         <div class="pane" hidden={s.id !== store.activeId || store.guideOpen}>
-          <Terminal sessionId={s.id} fontSize={store.appearance.terminalSize} theme={store.appearance.theme} onexit={(code) => store.markExited(s.id, code)} onzoom={(step) => store.zoomTerminal(step)} />
+          <Terminal sessionId={s.id} fontSize={store.appearance.terminalSize} fontFamily={terminalFamily} lineHeight={store.appearance.terminalLineHeight} theme={store.appearance.theme} onexit={(code) => store.markExited(s.id, code)} onzoom={(step) => store.zoomTerminal(step)} />
         </div>
       {/each}
       {#if store.guideShown}

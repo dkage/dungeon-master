@@ -398,6 +398,69 @@ test('a look chosen in one browser origin shows in another origin of the same se
   await other.close()
 })
 
+test('the terminal font and line height change on a live session, refit it, and are kept across reloads and origins', async ({ page, browser }) => {
+  const sizes: { cols: number; rows: number }[] = []
+  page.on('websocket', (ws) => ws.on('framesent', (f) => {
+    if (typeof f.payload === 'string') {
+      const m = JSON.parse(f.payload) as { type?: string; cols: number; rows: number }
+      if (m.type === 'resize') sizes.push({ cols: m.cols, rows: m.rows })
+    }
+  }))
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  const pane = page.locator('.pane:not([hidden])')
+  const family = () => pane.locator('.xterm-rows').evaluate((e) => getComputedStyle(e).fontFamily)
+  const rowHeight = () => pane.locator('.xterm-rows > div').first().evaluate((e) => e.getBoundingClientRect().height)
+  await expect.poll(family).toContain('Fira Code')
+  const baseRows = sizes.at(-1)!.rows
+  const baseHeight = await rowHeight()
+
+  await page.getByRole('button', { name: 'Settings' }).first().click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+
+  await settings.getByLabel('Terminal font').selectOption('system')
+  await expect.poll(family).toContain('ui-monospace')
+  await expect.poll(family).not.toContain('Fira Code')
+  await expect.poll(family).toMatch(/"Dungeon Symbols", monospace$/)
+
+  await settings.getByLabel('Terminal font').selectOption('custom')
+  const name = settings.getByLabel('Installed font name')
+  await name.fill('Fira", sans-serif')
+  await name.press('Enter')
+  await name.blur()
+  await expect(settings.getByRole('alert').filter({ hasText: 'Use only letters' })).toBeVisible()
+  await expect.poll(family).not.toContain('sans-serif')
+  await name.fill('Some Font')
+  await name.blur()
+  await expect.poll(family).toMatch(/^"Some Font", /)
+  await expect.poll(family).toMatch(/"Dungeon Symbols", monospace$/)
+
+  // Denser rows fit more of them, and the session is told.
+  await settings.getByLabel('Line height').selectOption('1.15')
+  await expect.poll(rowHeight).toBeLessThan(baseHeight)
+  await expect.poll(() => sizes.at(-1)!.rows).toBeGreaterThan(baseRows)
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await settings.getByLabel('Line height').selectOption('1.5')
+  await expect.poll(rowHeight).toBeGreaterThan(baseHeight)
+  await expect.poll(() => sizes.at(-1)!.rows).toBeLessThan(baseRows)
+
+  await expect.poll(async () => (await (await page.request.get('/api/appearance')).json()).settings.terminalLineHeight).toBe(1.5)
+  await page.reload()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await expect.poll(family).toMatch(/^"Some Font", /)
+  await expect.poll(rowHeight).toBeGreaterThan(baseHeight)
+
+  const other = await browser.newContext()
+  const second = await other.newPage()
+  await second.goto(url.replace('127.0.0.1', 'localhost'))
+  await second.getByRole('button', { name: /^demo/ }).click()
+  await hero(second, 'Opus').click()
+  await expect(second.locator('.pane:not([hidden]) .xterm-rows')).toContainText('FAKE-CLAUDE')
+  await expect.poll(() => second.locator('.pane:not([hidden]) .xterm-rows').evaluate((e) => getComputedStyle(e).fontFamily)).toMatch(/^"Some Font", /)
+  await other.close()
+})
+
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()
