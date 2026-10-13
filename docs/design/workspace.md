@@ -1,7 +1,7 @@
 ---
 status: planned
 milestone: workspace usability
-github_issues: [63, 64, 65, 78, 84, 87]
+github_issues: [63, 64, 65, 78, 84, 87, 88]
 tracking: in-gh-issues
 next: desktop-shell menu wiring for the shared actions; quick switcher decision (#146)
 verified: 2026-10-13
@@ -11,7 +11,7 @@ verified: 2026-10-13
 
 The default remains the existing three-panel cockpit and its visual design. All presentations share campaigns,
 sessions, selected issue, map level, filters and geometry. Planning, running and reviewing are activities in this
-workspace, not separate copies of it. Panel expansion (#64) column resizing (#78), reload restore (#84, #87) and configurable shortcuts (#65) are implemented; the rest of this document specifies future behavior.
+workspace, not separate copies of it. Panel expansion (#64) column resizing (#78), reload restore (#84, #87) configurable shortcuts (#65) and the terminal comfort work (#88, below) are implemented; the rest of this document specifies future behavior.
 
 ## Panel expansion
 
@@ -106,3 +106,19 @@ illustrated transcript. Keep the RPG theme focused on meaningful work states and
 Unit tests cover state transitions, restoration, binding validation and context routing. Browser tests expand and
 restore every region, switch targets, change and reload a shortcut, and show that a live stub session keeps its identity
 and output. Check keyboard focus, hidden-region accessibility, modal ordering and responsive restoration.
+
+## Terminal comfort (#88)
+
+All implemented; the evidence is each child issue's tests. Decisions that are not obvious from the code:
+
+- Shift+Enter sends ESC CR (`\x1b\r`), which the real Claude prompt reads as a new line; plain Enter stays CR (#85,
+  probe #89). The kitty, modifyOtherKeys, backslash-Enter and LF forms also worked; ESC CR is the plainest.
+- Pasted images and dropped files are stored by the server under `<state dir>/uploads/<session id>/` (10 MB, images,
+  PDF and plain text sniffed from the bytes, sanitised names, removed with the session) and their quoted path is
+  inserted with xterm's paste, which the Claude prompt turns into `[Image #N]`. Typing the path does not attach it, and
+  Ctrl+V is not forwarded because the CLI would read the clipboard of the machine, not the browser's (#86, #90).
+- Appearance settings live in `appearance.json` in the config dir and are served by `/api/appearance`; the browser
+  keeps a cache for the first paint and hands its old choices over once (#149). The terminal font, line height and
+  colour scheme are stored there too (#150, #153, #154); a typed font that is not installed is reported (#158).
+- Search and jump-to-latest use Ctrl+Shift+F and Ctrl+Shift+End; the zoom actions have no default binding because
+  the browser owns Ctrl and Cmd with plus, minus and zero (#91, #92). Copy and Save take the scrollback as text (#142).
