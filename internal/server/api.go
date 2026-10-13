@@ -56,6 +56,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/sessions", s.handleCreate)
 	mux.HandleFunc("DELETE /api/sessions/{id}", s.handleDelete)
 	mux.HandleFunc("GET /api/sessions/{id}/term", s.handleTerm)
+	mux.HandleFunc("POST /api/sessions/{id}/uploads", s.handleUpload)
 }
 
 type heroJSON struct {
@@ -572,6 +573,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		<-sess.Done()
 		_, code := sess.Exited()
 		_ = s.cfg.History.Finish(sess.ID, code)
+		s.removeUploads(sess.ID)
 		if g := s.cfg.Gatekeeper; g != nil {
 			g.Tokens.Revoke(sess.ID) // a finished session's shim token stops working
 		}
@@ -589,6 +591,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	live := s.cfg.Sessions.Remove(id)
+	s.removeUploads(id)
 	rec, err := s.cfg.History.Remove(id)
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, err.Error())

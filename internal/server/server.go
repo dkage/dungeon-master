@@ -29,6 +29,7 @@ import (
 	"github.com/dkage/dungeon-master/internal/quests"
 	"github.com/dkage/dungeon-master/internal/quests/demo"
 	"github.com/dkage/dungeon-master/internal/session"
+	"github.com/dkage/dungeon-master/internal/uploads"
 )
 
 // Config is everything New needs.
@@ -110,6 +111,9 @@ type Server struct {
 	gateSrv  *http.Server
 	gateLn   net.Listener
 	gateSock string
+
+	// uploads holds files pasted or dropped onto a session's terminal.
+	uploads *uploads.Store
 }
 
 // TokenFile is where the access token is kept inside the config directory.
@@ -306,6 +310,9 @@ func handlerServer(cfg Config, port int) *Server {
 }
 
 func (s *Server) handler() http.Handler {
+	if s.uploads == nil && s.cfg.StateDir != "" {
+		s.uploads, _ = uploads.New(filepath.Join(s.cfg.StateDir, "uploads")) // nil store: uploads answer 503
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "version": s.cfg.Version})
