@@ -1,4 +1,5 @@
 import * as realApi from './api'
+import { PLACE_KEY, format as formatPlace, type Place } from './place'
 import { DEFAULTS, KEY as COLUMNS_KEY, fit, parse as parseColumns, setWidth, type Columns, type Edge } from './columns'
 import { SPLIT, restore, toggle, type Region, type Workspace } from './workspace'
 import type {
@@ -140,6 +141,32 @@ export class AppStore {
   resizeColumn(edge: Edge, width: number) {
     this.setColumns(setWidth(this.columnWidths, edge, width, this.windowWidth))
   }
+  /**
+   * Go back to a remembered place. Only what still exists is restored; anything stale falls
+   * back to the default without an error. Nothing is started, restarted or ended.
+   */
+  async applyPlace(p: Place) {
+    if (p.campaign && this.campaigns.some((c) => c.id === p.campaign)) this.selectCampaign(p.campaign)
+    const s = p.session ? this.sessions.find((x) => x.id === p.session) : undefined
+    if (s && !s.lost && s.campaign === this.campaignId) this.activeId = s.id
+    if (p.view) this.setPanelView(p.view)
+    if (p.quest !== undefined && this.campaignId) {
+      await this.selectQuest(p.quest)
+      if (this.detailError) this.closeQuest()
+    }
+    const level = p.level
+    if (level && level.kind !== 'world' && this.campaignId) {
+      if (!this.quests) await this.loadQuests(false, true)
+      const known = level.kind === 'tavern' || this.mapModel.dungeons.some((d) => d.id === level.id)
+      if (known) this.mapLevel = level
+    }
+  }
+  /** The hash for the current place; saved so a bare URL can come back to it. */
+  placeHash(): string {
+    const h = formatPlace(this.place)
+    save(PLACE_KEY, h)
+    return h
+  }
   /** The workspace region that fills the application, or null for the split layout. */
   workspace = $state<Workspace>(SPLIT)
   /** Expand a region, or restore the split when it is already expanded. */
@@ -159,6 +186,14 @@ export class AppStore {
   /** The right panel shows the map or the list of the same quests. */
   panelView = $state<'map' | 'list'>(load(VIEW_KEY) === 'list' ? 'list' : 'map')
   mapLevel = $state<MapLevel>({ kind: 'world' })
+  /** Where the user is, as identifiers only. */
+  place = $derived<Place>({
+    campaign: this.campaignId ?? undefined,
+    quest: this.questNumber ?? undefined,
+    session: this.active?.id,
+    view: this.panelView,
+    level: this.mapLevel,
+  })
   /** One view of every quest, shared by the map and the list so they agree. */
   mapModel: MapModel = $derived(buildModel(this.quests?.quests ?? [], this.sessions, this.campaignId))
   /**

@@ -124,7 +124,10 @@ function fakeServer(opts: { claudeFound?: boolean; campaigns?: boolean; lost?: b
   return calls
 }
 
-beforeEach(() => localStorage.clear())
+beforeEach(() => {
+  localStorage.clear()
+  history.replaceState(null, '', '/')
+})
 afterEach(() => vi.unstubAllGlobals())
 
 describe('App', () => {
@@ -184,6 +187,32 @@ describe('App', () => {
     const right = screen.getByRole('separator', { name: 'Resize issues panel' })
     await fireEvent.keyDown(right, { key: 'ArrowLeft' })
     expect(app.style.getPropertyValue('--col-quests')).toBe('476px')
+  })
+
+  it('returns to the remembered issue after a reload, from the address bar', async () => {
+    fakeServer()
+    history.replaceState(null, '', '/#c=c1&q=11&v=list')
+    render(App)
+    const detail = await screen.findByRole('region', { name: 'Selected issue detail' })
+    expect(await within(detail).findByRole('heading', { name: /#11 Real blocked issue/ })).toBeInTheDocument()
+    expect(location.hash).toContain('q=11')
+  })
+
+  it('falls back quietly when the remembered campaign, issue or session is gone', async () => {
+    fakeServer()
+    history.replaceState(null, '', '/#c=gone&s=nope&q=999&l=d4')
+    render(App)
+    await screen.findByRole('button', { name: 'Opus' })
+    await waitFor(() => expect(location.hash).not.toContain('gone'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Selected issue detail' })).not.toBeInTheDocument()
+  })
+
+  it('ignores unreadable stored place data', async () => {
+    fakeServer()
+    localStorage.setItem('dungeon.place', 'c=%%%&q=abc')
+    render(App)
+    expect(await screen.findByRole('button', { name: 'Opus' })).toBeInTheDocument()
   })
 
   it('reopens the getting-started guide over a running session, and hides it again', async () => {

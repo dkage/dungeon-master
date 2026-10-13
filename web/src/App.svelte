@@ -9,6 +9,7 @@
   import SettingsDialog from './lib/SettingsDialog.svelte'
   import WordsDialog from './lib/WordsDialog.svelte'
   import { attentionTitle, faviconHref } from './lib/attention'
+  import { PLACE_KEY, parse as parsePlace, type Place } from './lib/place'
   import { keyWidth, DEFAULTS, limits, type Edge } from './lib/columns'
   import { escapeRestores } from './lib/workspace'
   import { notificationText, permission } from './lib/notify'
@@ -29,8 +30,44 @@
   // Is the user really looking at this window? A visible tab in a background window is not.
   let viewing = $state(document.visibilityState === 'visible' && document.hasFocus())
 
+  // Where the user was survives a reload: the address-bar hash first, then the copy in storage.
+  let restoring = $state(true)
+  async function restore(p: Place) {
+    restoring = true
+    try {
+      await store.applyPlace(p)
+    } finally {
+      restoring = false
+    }
+  }
+  const stored = () => {
+    try {
+      return localStorage.getItem(PLACE_KEY)
+    } catch {
+      return null
+    }
+  }
+  $effect(() => {
+    if (restoring || store.unauthorised) return
+    const hash = store.placeHash()
+    const now = location.hash.replace(/^#/, '')
+    if (hash === now) return
+    const was = parsePlace(now)
+    const is = store.place
+    const moved = was.campaign !== is.campaign || was.quest !== is.quest || was.session !== is.session
+    const url = location.pathname + location.search + (hash ? `#${hash}` : '')
+    try {
+      if (moved && now) history.pushState(null, '', url)
+      else history.replaceState(null, '', url)
+    } catch {
+      /* the address bar could not be updated; storage still has it */
+    }
+  })
+
   onMount(() => {
-    store.refresh()
+    void store.refresh().then(() => restore(location.hash.length > 1 ? parsePlace(location.hash) : parsePlace(stored())))
+    const onPop = () => void restore(parsePlace(location.hash))
+    window.addEventListener('popstate', onPop)
     const onEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
       if (!escapeRestores(store.workspace, event.target, settingsOpen || wordsOpen)) return
@@ -79,6 +116,7 @@
       window.removeEventListener('keydown', onShortcut)
       window.removeEventListener('keydown', onEscape)
       window.removeEventListener('resize', onWindow)
+      window.removeEventListener('popstate', onPop)
     }
   })
 
