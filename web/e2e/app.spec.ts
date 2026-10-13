@@ -1,7 +1,8 @@
 import { mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+import { test } from './fixtures'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const { url, workdir, subdir, plaindir, ghLog } = JSON.parse(readFileSync(join(here, '.url.json'), 'utf8')) as {
@@ -179,7 +180,13 @@ test('a monorepo subfolder runs agents in the subfolder but uses the repository 
 
 test('adding an existing directory selects its campaign', async ({ page }) => {
   await open(page)
+  const pickerRequests: string[] = []
+  await page.route('**/api/pick-folder', async (route) => {
+    pickerRequests.push(route.request().url())
+    await route.fulfill({ json: { cancelled: true } })
+  })
   await addCampaign(page, workdir, 'again')
+  expect(pickerRequests).toEqual([])
   await expect(nav(page).getByRole('button', { name: /^demo/ })).toHaveAttribute('aria-current', 'true')
   await expect(nav(page).getByRole('button', { name: /^again/ })).toHaveCount(0)
 })

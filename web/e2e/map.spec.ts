@@ -1,7 +1,8 @@
 import { mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+import { test } from './fixtures'
 
 // The map (M5a) on the sample project, whose shape is made to show it:
 // two epics with a line between them, a hall, a chain, strays for the

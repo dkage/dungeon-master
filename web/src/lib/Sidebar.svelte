@@ -32,15 +32,6 @@
     }
   }
 
-  function addFromPicker() {
-    adding = true
-    void store.pickFolder().then((path) => {
-      if (!path) return
-      dir = path
-      if (!name.trim()) name = path.split(/[\\/]/).filter(Boolean).at(-1) ?? ''
-    })
-  }
-
   async function rename(e: SubmitEvent, id: string) {
     e.preventDefault()
     if (!renameName.trim()) return
@@ -61,7 +52,7 @@
     <input type="search" bind:value={search} placeholder="Search projects and sessions…" />
   </label>
   <nav aria-label={wordLabel('campaign', store.appearance.wordMode, true)}>
-    <h2 class="sidebar-heading"><Term word="campaign" mode={store.appearance.wordMode} /><span class="section-rule" aria-hidden="true"></span><button type="button" class="heading-add" aria-label="Add project" onclick={addFromPicker}>＋</button></h2>
+    <h2 class="sidebar-heading"><Term word="campaign" mode={store.appearance.wordMode} /><span class="section-rule" aria-hidden="true"></span><button type="button" class="heading-add" aria-label="Add project" onclick={() => { adding = true }}>＋</button></h2>
     {#if store.campaigns.length === 0}
       <p class="hint">A campaign is a project directory. Add one to start.</p>
     {/if}
@@ -153,7 +144,7 @@
       <div class="add-heading"><h2>Add {store.appearance.wordMode === 'plain' ? 'project' : 'campaign'}</h2><button type="button" class="ghost" aria-label="Cancel adding project" onclick={() => (adding = false)}>×</button></div>
       <label>
         <span>Directory</span>
-        <button type="button" class="secondary" disabled={store.busy} onclick={() => void store.pickFolder().then((path) => { if (path) { dir = path; if (!name.trim()) name = path.split(/[\\/]/).filter(Boolean).at(-1) ?? '' } })}>Choose folder…</button>
+        <button type="button" class="secondary" aria-label="Choose folder" disabled={store.busy} onclick={() => void store.pickFolder().then((path) => { if (path) { dir = path; if (!name.trim()) name = path.split(/[\\/]/).filter(Boolean).at(-1) ?? '' } })}>Choose folder…</button>
         <input type="text" bind:value={dir} placeholder="/absolute/path/to/project" spellcheck="false" autocomplete="off" />
         <small class="hint">Type a path if the native folder picker is unavailable.</small>
       </label>
