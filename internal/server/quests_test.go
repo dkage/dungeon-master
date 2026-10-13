@@ -261,7 +261,7 @@ func TestScopeOptionsForCampaignsWithoutARepoOrOnDemoData(t *testing.T) {
 	}
 	e.req("PATCH", "/api/campaigns/"+c.ID, map[string]any{"demo": true}, nil)
 	resp, out := e.req("GET", "/api/campaigns/"+c.ID+"/scope/options", nil, nil)
-	if resp.StatusCode != http.StatusOK || !strings.Contains(string(out), `"openTotal":11`) {
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(out), `"openTotal":14`) {
 		t.Fatalf("demo: %d %s", resp.StatusCode, out)
 	}
 }
