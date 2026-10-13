@@ -166,4 +166,4 @@ started in; the Gatekeeper rule and its limits are described in [docs/design/git
 
 ## License
 
-To be decided before the first release.
+[MIT](LICENSE). Bundled fonts, libraries and the art notice are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
