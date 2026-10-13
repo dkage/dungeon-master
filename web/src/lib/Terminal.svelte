@@ -9,7 +9,7 @@
   import { TermSocket } from './termsocket'
   import { TERM_THEMES, dimStyles, type TermThemeName } from './termTheme'
   import { terminalTypography } from './termOptions'
-  import { keyInput } from './termKeys'
+  import { browserPastes, keyInput } from './termKeys'
   import { DEFAULT_TERMINAL_SIZE, MAX_SIZE, MIN_SIZE, type Zoom } from './termSize'
   import { bufferText, outputFileName, wasCut, type BufferLine } from './termText'
   import { SEARCH_DECORATIONS, TERMINAL_ACTION, matchLabel, scrolledUp } from './termSearch'
@@ -202,7 +202,10 @@
 
     // Copy the selection with Cmd+C (macOS) or Ctrl+Shift+C. Plain Ctrl+C is
     // left alone: it must reach the process as an interrupt.
+    const mac = /Mac|iPhone|iPad/i.test(navigator.platform ?? '')
     term.attachCustomKeyEventHandler((ev) => {
+      // Ctrl+V pastes (Windows, Linux): leave the key to the browser so its paste event fires.
+      if (browserPastes(ev, mac)) return false
       // Shift+Enter inserts a line break in the agent's prompt without submitting.
       const input = keyInput(ev)
       if (input !== null) {

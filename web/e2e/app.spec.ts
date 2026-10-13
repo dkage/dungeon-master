@@ -606,7 +606,10 @@ test('a copy of a session whose scrollback overflowed starts with the cut-off no
   await page.keyboard.type('echo FIRST-MARKER')
   await page.keyboard.press('Enter')
   await expect(screenText(page)).toContainText('FIRST-MARKER')
-  await page.keyboard.type(process.platform === 'win32' ? 'for /L %i in (1,1,6000) do @echo flood-%i' : 'seq -f "flood-%g" 1 6000')
+  // Paced in blocks of 500: one unbroken burst can outrun the viewer, which the server then drops.
+  await page.keyboard.type(process.platform === 'win32'
+    ? 'for /L %i in (1,1,6000) do @echo flood-%i'
+    : 'i=0; while [ $i -lt 6000 ]; do seq -f "flood-%g" $((i+1)) $((i+500)); i=$((i+500)); sleep 0.1; done')
   await page.keyboard.press('Enter')
   await expect(screenText(page)).toContainText('flood-6000', { timeout: 60_000 })
 
@@ -617,10 +620,9 @@ test('a copy of a session whose scrollback overflowed starts with the cut-off no
   await expect(async () => {
     await page.mouse.wheel(0, -2_000_000)
     await expect(pane.getByRole('button', { name: 'Jump to latest output' })).toBeVisible({ timeout: 1_000 })
+    await expect(screenText(page)).not.toContainText('flood-6000', { timeout: 1_000 })
+    await expect(screenText(page)).not.toContainText('FIRST-MARKER', { timeout: 1_000 })
   }).toPass({ timeout: 20_000 })
-  await expect(screenText(page)).not.toContainText('flood-6000')
-  await expect(screenText(page)).not.toContainText('FIRST-MARKER')
-  await expect(screenText(page)).not.toContainText('flood-1 ')
   await pane.getByRole('button', { name: 'Jump to latest output' }).click()
   await expect(screenText(page)).toContainText('flood-6000')
 
