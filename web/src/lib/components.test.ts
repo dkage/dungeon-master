@@ -154,6 +154,17 @@ describe('first-run terminology and appearance', () => {
 })
 
 describe('Sidebar', () => {
+  it('opens the add form without a native dialog, and only picks on Choose folder', async () => {
+    const s = store()
+    const pick = vi.spyOn(s, 'pickFolder').mockResolvedValue('/work/new-project')
+    render(Sidebar, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: 'Add project' }))
+    expect(screen.getByPlaceholderText('/absolute/path/to/project')).toBeInTheDocument()
+    expect(pick).not.toHaveBeenCalled()
+    await fireEvent.click(screen.getByRole('button', { name: /Choose folder/ }))
+    expect(pick).toHaveBeenCalledOnce()
+    expect(screen.getByPlaceholderText('/absolute/path/to/project')).toHaveValue('/work/new-project')
+  })
   it('lists campaigns with repos, highlights the selected one and selects on click', async () => {
     const s = store()
     render(Sidebar, { store: s })
