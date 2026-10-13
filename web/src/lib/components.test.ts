@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/svelte'
+import { tick } from 'svelte'
 import Toolbar from './Toolbar.svelte'
 import Sidebar from './Sidebar.svelte'
 import { AppStore } from './store.svelte'
@@ -406,6 +407,17 @@ describe('QuestsPanel', () => {
     const place = screen.getByRole('combobox', { name: 'Dungeon' })
     expect([...place.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['All', '#1 Epic', 'Tavern (no epic)'])
     await fireEvent.change(place, { target: { value: 'tavern' } })
+    expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual([expect.stringContaining('Mine'), expect.stringContaining('Stray')])
+  })
+
+  it('shows the whole list again when the chosen epic disappears', async () => {
+    const quests = [...sample, quest(6, { title: 'Stray' })]
+    const s = questStore(questResult(quests))
+    render(QuestsPanel, { store: s })
+    await fireEvent.change(screen.getByRole('combobox', { name: 'Dungeon' }), { target: { value: '1' } })
+    expect(screen.queryByText('Stray')).toBeNull()
+    s.quests = questResult([quest(5, { title: 'Mine' }), quest(6, { title: 'Stray' })])
+    await tick()
     expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual([expect.stringContaining('Mine'), expect.stringContaining('Stray')])
   })
 

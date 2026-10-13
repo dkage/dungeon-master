@@ -28,6 +28,13 @@
 
   const result = $derived(store.quests)
   const model = $derived(store.mapModel)
+
+  // An epic that has gone (closed, left the scope) cannot stay chosen: the select would show nothing and the list be empty.
+  $effect(() => {
+    if (placeFilter === 'all') return
+    const there = model.dungeons.length > 0 && (placeFilter === 'tavern' || model.dungeons.some((d) => d.id === placeFilter))
+    if (!there) placeFilter = 'all'
+  })
   // A state or epic filter flattens the forest like a search does, so a match
   // never hangs under a parent that is filtered out.
   const narrowed = $derived(stateFilter !== 'all' || placeFilter !== 'all')
