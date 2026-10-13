@@ -1,7 +1,7 @@
 ---
 status: current
 milestone: M5a, M6
-github_issues: [28, 44, 72, 73, 74, 75, 76]
+github_issues: [28, 44, 72, 73, 74, 75, 76, 96]
 tracking: in-gh-issues
 next: finish the reference's textures and frames in #72; review as later art is added
 verified: 2026-10-13
@@ -95,6 +95,27 @@ without rebuilding the layout.
 3. External mood images may guide atmosphere and material choices. Create
    original borders, icons, and components for this app; do not import,
    trace, or extract pieces from reference images.
+
+## Terminal typography
+
+Mapped against the Stitch v4 full-window reference (#96). The reference sets
+the terminal body in a serif with HTML pills and a prompt box; the real
+terminal draws a cell grid, so only family, size, line height, weight and
+padding can map. Options live in `web/src/lib/termOptions.ts`.
+
+| Trait | Reference | Terminal | Why |
+| --- | --- | --- | --- |
+| Family | Georgia serif body; Fira Code for stamps | Fixed monospace stack: Nerd Font names, bundled Fira Code, then system monospace | Column alignment and glyph coverage (box drawing, prompt icons) need a monospace. The stack is not user-selectable. |
+| Interface serif | n/a | Almendra, EB Garamond and Alegreya never reach the terminal, in either appearance | The reading font only sets `--reading-font`; a browser test checks the computed family. |
+| Line height | 1.7 | 1.3 | 1.7 costs about a third of the rows a TUI needs; 1.3 adds air and box drawing stays joined. |
+| Weight | Bold dark ink | Regular, with bold left to the agent | Bold everywhere removes the agent's own emphasis; contrast comes from the colour rules (#93). |
+| Size | 12.5px | 13px default | The user's size is #92. |
+| Padding | 22px 28px | 22px 28px in Dungeon, 8px in Neutral | Matches the parchment frame; Neutral stays compact. |
+| Fira Code | Timestamps and pills | In the stack ahead of system monospace | Already bundled, so the look is the same on every machine. |
+
+Planned differences (cannot map to a cell grid): the serif body and log lines,
+the bold code pills, and the prompt input box. #72's side-by-side comparison
+cites this section for each.
 
 ## Review at actual size
 
