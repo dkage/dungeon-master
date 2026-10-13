@@ -278,3 +278,25 @@ for (const theme of ['dungeon', 'neutral'] as const) {
     await expect(side.getByRole('button', { name: 'Getting started' })).toBeVisible()
   })
 }
+
+for (const theme of ['dungeon', 'neutral'] as const) {
+  test(`keeps the keyboard order of the header and footer controls in the ${theme} appearance`, async ({ page }) => {
+    await page.addInitScript((t) => localStorage.setItem('dungeon.appearance', JSON.stringify({ theme: t })), theme)
+    await openSample(page)
+    const active = () => page.evaluate(() => {
+      const e = document.activeElement as HTMLElement | null
+      return e?.getAttribute('aria-label') ?? e?.textContent?.trim() ?? ''
+    })
+    const tabFrom = async (start: ReturnType<Page['locator']>, steps: number) => {
+      await start.focus()
+      const seen = [await active()]
+      for (let i = 0; i < steps; i++) {
+        await page.keyboard.press('Tab')
+        seen.push(await active())
+      }
+      return seen
+    }
+    expect(await tabFrom(panel(page).getByRole('button', { name: 'Map', exact: true }), 2)).toEqual(['Map', 'List', 'Refresh quests'])
+    expect(await tabFrom(page.locator('.sidebar').getByRole('button', { name: '＋ Add project' }), 3)).toEqual(['＋ Add project', '⚙ Settings', 'Word guide', 'Getting started'])
+  })
+}
