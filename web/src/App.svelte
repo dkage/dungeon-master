@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import { AppStore } from './lib/store.svelte'
   import Sidebar from './lib/Sidebar.svelte'
   import Toolbar from './lib/Toolbar.svelte'
@@ -9,6 +9,7 @@
   import SettingsDialog from './lib/SettingsDialog.svelte'
   import WordsDialog from './lib/WordsDialog.svelte'
   import { attentionTitle, faviconHref } from './lib/attention'
+  import { escapeRestores } from './lib/workspace'
   import { notificationText, permission } from './lib/notify'
 
   let { store = new AppStore() }: { store?: AppStore } = $props()
@@ -29,6 +30,15 @@
 
   onMount(() => {
     store.refresh()
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+      if (!escapeRestores(store.workspace, event.target, settingsOpen || wordsOpen)) return
+      event.preventDefault()
+      const region = store.workspace.expanded
+      store.restoreSplit()
+      void tick().then(() => document.querySelector<HTMLElement>(`.expand-button[data-region="${region}"]`)?.focus())
+    }
+    window.addEventListener('keydown', onEscape)
     const onShortcut = (event: KeyboardEvent) => {
       if (event.ctrlKey && !event.metaKey && event.key === ',') {
         event.preventDefault()
@@ -64,6 +74,7 @@
       clearInterval(quests)
       document.removeEventListener('visibilitychange', onFocus)
       window.removeEventListener('keydown', onShortcut)
+      window.removeEventListener('keydown', onEscape)
     }
   })
 
@@ -127,6 +138,7 @@
 {:else}
 <div
   class="app"
+  data-expanded={store.workspace.expanded ?? undefined}
   data-theme={store.appearance.theme}
   data-font={store.appearance.font}
   style={`--sidebar-size:${store.appearance.sidebarSize}px;--sidebar-font-scale:${store.appearance.sidebarSize / 14};--terminal-size:${store.appearance.terminalSize}px;--quests-size:${store.appearance.questsSize}px;--quests-font-scale:${store.appearance.questsSize / 14}`}

@@ -143,6 +143,29 @@ describe('App', () => {
     expect(screen.queryByRole('heading', { name: 'Start here' })).not.toBeInTheDocument()
   })
 
+  it('expands a region, keeps the terminal mounted, and restores by button and Escape', async () => {
+    fakeServer()
+    const { container } = render(App)
+    await fireEvent.click(await screen.findByRole('button', { name: 'Opus' }))
+    const stub = await screen.findByTestId('term-stub')
+    const app = container.querySelector('.app')!
+    expect(app).not.toHaveAttribute('data-expanded')
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Expand projects' }))
+    expect(app).toHaveAttribute('data-expanded', 'projects')
+    expect(screen.getByRole('button', { name: 'Restore split' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('term-stub')).toBe(stub)
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Restore split' }))
+    expect(app).not.toHaveAttribute('data-expanded')
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Expand terminal' }))
+    expect(app).toHaveAttribute('data-expanded', 'terminal')
+    await fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(app).not.toHaveAttribute('data-expanded')
+    expect(screen.getByTestId('term-stub')).toBe(stub)
+  })
+
   it('reopens the getting-started guide over a running session, and hides it again', async () => {
     fakeServer()
     render(App)

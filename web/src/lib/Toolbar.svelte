@@ -2,6 +2,7 @@
   import type { AppStore } from './store.svelte'
   import { wordLabel } from './words'
   import { sessionStatus } from './attention'
+  import ExpandButton from './ExpandButton.svelte'
 
   let { store }: { store: AppStore } = $props()
   const campaign = $derived(store.campaign)
@@ -39,6 +40,7 @@
     <button type="button" class="shell" disabled={!canLaunch} onclick={() => store.launch({ shell: true })}>
       Shell
     </button>
+    <ExpandButton {store} region="terminal" />
     <button type="button" class="quests-toggle" aria-pressed={store.questsOpen} onclick={() => (store.questsOpen = !store.questsOpen)}>
       {wordLabel('quest', store.appearance.wordMode, true)}
     </button>

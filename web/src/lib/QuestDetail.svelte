@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ExpandButton from './ExpandButton.svelte'
   import { tick } from 'svelte'
   import type { AppStore } from './store.svelte'
   import type { QuestRef } from './api'
@@ -114,6 +115,7 @@
 <div class="detail">
   <header class="qhead">
     <button type="button" class="back" onclick={() => store.closeQuest()}>← {wordLabel('quest', store.appearance.wordMode, true)}</button>
+    <ExpandButton {store} region="detail" />
     <button type="button" class="ghost close-drawer" aria-label="Close quests" onclick={() => (store.questsOpen = false)}>×</button>
   </header>
 

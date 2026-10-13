@@ -612,3 +612,16 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .app[data-theme='dungeon'] .sidebar-footer .settings-button:not(.minor):hover { border-color: #d8a04b; filter: brightness(1.12); }
 .app[data-theme='dungeon'] .sidebar-footer .settings-button.minor { color: var(--muted); }
 .app[data-theme='dungeon'] .sidebar-footer .settings-button.minor:hover { color: var(--text); background: transparent; }
+
+/* Expanded region: one region fills the workspace; the others stay mounted but are hidden and inert. */
+.app[data-expanded] { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.app[data-expanded='projects'] :is(.main, .quests),
+.app[data-expanded='terminal'] :is(.sidebar, .quests),
+.app[data-expanded='map'] :is(.sidebar, .main, .splitter, .quest-detail-slot),
+.app[data-expanded='detail'] :is(.sidebar, .main, .splitter, .quest-browser) { display: none; }
+.app[data-expanded='map'] .quests, .app[data-expanded='detail'] .quests { position: static; width: auto; transform: none; box-shadow: none; display: flex; flex-direction: column; }
+.app[data-expanded='map'] .quest-browser, .app[data-expanded='detail'] .quest-detail-slot { flex: 1; min-height: 0; }
+.app[data-expanded] .sidebar { max-height: none; }
+.expand-button { padding: 2px 8px; }
+.expand-button[aria-pressed='true'] { border-color: var(--accent); }
+.brand-header .expand-button { margin-left: auto; }

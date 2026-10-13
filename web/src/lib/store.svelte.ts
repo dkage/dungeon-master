@@ -1,4 +1,5 @@
 import * as realApi from './api'
+import { SPLIT, restore, toggle, type Region, type Workspace } from './workspace'
 import type {
   AppState, Campaign, CampaignInput, CampaignPatch, EffortTier, GithubStatus, Hero, HeroesConfig, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
   SessionInfo,
@@ -126,6 +127,22 @@ export class AppStore {
   github = $state<GithubStatus | null>(null)
   /** Whether the quest panel is open on narrow screens. */
   questsOpen = $state(false)
+  /** The workspace region that fills the application, or null for the split layout. */
+  workspace = $state<Workspace>(SPLIT)
+  /** Expand a region, or restore the split when it is already expanded. */
+  toggleRegion(region: Region) {
+    this.workspace = toggle(this.workspace, region)
+  }
+  /** Opening a session or issue must not leave it in a hidden region. */
+  reveal(region: Region) {
+    const open = this.workspace.expanded
+    if (open === null || open === region) return
+    if (region === 'detail' && (open === 'map')) return
+    this.workspace = { expanded: region }
+  }
+  restoreSplit() {
+    this.workspace = restore()
+  }
   /** The right panel shows the map or the list of the same quests. */
   panelView = $state<'map' | 'list'>(load(VIEW_KEY) === 'list' ? 'list' : 'map')
   mapLevel = $state<MapLevel>({ kind: 'world' })
@@ -439,6 +456,7 @@ export class AppStore {
     if (!id) return
     const seq = ++this.detailSeq
     this.questNumber = number
+    this.reveal('detail')
     this.detail = null
     this.detailError = null
     this.detailLoading = true
@@ -567,11 +585,15 @@ export class AppStore {
     this.guideOpen = false
     this.pickCampaign(s.campaign)
     this.activeId = id
+    this.reveal('terminal')
     if (changed) void this.loadQuests()
     const session = this.sessions.find((x) => x.id === id)
     if (session?.quest) {
       this.questsOpen = true
+      const expanded = this.workspace.expanded
       await this.selectQuest(session.quest)
+      // The session was the target; its issue loads in the background without taking the screen.
+      if (expanded !== null) this.workspace = { expanded: 'terminal' }
     }
   }
 

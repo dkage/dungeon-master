@@ -3,6 +3,7 @@
   import { labelStyle, scopeText, timeAgo, typeChips, visibleRows } from './quests'
   import QuestDetail from './QuestDetail.svelte'
   import QuestMap from './QuestMap.svelte'
+  import ExpandButton from './ExpandButton.svelte'
   import { CREATURES, effortWord } from './map/art'
   import { STATE_FILTERS, STATE_WORDS, inPlace, inStateFilter, stateCounts, type ListFilter } from './map/model'
   import Rations from './Rations.svelte'
@@ -130,6 +131,7 @@
         >
           {store.questsLoading ? '…' : '↻'}
         </button>
+        <ExpandButton {store} region="map" />
         <button type="button" class="ghost close-drawer" aria-label="Close quests" onclick={() => (store.questsOpen = false)}>×</button>
       </div>
     </header>

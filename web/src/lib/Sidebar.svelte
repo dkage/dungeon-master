@@ -2,6 +2,7 @@
   import type { AppStore } from './store.svelte'
   import type { SessionInfo } from './api'
   import Term from './Term.svelte'
+  import ExpandButton from './ExpandButton.svelte'
   import { wordLabel } from './words'
   import { sessionStatus } from './attention'
 
@@ -48,6 +49,7 @@
   <header class="brand-header">
     <span class="brand-mark" aria-hidden="true">✦</span>
     <strong>Dungeon Master</strong>
+    <ExpandButton {store} region="projects" />
   </header>
   <label class="sidebar-search">
     <span class="sr">Search projects and sessions</span>
