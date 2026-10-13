@@ -105,6 +105,28 @@ Heroes come from `party.toml` in the config directory; without one, built-in Opu
 `make check` runs the Go and frontend tests; `make test-e2e` runs the browser tests (once:
 `cd web && npx playwright install chromium`).
 
+### Development with automatic updates
+
+Stop the existing `make run` server, then run:
+
+```sh
+make dev
+```
+
+Open the backend's printed token URL once to sign in, then use **http://127.0.0.1:5173** for development.
+Vite updates Svelte, TypeScript, CSS and asset changes in the browser. The backend builds once and stays running,
+so edits do not terminate active agent sessions. Go changes take effect when you stop and restart development.
+Ctrl+C stops both servers and ends their sessions.
+
+For backend work when no active sessions need to survive, use `make dev-watch`. Go source or module changes then
+rebuild and restart the backend automatically. Each restart terminates active agent sessions, including agents
+editing this project from inside Dungeon. Use `make dev` for those sessions.
+
+The optional watch mode uses the MIT-licensed [wgo](https://github.com/bokwoon95/wgo) watcher, pinned to v0.7.1 and
+downloaded by Go on first use. It does not add a runtime dependency or reinstall frontend dependencies on every start.
+To use other ports: `make dev DEV_ADDR=127.0.0.1:7880 DEV_PORT=5174`.
+`make run` remains the way to check the complete embedded production build.
+
 ## Supported platforms
 
 Dungeon Master is released for macOS, Linux and Windows, and every feature must work on all three (a requirement for
