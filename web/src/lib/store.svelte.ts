@@ -1,4 +1,5 @@
 import * as realApi from './api'
+import { KEY as SHORTCUTS_KEY, check as checkShortcut, parseOverrides, platformOf, type ActionId, type Overrides } from './shortcuts'
 import { PLACE_KEY, format as formatPlace, type Place } from './place'
 import { DEFAULTS, KEY as COLUMNS_KEY, fit, parse as parseColumns, setWidth, type Columns, type Edge } from './columns'
 import { SPLIT, restore, toggle, type Region, type Workspace } from './workspace'
@@ -186,6 +187,62 @@ export class AppStore {
   /** The right panel shows the map or the list of the same quests. */
   panelView = $state<'map' | 'list'>(load(VIEW_KEY) === 'list' ? 'list' : 'map')
   mapLevel = $state<MapLevel>({ kind: 'world' })
+  /** Shortcut overrides (null disables an action); missing actions use their platform default. */
+  platform = platformOf()
+  shortcuts = $state<Overrides>(parseOverrides(load(SHORTCUTS_KEY) || null, platformOf()))
+  /** Set when the overrides could not be saved, so Settings can say so instead of claiming success. */
+  shortcutError = $state('')
+  private saveShortcuts(next: Overrides) {
+    this.shortcuts = next
+    try {
+      localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(next))
+      this.shortcutError = ''
+    } catch {
+      this.shortcutError = 'Could not save shortcuts in this browser; they will be lost on reload.'
+    }
+  }
+  /** Validates and stores a binding. Returns the reason it was refused, or null. */
+  setShortcut(id: ActionId, text: string | null): string | null {
+    if (text === null) {
+      this.saveShortcuts({ ...this.shortcuts, [id]: null })
+      return null
+    }
+    const res = checkShortcut(id, text, this.shortcuts, this.platform)
+    if (!res.ok) return res.reason
+    this.saveShortcuts({ ...this.shortcuts, [id]: res.binding })
+    return null
+  }
+  resetShortcut(id: ActionId) {
+    const next = { ...this.shortcuts }
+    delete next[id]
+    this.saveShortcuts(next)
+  }
+  resetShortcuts() {
+    this.saveShortcuts({})
+  }
+  /** The semantic actions; buttons, shortcuts and a future native menu all come through here. */
+  runAction(id: ActionId, openSettings: () => void = () => {}) {
+    switch (id) {
+      case 'expand-projects': return this.toggleRegion('projects')
+      case 'expand-terminal': return this.toggleRegion('terminal')
+      case 'expand-map': return this.toggleRegion('map')
+      case 'expand-detail':
+        if (this.questNumber !== null) this.toggleRegion('detail')
+        return
+      case 'restore-split': return this.restoreSplit()
+      case 'show-map': this.reveal('map'); return this.setPanelView('map')
+      case 'show-list': this.reveal('map'); return this.setPanelView('list')
+      case 'open-settings': return openSettings()
+      case 'next-session':
+      case 'previous-session': {
+        const mine = this.campaignId ? this.sessionsOf(this.campaignId).filter((s) => !s.lost) : []
+        if (mine.length === 0) return
+        const at = mine.findIndex((s) => s.id === this.activeId)
+        const step = id === 'next-session' ? 1 : -1
+        void this.selectSession(mine[(at + step + mine.length) % mine.length].id)
+      }
+    }
+  }
   /** Where the user is, as identifiers only. */
   place = $derived<Place>({
     campaign: this.campaignId ?? undefined,

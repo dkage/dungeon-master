@@ -3,7 +3,7 @@ status: planned
 milestone: workspace usability
 github_issues: [63, 64, 65, 78, 84, 87]
 tracking: in-gh-issues
-next: reload decision record (#87) and restore (#84), then configurable shortcuts (#65)
+next: desktop-shell menu wiring for the shared actions; quick switcher decision (#146)
 verified: 2026-10-13
 ---
 
@@ -11,7 +11,7 @@ verified: 2026-10-13
 
 The default remains the existing three-panel cockpit and its visual design. All presentations share campaigns,
 sessions, selected issue, map level, filters and geometry. Planning, running and reviewing are activities in this
-workspace, not separate copies of it. Panel expansion (#64) and column resizing (#78) are implemented; the rest of this document specifies future behavior.
+workspace, not separate copies of it. Panel expansion (#64) column resizing (#78), reload restore (#84, #87) and configurable shortcuts (#65) are implemented; the rest of this document specifies future behavior.
 
 ## Panel expansion
 
@@ -82,8 +82,8 @@ and a disabled action has a reason. Binding a key never changes execution config
 Initial actions: expand each of the four regions, restore split, show map, show list, open settings, and next/previous
 session. A command palette can use the same action registry later; do not show nonfunctional palette or launch actions.
 
-Default candidates to validate during implementation: Ctrl+Shift+1 through 4 for expansion, Ctrl+Shift+0 to restore,
-Ctrl+, for Settings in browser mode, and Ctrl+PageDown/PageUp for session navigation where the host permits them.
+Implemented defaults: Ctrl+Shift+1 through 4 for expansion (Control, not Cmd, on macOS, where Cmd+Shift+3/4 are
+screenshots), Ctrl+Shift+0 to restore, Mod+, (Cmd on macOS) for Settings, and Ctrl+PageDown/PageUp for session navigation where the host permits them.
 Use platform labels and record native-shell alternatives separately; desktop/browser conflicts need practical checks.
 Settings must explain when the browser or operating system owns a proposed key and keep the button alternative.
 Do not intercept browser close/quit/reload keys, unmodified typing or standard clipboard shortcuts.

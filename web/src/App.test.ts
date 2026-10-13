@@ -215,6 +215,42 @@ describe('App', () => {
     expect(await screen.findByRole('button', { name: 'Opus' })).toBeInTheDocument()
   })
 
+  it('runs workspace actions from shortcuts, never while typing a binding, and lets Settings edit them', async () => {
+    fakeServer()
+    const { container } = render(App)
+    await screen.findByRole('button', { name: 'Opus' })
+    const app = container.querySelector('.app')!
+    const press = (init: KeyboardEventInit) => fireEvent.keyDown(document.body, init)
+
+    await press({ key: '@', code: 'Digit2', ctrlKey: true, shiftKey: true })
+    expect(app).toHaveAttribute('data-expanded', 'terminal')
+    await press({ key: ')', code: 'Digit0', ctrlKey: true, shiftKey: true })
+    expect(app).not.toHaveAttribute('data-expanded')
+    await press({ key: 'a', code: 'KeyA' }) // plain typing does nothing
+    await press({ key: ',', code: 'Comma', ctrlKey: true })
+    const dialog = await screen.findByRole('dialog', { name: 'Settings' })
+
+    // Rebind "Show map": a taken key names its owner, a free one is saved and survives a reload.
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Change shortcut for Show map' }))
+    const field = within(dialog).getByLabelText('Press the new shortcut for Show map')
+    await fireEvent.keyDown(field, { key: '!', code: 'Digit1', ctrlKey: true, shiftKey: true })
+    expect(within(dialog).getByRole('row', { name: /Show map/ })).toHaveTextContent('Already used by "Expand projects".')
+    await fireEvent.keyDown(field, { key: 'm', code: 'KeyM', ctrlKey: true, altKey: true })
+    expect(within(dialog).getByRole('row', { name: /Show map/ })).toHaveTextContent('Ctrl+Alt+m')
+    expect(JSON.parse(localStorage.getItem('dungeon.shortcuts')!)).toEqual({ 'show-map': 'Ctrl+Alt+m' })
+
+    // While the dialog is open the global handler stays out of the way.
+    await press({ key: '@', code: 'Digit2', ctrlKey: true, shiftKey: true })
+    expect(app).not.toHaveAttribute('data-expanded')
+
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Disable shortcut for Restore split' }))
+    expect(within(dialog).getByRole('row', { name: /Restore split/ })).toHaveTextContent('Disabled')
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Reset shortcut for Restore split' }))
+    expect(within(dialog).getByRole('row', { name: /Restore split/ })).toHaveTextContent('Ctrl+Shift+0')
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Restore defaults' }))
+    expect(localStorage.getItem('dungeon.shortcuts')).toBe('{}')
+  })
+
   it('reopens the getting-started guide over a running session, and hides it again', async () => {
     fakeServer()
     render(App)

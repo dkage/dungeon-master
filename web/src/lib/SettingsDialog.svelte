@@ -3,6 +3,7 @@
   import type { AppStore, ReadingFont, WordMode, ThemePack } from './store.svelte'
   import type { HeroConfig, HeroesConfig } from './api'
   import { wordLabel } from './words'
+  import ShortcutsSettings from './ShortcutsSettings.svelte'
   import { permission as notifyPermission, requestPermission } from './notify'
 
   let { store, onclose }: { store: AppStore; onclose: () => void } = $props()
@@ -279,6 +280,8 @@
       </label>
     {/each}
   </section>
+
+  <ShortcutsSettings {store} />
   </div>
 
   <footer><p>Changes apply immediately and stay on this computer.</p><button type="button" onclick={close}>Done</button></footer>

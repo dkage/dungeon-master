@@ -9,6 +9,7 @@
   import SettingsDialog from './lib/SettingsDialog.svelte'
   import WordsDialog from './lib/WordsDialog.svelte'
   import { attentionTitle, faviconHref } from './lib/attention'
+  import { route as routeShortcut } from './lib/shortcuts'
   import { PLACE_KEY, parse as parsePlace, type Place } from './lib/place'
   import { keyWidth, DEFAULTS, limits, type Edge } from './lib/columns'
   import { escapeRestores } from './lib/workspace'
@@ -79,13 +80,15 @@
     window.addEventListener('keydown', onEscape)
     const onWindow = () => (store.windowWidth = window.innerWidth)
     window.addEventListener('resize', onWindow)
+    // Capture phase, so a binding is handled before the terminal or a field sees the key.
     const onShortcut = (event: KeyboardEvent) => {
-      if (event.ctrlKey && !event.metaKey && event.key === ',') {
-        event.preventDefault()
-        settingsOpen = true
-      }
+      const action = routeShortcut(event, store.shortcuts, store.platform, settingsOpen || wordsOpen)
+      if (!action) return
+      event.preventDefault()
+      event.stopPropagation()
+      store.runAction(action, () => (settingsOpen = true))
     }
-    window.addEventListener('keydown', onShortcut)
+    window.addEventListener('keydown', onShortcut, true)
     const visible = () => document.visibilityState === 'visible'
     const look = () => (viewing = document.visibilityState === 'visible' && document.hasFocus())
     window.addEventListener('focus', look)
@@ -113,7 +116,7 @@
       document.removeEventListener('visibilitychange', look)
       clearInterval(quests)
       document.removeEventListener('visibilitychange', onFocus)
-      window.removeEventListener('keydown', onShortcut)
+      window.removeEventListener('keydown', onShortcut, true)
       window.removeEventListener('keydown', onEscape)
       window.removeEventListener('resize', onWindow)
       window.removeEventListener('popstate', onPop)
