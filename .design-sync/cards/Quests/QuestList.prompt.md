@@ -23,7 +23,10 @@ Quest browser: framed header with gem, scope chip, filters and a list of quest r
 </aside>
 ```
 
-The row state goes on both `.qitem` (`cleared` strikes the title, `locked` mutes it) and the `.statetag`. Nest rows
+The row state goes on both `.qitem` (`cleared` strikes the title, `locked` mutes it) and the `.statetag`. The thumbnail is the first frame of the quest's creature strip:
+`<span className="thumb framed" style={{backgroundImage: 'url(<assets>/map/creatures/goblin-idle-strip.png)'}} />`
+(`<assets>` is the `assets/` folder next to `styles.css`); with no effort known use
+`<span className="thumb framed unknown">◇</span>`. Nest rows
 with `style={{'--depth': 1}}` on `.qitem`. The selected row is `qbtn selected`. In the app `.quests` is a two-row grid
 (browser, `.splitter`, detail); use `style={{display:'block'}}` when showing the list alone.
 

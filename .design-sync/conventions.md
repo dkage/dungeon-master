@@ -43,12 +43,21 @@ Every design must sit inside the theme root, or nothing is themed (the tokens ar
 | Quests | `quest-browser`, `qhead`, `qtitle`, `gem`, `qtools`, `viewtoggle`, `source`, `age`, `scopeline`, `scopechip`, `filters`, `statefilters`, `statefilter`, `qlist`, `qitem`, `qbtn`(`selected`), `thumb framed`, `qmain`, `qline`, `num`, `qname`, `meta`, `effort` |
 | Detail | `detail`, `back`, `titlecard`, `dtitle`, `dmeta`, `pill`, `rel`, `link`, `mark`, `md`, `comments`, `comment`, `who`, `launch-footer`, `hero-label`, `launch-button`, `launch-note`, `detail-empty`, `kicker` |
 | Status | `chip`, `label` + `swatch`, `statetag`, `dot`, `badge`, `activity-chip`, `rations` |
+| Map | `map`(`plain`), `maptools`, `crumbs`, `crumb`(`current`), `sep`, `progress`, `zoom`, `viewport`, `node`, `plate`, `ring`, `ring-bg`, `wedge`, `room`(`ready`/`running`/`needs-you`/`assigned`/`locked`/`cleared`/`boss`/`selected`), `floor`, `light`, `creature`, `strip`, `link`, `gate`, `hall`, `stub`, `maphint` (all scoped under `.map`) |
 | Generic | `actions`, `secondary`, `danger`, `ghost`, `hint`, `banner`, `empty` |
 
 ## Where the truth lives
 
 `_ds/<folder>/styles.css` imports `_ds_bundle.css`, which is the app's real stylesheet. Read it before styling
 anything new. Each card's `components/<Group>/<Name>/<Name>.prompt.md` gives that element's exact markup.
+
+## Images
+
+Under `assets/` next to `styles.css`: `map/creatures/<name>-idle-strip.png` (15 creatures, 4-frame idle strips:
+rat, slime, bat, kobold, beetle, spider, goblin, skeleton, ghoul, orc, troll, warlock, many-eyed, lich, dragon),
+`map/dungeon-1-burrow.png` to `map/dungeon-5-citadel.png`, `map/tavern.png`, floor textures
+`map/{world,stone,tavern}-floor.jpg`, and `reference/prototype-*.jpg`, the frozen full-window target look (see the
+Reference cards; where it differs from the element cards, the cards win).
 
 ## Example
 
