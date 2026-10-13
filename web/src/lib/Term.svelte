@@ -12,7 +12,7 @@
   }
 </script>
 
-<span class="term-wrap">
+<span class="word-hint">
   <button
     type="button"
     class="term-word"
@@ -27,7 +27,7 @@
 </span>
 
 <style>
-  .term-wrap { position: relative; display: inline; }
+  .word-hint { position: relative; display: inline; }
   .term-word { display: inline; padding: 0; border: 0; border-bottom: 1px dotted currentColor; color: inherit; background: none; font: inherit; cursor: help; }
   .term-plain { color: var(--muted); font-size: .9em; font-weight: 400; }
   .term-popover { position: absolute; z-index: 50; left: 0; top: calc(100% + 5px); width: max-content; max-width: min(280px, 80vw); padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); box-shadow: 0 6px 20px #0005; font-size: 13px; font-weight: 400; letter-spacing: normal; text-transform: none; }

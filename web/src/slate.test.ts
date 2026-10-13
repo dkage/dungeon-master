@@ -37,3 +37,13 @@ describe('slate behind the Dungeon side panels', () => {
     expect(contrast(hex(c), lightest)).toBeGreaterThanOrEqual(4.5)
   })
 })
+
+describe('nothing paints over the slate by accident', () => {
+  it('the word-hint wrapper has a class no global rule uses', () => {
+    // It once shared .term-wrap with the terminal frame and drew a red block behind every themed heading.
+    const term = readFileSync('src/lib/Term.svelte', 'utf8')
+    const wrapper = /^<span class="([\w-]+)">/m.exec(term)![1]
+    expect(wrapper).toBe('word-hint')
+    expect(css).not.toMatch(new RegExp(`\\.${wrapper}\\b`))
+  })
+})
