@@ -117,12 +117,22 @@ export function mapState(q: Quest, session?: SessionInfo): MapState {
 export function buildModel(quests: Quest[], sessions: SessionInfo[] = [], campaignId: string | null = null): MapModel {
   const byNumber = new Map(quests.map((q) => [q.number, q]))
   const live = sessionsByQuest(sessions, campaignId)
-  const children = new Map<number, number[]>()
+  // The parent each quest is read with. Bad data can make parents loop; the
+  // lowest-numbered quest of a loop is treated as having no parent, so the
+  // loop becomes a dungeon instead of vanishing from the map.
+  const parentOf = new Map<number, number>()
+  for (const q of quests) if (q.parent && q.parent !== q.number && byNumber.has(q.parent)) parentOf.set(q.number, q.parent)
   for (const q of quests) {
-    if (q.parent && q.parent !== q.number && byNumber.has(q.parent)) {
-      children.set(q.parent, [...(children.get(q.parent) ?? []), q.number])
+    const loop = [q.number]
+    let p = parentOf.get(q.number)
+    while (p !== undefined && p !== q.number && !loop.includes(p)) {
+      loop.push(p)
+      p = parentOf.get(p)
     }
+    if (p === q.number && Math.min(...loop) === q.number) parentOf.delete(q.number)
   }
+  const children = new Map<number, number[]>()
+  for (const [child, parent] of parentOf) children.set(parent, [...(children.get(parent) ?? []), child])
   const blocks = new Map<number, number[]>()
   for (const q of quests) {
     for (const b of q.blockedBy) {
@@ -134,11 +144,11 @@ export function buildModel(quests: Quest[], sessions: SessionInfo[] = [], campai
   const ancestors = (n: number): number[] => {
     const out: number[] = []
     const seen = new Set([n])
-    let p = byNumber.get(n)?.parent
-    while (p && byNumber.has(p) && !seen.has(p)) {
+    let p = parentOf.get(n)
+    while (p !== undefined && !seen.has(p)) {
       out.push(p)
       seen.add(p)
-      p = byNumber.get(p)?.parent
+      p = parentOf.get(p)
     }
     return out
   }
@@ -225,8 +235,8 @@ export function dungeonTier(size: number, longestChain: number): number {
   return Math.min(5, bySize + (longestChain >= 4 ? 1 : 0))
 }
 
-/** The number of quests in the longest blocked-by chain among these rooms; cycles are cut. */
-export function longestChainIn(rooms: number[], views: Map<number, QuestView>): number {
+/** The longest blocked-by chain among these rooms: its length in quests and its last quest (lowest number on a tie); cycles are cut. */
+export function longestChain(rooms: number[], views: Map<number, QuestView>): { length: number; end: number | null } {
   const inside = new Set(rooms)
   const memo = new Map<number, number>()
   const visiting = new Set<number>()
@@ -241,7 +251,21 @@ export function longestChainIn(rooms: number[], views: Map<number, QuestView>): 
     memo.set(n, best + 1)
     return best + 1
   }
-  return rooms.reduce((m, n) => Math.max(m, depth(n)), 0)
+  let length = 0
+  let end: number | null = null
+  for (const n of [...rooms].sort((a, b) => a - b)) {
+    const d = depth(n)
+    if (d > length) {
+      length = d
+      end = n
+    }
+  }
+  return { length, end }
+}
+
+/** The number of quests in the longest blocked-by chain among these rooms; cycles are cut. */
+export function longestChainIn(rooms: number[], views: Map<number, QuestView>): number {
+  return longestChain(rooms, views).length
 }
 
 /** Dungeon A leads to dungeon B when a quest in A blocks a quest in B. */

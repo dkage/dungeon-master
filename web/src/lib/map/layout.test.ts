@@ -43,6 +43,11 @@ describe('layoutDungeon', () => {
     expect(l.links.every((k) => k.kind === 'block' && !k.open && k.d.startsWith('M'))).toBe(true)
   })
 
+  it('crowns the end of the longest chain, and the lowest number when chains tie', () => {
+    const m = dungeon(quest(5), quest(6, { blockedBy: blocked(5) }), quest(7, { blockedBy: blocked(6) }), quest(2), quest(3, { blockedBy: blocked(2) }), quest(4, { blockedBy: blocked(3) }), quest(9))
+    expect(layoutDungeon(m, 1).rooms.filter((r) => r.boss).map((r) => r.n)).toEqual([4])
+  })
+
   it('has no boss for a chain shorter than three', () => {
     const l = layoutDungeon(dungeon(quest(2), quest(3, { blockedBy: blocked(2) })), 1)
     expect(l.rooms.some((r) => r.boss)).toBe(false)
@@ -171,6 +176,11 @@ describe('layoutTavern', () => {
 })
 
 describe('layoutWorld', () => {
+  it('lays out parent cycles with a cross-epic blocker without failing', () => {
+    const m = buildModel([quest(1, { parent: 2 }), quest(2, { parent: 1 }), quest(5, { parent: 2 }), quest(10), quest(11, { parent: 10, blockedBy: blocked(5) })])
+    expect(() => layoutWorld(m)).not.toThrow()
+  })
+
   const m = buildModel([
     quest(1), quest(2, { parent: 1 }),
     quest(11), quest(12, { parent: 11, blockedBy: blocked(2) }),

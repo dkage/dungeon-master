@@ -77,6 +77,13 @@ describe('buildModel', () => {
     expect(m.quests.get(3)!.place).toBe('tavern')
   })
 
+  it('shows every quest of a parent cycle, with its children, inside one dungeon', () => {
+    const m = buildModel([quest(1, { parent: 2 }), quest(2, { parent: 1 }), quest(5, { parent: 2 }), quest(9, { blockedBy: [{ number: 5, closed: false }] })])
+    expect(m.dungeons.map((d) => d.id)).toEqual([1])
+    expect([1, 2, 5].map((n) => m.quests.get(n)!.place)).toEqual([1, 1, 1])
+    expect(m.links).toEqual([])
+  })
+
   it('adds the app sessions to the state: needing you wins over working, ended sessions do not count', () => {
     const qs = [quest(1), quest(2), quest(3), quest(4)]
     const sessions = [

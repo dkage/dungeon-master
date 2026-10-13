@@ -1,5 +1,5 @@
 import type { MapModel, PlaceId, QuestView } from './model'
-import { longestChainIn } from './model'
+import { longestChain } from './model'
 
 /**
  * Pure layout for the three map levels (docs/design/map.md §5). Same input,
@@ -238,9 +238,10 @@ function layoutRooms(model: MapModel, rooms: number[], hallOf: (n: number) => nu
   const hallPad = halls.length ? HALL_PAD * 2 : 0
   const width = PAD * 2 + (maxLayer + 1) * (ROOM.w + GAP_X) - GAP_X + hallPad
   const height = y - LANE_GAP + PAD
-  // The boss: the last quest of the longest chain, when it is three or more long.
-  if (longestChainIn(rooms, model.quests) >= 3) {
-    const last = boxes.filter((b) => b.layer === maxLayer).sort((a, b) => a.n - b.n)[0]
+  // The boss: the last quest of the longest chain itself (not whatever else stands in the last column), when it is three or more long.
+  const chain = longestChain(rooms, model.quests)
+  if (chain.length >= 3) {
+    const last = boxes.find((b) => b.n === chain.end)
     if (last) last.boss = true
   }
   return finish(model, boxes, halls, width, height, cycle)
@@ -334,7 +335,8 @@ export function layoutWorld(model: MapModel): WorldLayout {
   const hasTavern = model.tavern.rooms.length > 0 || ids.length === 0
   if (hasTavern) nodes.push({ id: 'tavern', x: PAD, y: ids.length ? gridBottom + GAP_Y : PAD, ...NODE })
   const at = new Map(nodes.map((n) => [n.id, n]))
-  const edges: WorldEdge[] = model.links.map((l) => {
+  // A link whose end is not a drawn node (bad data) is skipped rather than failing the layout.
+  const edges: WorldEdge[] = model.links.filter((l) => at.has(l.from) && at.has(l.to)).map((l) => {
     const a = at.get(l.from)!
     const b = at.get(l.to)!
     const x1 = a.x + a.w
