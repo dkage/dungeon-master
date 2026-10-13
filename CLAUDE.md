@@ -4,11 +4,13 @@ A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents ag
 an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native
 webview shell.
 
-Status: M0-M4.5 done. M3.5 (GitHub budget, scope and the `gh` shim) is done except the SQLite copy and write queue
-(issues #41, #42). M3.6 (Stitch v4 cockpit shell, first run and words) and M4 (quest briefing, launch, session linkage)
-are done, and so is M4.5 (attention: waiting sessions in the list, tab title and icon, and optional
-desktop notifications). Next: M5a map (#28). Everything unbuilt is a GitHub issue; the open list is the
-source of truth for what is left, including Windows and release work. Themed words: `GLOSSARY.md`.
+Status: M0-M4.5 delivered (#7, #19 and #23 are closed). M5a map (#28) is committed locally across five commits
+(a1676ae through 808573b), with its automated checks passed; the milestone remains open. On 2026-10-13, after fetching
+origin, the five implementation commits were not yet published. The revised roadmap/design/skill plans record
+the approved follow-up work separately from that implementation.
+Next: review and publish the M5a increment, then expandable panels/shortcuts (#63) and registered skill sources mapped
+to projects (#43). Priority and verification evidence live in `docs/roadmap.md`; the GitHub open list owns remaining
+scope. Themed words: `GLOSSARY.md`.
 
 Design for work not yet built lives in `docs/` (`architecture.md`, `ideas.md`, `design/`), not in the repo root. Each of
 those files starts with front-matter properties (`status`, `milestone`, `github_issues`, `tracking`, `next`,
@@ -54,8 +56,15 @@ historical right-panel study remain in `design/quest-encounters/`. Current map a
   weakening of `internal/server/guard.go` as a release blocker. The CSP deliberately allows inline *styles* (xterm.js
   builds its font, colour and selection rules as `<style>` elements; blocking them breaks the terminal) but never inline
   or foreign scripts; both are covered by tests. Issue text is untrusted input to agents.
-- **Own as little as possible for skills.** Use Matt Pocock's skills (MIT) as a pinned external source; fork only on a
-  real gap, keeping his notice and credits.
+- **Skills come from registered sources.** Local folders and pinned Git repositories are enabled/mapped per campaign
+  in local state. Project/user/plugin discovery is supplementary. Preserve source-qualified identity and verify agent
+  delivery; caching a skill does not register a slash command. Keep the reviewed briefing for skill launches.
+- **Own as little as possible for skills.** Offer Matt Pocock's skills (MIT) as an opt-in pinned external source;
+  adapt only a verified workflow gap, keeping notices and credits.
+- **One workspace, several focus targets.** Expand/restore panels through shared semantic actions; retain sessions,
+  selections and geometry. Shortcuts are configurable in Settings and respect terminal/input contexts.
+- **Evidence before status.** Separate planned, local implementation, checks passed, committed/published and closed.
+  A successful process exit never establishes issue completion. GitHub assignment and local session ownership differ.
 - **Independent design.** Write from the behaviour in the plans; do not copy code, prose or assets from other projects.
   `private/` is gitignored local notes: never commit it, never quote from it in tracked files.
 
@@ -121,8 +130,8 @@ built separately, never by the portable build.
   `_probe/`.
 - Never build a command line through a shell; exec argv directly.
 - **GitHub issues have a shape.** Every issue you create uses the `issue-shape` skill (`.claude/skills/issue-shape`;
-  contract in `docs/design/issue-shape.md`): an effort label, sub-issues for epics, blocked-by links in order, neutral
-  wording.
+  contract in `docs/design/issue-shape.md`): effort/method labels, observable completion criteria, native sub-issues and true prerequisite links, neutral
+  wording. Preserve existing identities and verify relationships after changes.
 - Module path is `github.com/dkage/dungeon-master`. The product name "Dungeon Master" is provisional: it appears in
   prose and UI text only, while the binary, config directory and `DUNGEON_HOME` keep the short `dungeon` name so a later
   rename stays cheap.
@@ -186,3 +195,8 @@ Still open:
 - Windows runtime fixes (executable extensions, `gh.exe` copies, bounded socket paths, native shells, private state
   ACLs and ConPTY completion) are covered by native Windows tests; CI is configured for all three supported platforms.
   Linux runtime verification via WSL is pending its installation reboot.
+
+## Personal Preferences
+
+If [CLAUDE_PERSONAL.md](private/CLAUDE_PERSONAL.md) exists, read as if it was part of this CLAUDE.md.
+It contains Developer Personal preferences.

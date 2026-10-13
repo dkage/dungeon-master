@@ -1,10 +1,10 @@
 ---
 status: current
 milestone: M5a, M6
-github_issues: [23, 28, 44]
+github_issues: [28, 44, 64, 67]
 tracking: in-gh-issues
 next: keep until M5a and M6 close; then delete
-verified: 2026-10-11
+verified: 2026-10-13
 ---
 
 # Map and right panel: design
@@ -77,8 +77,9 @@ and keeping the three regions in stable roles.
       plain quest session (see `docs/design/ui.md` §5.3);
     - **Start** launches the chosen hero and invokes the chosen skill as the opener. Disabled states say why ("claude
       not found", "another session is working in this folder").
-- **Expand the map**: one key (M) or a button makes the map fill the centre temporarily, for large repositories. Escape
-  returns. The terminal keeps running.
+- **Expand the map/list**: its header button fills the application workspace; Restore split returns. Projects,
+  terminal and issue detail have equivalent controls. Bindings and input-aware Escape follow
+  `docs/design/workspace.md` (#64/#65); terminal sessions remain mounted and running.
 - **Narrow screens**: the right column becomes a drawer (as today), with map and detail stacked.
 
 ## 3. What the map shows
@@ -282,8 +283,10 @@ on real repositories, and only behind the same renderer interface.
   same positions. It handles the three levels (world, dungeon, Tavern), halls, out-of-scope stubs, derived lines
   between dungeons and collapsed halls. A view-model per quest (state, effort tier, blockers, parent, epic) is built
   once and shared by the map and the list, so the two cannot disagree.
-- **Graph layout library**: `@dagrejs/dagre` (MIT) for a layered left-to-right layout. Check licences before adding
-  anything else; `elkjs` is EPL-2.0, which is not on our permissive list.
+- **Graph layout**: in-house, in `web/src/lib/map/layout.ts`, with no dependency. Rooms sit in columns by their
+  longest blocked-by path (cycles are cut and marked), each hall is its own horizontal lane so its frame never
+  overlaps other rooms, and stubs go in an outskirts strip below. `@dagrejs/dagre` (MIT) stays the fallback if
+  real repositories need crossing reduction; `elkjs` is EPL-2.0, which is not on our permissive list.
 - **SVG in Svelte**, no canvas for the MVP. Pan and zoom with a small in-house handler (wheel, drag, pinch, fit to view)
   or one small permissive library. Canvas only if a real repository proves SVG too slow.
 - **Stable positions**: when a quest is added or closed, the rest should not jump. Seed the layout with previous
@@ -374,3 +377,11 @@ switches to the List). The art still to be made is listed in `docs/design/art-ch
 Resolved: M5a includes the torchlight skin, state markers, and creature sprites. The 15-sheet roster and current theme
 guidance are in `docs/design/creature-roster.md` and `docs/design/art-direction.md`; source artwork remains in
 `design/quest-encounters/assets/`. Only walking sprites and isometric floors remain later work.
+
+## 11. Planned workflow extensions
+
+Basic expansion/restoration belongs to #63, not deferred map decoration. #44 is limited to additional map-specific
+focus/grouping and milestone presentation after the full campaign loop is useful; it must not rebuild M5a's halls,
+outside-scope stubs or existing world navigation. #67 strengthens completion/cancellation, missing-blocker, cycle and
+qualified-reference handling. Until that implementation lands, the current map uses the existing open/closed facts.
+Changing method never changes readiness; the list and map consume the same model and remain behaviorally equivalent.

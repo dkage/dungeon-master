@@ -1,10 +1,10 @@
 ---
 status: current
-milestone: M3.6 to M6
-github_issues: [8, 9, 10, 11, 12, 15]
+milestone: cockpit and workspace focus
+github_issues: [28, 43, 63, 64, 65, 67, 68, 71]
 tracking: in-gh-issues
-next: screen spec; keep
-verified: 2026-10-11
+next: finish prototype parity, then expansion/shortcuts; see the roadmap for priority
+verified: 2026-10-13
 ---
 
 # Screens and controls
@@ -40,14 +40,16 @@ this file wins.
 ```
 
 Three regions: the **left panel** (where), the **centre** (the terminal), the **right panel** (what: map and quest).
-Settings open as a modal over the whole window (§6).
+Settings open as a modal over the whole window (§6). The default split remains the prototype baseline. Planned
+Expand/Restore controls on projects, terminal, map/list and issue detail temporarily focus one region; all use the
+same workspace state and preserve selections, sessions and split geometry (`docs/design/workspace.md`, #63).
 
 ## 2. Left panel
 
 ### 2.1 Search
 
-A filter box at the top. Typing filters campaigns and expeditions in place. Ctrl/Cmd+K opens the command palette
-(`docs/design/experience.md` §7.5) for jumping to a quest by number or title, which the filter box does not do.
+A filter box at the top. Typing filters campaigns and expeditions in place. A future command palette can use the semantic actions
+(`docs/design/experience.md` §7.5); command-palette binding and issue jumps are not delivered by the current filter.
 
 ### 2.2 Campaigns header
 
@@ -142,8 +144,8 @@ Layout and map behaviour are in `docs/design/map.md` §2 and §3. The controls a
 
 ### 5.1 Map header
 
-- Title `Map`, with **Map | List** toggle, **Expand** (the map takes the centre until Escape) and **Close** (hides the
-  panel, same as the Pane toggle).
+- Title `Map`, with **Map | List** toggle, **Expand / Restore split** (fills the application workspace; #64) and
+  **Close** (hides the panel, same as the Pane toggle).
 - **Shell here** (`>_`): opens a new shell session in the campaign's folder, listed under the campaign in the left
   panel like any other session. It is per folder, not per quest, so it sits in the panel header rather than the quest
   footer. Same action as "Shell" in the campaign card's `+` menu; the right panel just keeps it within reach while
@@ -161,7 +163,7 @@ Layout and map behaviour are in `docs/design/map.md` §2 and §3. The controls a
 
 ### 5.2 Quest detail
 
-- Header: number, title, `×` (deselects).
+- Header: number, title, **Expand / Restore split** (#64), `×` (deselects).
 - Chips: the quest's kind (from labels), its state in words, and **ready** when it can be started now.
 - **Brief** button: a preview of exactly what will be sent if the quest is started now: the hero's command line, the
   spell, the opener, the appended instructions and the briefing file. It builds trust, and it is the first place to
@@ -254,7 +256,9 @@ Three parts, matching `docs/design/skills.md`:
    (`/research` + "focus on security"). Presets appear as entries in the skill combo. This is how new skills become
    launch choices without code.
 
-Milestone: M5b (spells).
+Milestone: M5b (spells). Registered folder/Git sources with per-project mappings are the primary source model.
+Project/user/plugin discovery supplements it. Source pins, availability and verified invocation follow
+`docs/design/skills.md`; fetching a repository never implies native skill registration.
 
 ### 6.3 Local files
 
@@ -368,63 +372,20 @@ as a starship pack, are a later initiative in `docs/ideas.md`.
 
 ## 7. Keyboard and platform conventions
 
-The app is planned to ship as a native desktop application (the webview shell, `release/PLAN_RELEASE.md`), so it must
-behave like one. A Mac app that does not open its settings with Cmd+, feels broken.
+### 7.1 Shortcuts settings
 
-### 7.1 Native shell (the packaged app)
+Settings gains a dedicated Shortcuts page (#65): named actions, editable/disabled bindings, platform defaults, conflict
+feedback, per-action reset and restore defaults. It remains accessible while a panel is expanded. The exact action,
+focus, input-context and persistence contract is `docs/design/workspace.md`. Shortcut dispatch and visible buttons use
+one semantic registry; a key never launches an agent implicitly.
 
-The shell installs a real application menu, so shortcuts work through the system and show up where users look for
-them. On macOS:
+### 7.2 Browser and native shell
 
-| Menu                      | Item and shortcut                                                           |
-|---------------------------|-----------------------------------------------------------------------------|
-| Dungeon Master (app menu) | About · **Settings… ⌘,** · Hide ⌘H · Hide Others ⌥⌘H · Quit ⌘Q              |
-| File                      | Add Campaign… ⇧⌘O · New Session ⌘T · Close Session ⌘W (asks if running)     |
-| Edit                      | Undo, Redo, Cut, Copy, Paste, Select All (standard items)                   |
-| View                      | Show Map ⌘1 · Show List ⌘2 · Toggle Pane ⌥⌘P · Expand Map ⇧⌘M · Zoom In/Out |
-| Go                        | Command Palette ⌘K · Find in panel ⌘F · Next/Previous Session ⌃Tab/⌃⇧Tab    |
-| Window                    | Minimize ⌘M · Zoom · Enter Full Screen ⌃⌘F                                  |
-| Help                      | Words (the glossary) · Keyboard Shortcuts                                   |
-
-Notes:
-
-- **The Edit menu is not optional.** In a macOS webview, copy and paste (including in the terminal and in text fields)
-  only work when the standard Edit menu items exist. Missing it is a classic bug in webview apps.
-- Settings is reached from the menu and from ⌘, and also from the `⚙ Settings` button in the left panel; all three
-  open the same modal. Escape or ⌘W closes it.
-- Menu items call into the web UI through one small, fixed bridge (an allowlist of action names), not arbitrary script.
-- On Linux and Windows the same actions use Ctrl instead of Cmd, and Settings is Ctrl+, (the convention of most
-  editors on those systems), plus the platform's usual menu placement.
-- The `webview_go` binding does not build menus itself, so the shell needs a small platform layer for them (Cocoa on
-  macOS first). This belongs to release phase R1 and is part of its smoke test.
-
-### 7.2 Browser mode (`dungeon serve`)
-
-The planned in-page shortcuts are a later usability slice, after quest launch. A browser keeps some keys for itself
-(⌘, opens the browser's own settings in Chrome and Safari, ⌘W closes the tab, ⌘T opens a tab). When shortcuts are
-implemented:
-
-- shortcuts the browser reserves get a second binding that works (`Ctrl+,` or `g` then `s`), shown in the Keyboard
-  Shortcuts help;
-- nothing in the page tries to override ⌘W or ⌘Q;
-- the help says which shortcuts are native-app only.
-
-### 7.3 Terminal focus
-
-When the terminal has focus, every key goes to the agent except the app's menu shortcuts in the native shell and a
-small reserved set in the browser (⌘K, ⌘,). Ctrl+C, Escape and the arrow keys always belong to the terminal. Leaving
-the terminal by keyboard is one documented shortcut (for example ⌃⇧Tab or ⌘\`), so the app is usable without a mouse.
-
-### 7.4 Other desktop expectations
-
-- The window remembers its size, position and the panel splits.
-- Quitting with running sessions asks once and says how many will be stopped.
-- A Dock badge (macOS) or taskbar badge shows how many sessions need you (M4.5).
-- Settings changes apply immediately; there is no Save button except in dialogs that create something.
-- Light and dark follow the system unless the user picks one.
-
-Tests: a unit test that the shortcut table has no duplicate bindings per platform; browser tests for the in-page
-bindings; the R1 smoke test opens Settings with ⌘, and pastes into a text field in the packaged app.
+Browser keys owned by the host remain host actions, with working button alternatives and documented bindings. Do not
+intercept close/quit/reload or ordinary terminal/editing keys. Native menus can bind the same semantic actions when
+shell work lands; keep system Edit menu behavior on macOS for clipboard support and platform-correct Settings access.
+Native menu integration is #36/#57 work, not a claim that the current browser UI implements it. Operating-system
+fullscreen is distinct from expanding an application panel. Avoid arbitrary-script menu bridges and double dispatch.
 
 ## 8. Milestone summary
 

@@ -1,10 +1,10 @@
 ---
 status: partial
 milestone: M8 (R0 to R6)
-github_issues: [29, 30, 31, 35, 36, 37, 38, 39]
+github_issues: [35, 36, 37, 38, 39, 57, 69, 70]
 tracking: in-gh-issues
 next: phases R0 to R6 are issues; delete when the first release ships
-verified: 2026-10-11
+verified: 2026-10-13
 ---
 
 # Release plan
@@ -13,8 +13,11 @@ How Dungeon Master is versioned, built, packaged, verified and distributed. Ever
 directory; the only exceptions are files GitHub forces elsewhere (`.github/workflows/`) and thin `Makefile` entry points
 that delegate here.
 
-Aligns with milestone M8 in `../docs/architecture.md`, but the first pieces land much earlier
-(see §10).
+Delivery order lives in `../docs/roadmap.md`. Packaging preparation can begin earlier (see §10), but desktop-window
+shutdown wiring depends on the session-ownership decision (#69). Closing a window, detaching a UI and stopping the
+backend are separate actions; `../docs/design/sessions.md` specifies the investigation and continuity boundaries.
+Native menus call the shared semantic actions in `../docs/design/workspace.md`, including platform-correct Settings
+and Edit behavior. Panel expansion is distinct from operating-system fullscreen. Browser operation remains supported.
 
 ## 1. Goals
 

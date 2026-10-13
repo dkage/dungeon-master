@@ -4,13 +4,14 @@ milestone: after v1
 github_issues: []
 tracking: none
 next: ideas only; promote an idea to an issue when v1 is stable
-verified: 2026-10-11
+verified: 2026-10-13
 ---
 
 # Dungeon Master — plan v2 (parking lot)
 
-Brainstorm only. Nothing here is in v1 (see `docs/architecture.md`: Claude only, GitHub issues read-mostly, one expedition per
-working tree). Add ideas freely; promote to a real plan when v1 is stable.
+Unpromoted ideas only. Approved source registration/project mapping (#43/#51), workspace expansion/shortcuts (#63),
+ready-work/planning (#67/#68), continuity (#69/#70) and outcome review (#71) now live in their design docs and roadmap.
+Do not use this parking lot as a second plan or imply these approved additions already ship. v1 remains Claude-only.
 
 ## More agents
 
@@ -21,7 +22,7 @@ working tree). Add ideas freely; promote to a real plan when v1 is stable.
 - First-run PATH scan offering template heroes.
 - Per-agent status detection: hooks where they exist, else OSC titles / screen rules via a VT emulator
   (`charmbracelet/x/vt`).
-- Skills for agents without native skill support: mirror into repo + path in briefing.
+- For another provider, verify source-qualified method delivery and supporting-file access without repository mirrors.
 
 ## Quest sources
 
@@ -54,24 +55,24 @@ working tree). Add ideas freely; promote to a real plan when v1 is stable.
 ## Sessions
 
 - `git worktree` per expedition to allow parallel heroes in one repo.
-- Run agents inside tmux for reattach after app restart.
+- Persistent-session technology is decided by #69/#70; do not preselect tmux here.
 - Claude transcript parsing: auto titles, token usage and cost per expedition.
-- Resume (`--resume`) a previous expedition from its quest.
-- Multi-hero quests: one hero implements, another reviews.
+- Provider conversation resume after verifying identifiers and recovery semantics; distinct from live reattachment.
+- Concurrent agents with worktree isolation; sequential method review is planned in #71.
 
 ## Dungeon map
 
 - Fog of war, animated state changes, milestone floors.
 - Minimap, search and filter by label/assignee.
 - Party view: which hero is where, token burn per room.
-- Alternate "inbox" view: quests needing my attention (waiting-for-input, PR ready).
+- More attention aggregation after #67/#71 validate the basic ready-work and review paths.
 
 ## Spells
 
 - Label/type → spell presets (bug → debug spell).
-- Git spellbooks with pinning; spell editor.
+- Skill authoring/editor after registered sources and delivery work (#43/#51/#66).
 - Prompt presets catalog per campaign.
-- Per-campaign custom spell buttons (v1 has global custom buttons only, `docs/design/ui.md` §6.2).
+- Per-campaign prompt presets after source mapping and the method picker are delivered.
 
 ## Release / distribution
 
@@ -94,6 +95,6 @@ v1 ships the Dungeon and Neutral packs and the seams for more (`docs/design/ui.m
 ## Polish / ideas
 
 - Dice-roll flavor: random quest names, loot (summary of changes) on clear.
-- Keybinding presets (vim/emacs).
+- Additional keybinding presets after configurable Shortcuts (#65).
 - Scratch location setting.
 - More panes: browser, source control, code review.
