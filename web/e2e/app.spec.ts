@@ -274,6 +274,34 @@ test('the slate shows behind both side panels in Dungeon, not in Neutral', async
     })
   }, await image(panels[0]))
   expect(loaded).toBe(true)
+  // The panels carry no red wash of their own: the only layer over the slate is the neutral dim.
+  for (const panel of panels) {
+    const bg = await image(panel)
+    expect(bg).toContain('rgba(0, 0, 0, 0.4)')
+    expect(bg.match(/rgba?\(/g)).toHaveLength(2)
+  }
+  // slate.test.ts checks text contrast against the texture's brightest pixel; re-measure it so a new asset cannot
+  // invalidate that check.
+  const brightest = await page.evaluate(async (css) => {
+    const img = new Image()
+    img.src = /url\("?([^")]+)"?\)/.exec(css)![1]
+    await img.decode()
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(img, 0, 0)
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+    let max = 0
+    for (let i = 0; i < data.length; i += 4) max = Math.max(max, 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2])
+    return max
+  }, await image(panels[0]))
+  expect(brightest).toBeLessThanOrEqual(0.2126 * 86 + 0.7152 * 85 + 0.0722 * 83 + 2)
+  // A themed heading word sits straight on the slate, without a box of its own.
+  const word = page.locator('.sidebar-heading .word-hint').first()
+  await expect(word).toHaveCSS('background-image', 'none')
+  await expect(word).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(word).toHaveCSS('padding-left', '0px')
 
   await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
   const settings = page.getByRole('dialog', { name: 'Settings' })
