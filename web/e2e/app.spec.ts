@@ -602,15 +602,30 @@ test('a copy of a session whose scrollback overflowed starts with the cut-off no
 
   // A shell loop prints 6,000 lines, more than the 5,000 the terminal keeps. The copy button took the focus.
   await page.locator('.pane:not([hidden]) .xterm').click()
+  await page.keyboard.type('echo FIRST-MARKER')
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('FIRST-MARKER')
   await page.keyboard.type(process.platform === 'win32' ? 'for /L %i in (1,1,6000) do @echo flood-%i' : 'seq -f "flood-%g" 1 6000')
   await page.keyboard.press('Enter')
   await expect(screenText(page)).toContainText('flood-6000', { timeout: 60_000 })
+
+  // What the user sees: scrolling all the way up never reaches the marker, which was dropped.
+  const view = pane.locator('.xterm')
+  await view.hover()
+  await page.mouse.wheel(0, -2_000_000)
+  await expect(pane.getByRole('button', { name: 'Jump to latest output' })).toBeVisible()
+  await expect(screenText(page)).not.toContainText('flood-6000')
+  await expect(screenText(page)).not.toContainText('FIRST-MARKER')
+  await expect(screenText(page)).not.toContainText('flood-1 ')
+  await pane.getByRole('button', { name: 'Jump to latest output' }).click()
+  await expect(screenText(page)).toContainText('flood-6000')
 
   const text = await copy()
   expect(text.startsWith('[' + notice)).toBe(true)
   expect(text).toContain('flood-6000')
   // The oldest output is what was dropped.
   expect(text).not.toMatch(/flood-1\n/)
+  expect(text).not.toContain('FIRST-MARKER')
 })
 
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
