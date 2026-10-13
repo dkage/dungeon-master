@@ -74,6 +74,7 @@ func TestEffortSettingsValidation(t *testing.T) {
 		"control":     {"size\x00s": "low"},
 		"too long":    {strings.Repeat("x", 51): "low"},
 		"too many":    many(101),
+		"collision":   {"Size/S": "low", " size/s ": "high"},
 	} {
 		if _, err := r.SetEffortLabels(c.ID, m); !errors.As(err, &ve) {
 			t.Errorf("%s: want a validation error, got %v", name, err)

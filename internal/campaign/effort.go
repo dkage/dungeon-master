@@ -2,6 +2,7 @@ package campaign
 
 import (
 	"maps"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -29,6 +30,9 @@ func (r *Registry) SetEffortLabels(id string, mapping map[string]string) (Campai
 		l := strings.ToLower(strings.TrimSpace(label))
 		if l == "" || len([]rune(l)) > 50 || strings.IndexFunc(l, unicode.IsControl) >= 0 {
 			return Campaign{}, ValidationError("effort labels must be 1 to 50 printable characters")
+		}
+		if _, dup := clean[l]; dup {
+			return Campaign{}, ValidationError("effort labels must differ by more than case or spacing: " + strconv.Quote(l))
 		}
 		clean[l] = tier
 	}

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -34,13 +35,17 @@ func (s *Server) handleQuests(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
-// rememberCreatures stores first-time creature choices. Failing to save is
-// harmless: the choice is deterministic and is simply made again next time.
+// rememberCreatures stores first-time creature choices, which the design makes
+// the long-term source of truth (docs/design/creature-roster.md). Failing to
+// save is survivable, because the choice is deterministic and is made again
+// next time, but it is logged so a read-only state directory is not silent.
 func (s *Server) rememberCreatures(id string, picks map[int]string) {
 	if len(picks) == 0 {
 		return
 	}
-	_ = s.cfg.Campaigns.RememberCreatures(id, picks)
+	if err := s.cfg.Campaigns.RememberCreatures(id, picks); err != nil && !errors.Is(err, campaign.ErrNotFound) {
+		log.Printf("could not save creature choices: %v", err)
+	}
 }
 
 // handleEffortLabels replaces the campaign's mapping from its own labels to
