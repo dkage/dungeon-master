@@ -208,6 +208,27 @@ test('launch a hero, see its output, type to it', async ({ page }) => {
   await expect(term).toContainText('echo:hello dungeon')
 })
 
+test('Shift+Enter sends the new-line sequence while plain Enter still sends a carriage return', async ({ page }) => {
+  const sent: string[] = []
+  page.on('websocket', (ws) => ws.on('framesent', (f) => {
+    if (typeof f.payload !== 'string') sent.push(f.payload.toString('latin1'))
+  }))
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await page.locator('.pane:not([hidden]) .xterm').click()
+  await page.keyboard.type('one')
+  await page.keyboard.press('Shift+Enter')
+  await page.keyboard.type('two')
+  await expect(screenText(page)).toContainText('echo:one')
+  await expect(screenText(page)).not.toContainText('echo:two')
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('echo:two')
+  // One input frame per key: the new line is ESC CR, the submit is a bare CR.
+  expect(sent).toContain('\x1b\r')
+  expect(sent.filter((x) => x === '\r')).toHaveLength(1)
+})
+
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()

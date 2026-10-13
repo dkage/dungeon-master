@@ -8,6 +8,7 @@
   import { TermSocket } from './termsocket'
   import { TERM_THEMES, dimStyles } from './termTheme'
   import { terminalTypography } from './termOptions'
+  import { keyInput } from './termKeys'
 
   let {
     sessionId,
@@ -77,6 +78,13 @@
     // Copy the selection with Cmd+C (macOS) or Ctrl+Shift+C. Plain Ctrl+C is
     // left alone: it must reach the process as an interrupt.
     term.attachCustomKeyEventHandler((ev) => {
+      // Shift+Enter inserts a line break in the agent's prompt without submitting.
+      const input = keyInput(ev)
+      if (input !== null) {
+        ev.preventDefault()
+        sock.sendInput(input)
+        return false
+      }
       const copy = ev.type === 'keydown' && ev.code === 'KeyC' && (ev.metaKey || (ev.ctrlKey && ev.shiftKey))
       if (copy && term.hasSelection()) {
         void navigator.clipboard?.writeText(term.getSelection())
