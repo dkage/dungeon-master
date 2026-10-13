@@ -4,8 +4,8 @@ A desktop cockpit for a human "Dungeon Master" who launches CLI coding agents ag
 an agent CLI in a PTY with its model, flags and context already set. Go server with an embedded SPA, optional native
 webview shell.
 
-Status: M0-M4.5 delivered (#7, #19 and #23 are closed). M5a map (#28) is committed locally across five commits
-(a1676ae through 808573b), with its automated checks passed; the milestone remains open. On 2026-10-13, after fetching
+Status: M0-M4.5 delivered (#7, #19 and #23 are closed). M5a map (#28) is committed locally across five commits (a1676ae
+through 808573b), with its automated checks passed; the milestone remains open. On 2026-10-13, after fetching
 origin, the five implementation commits were not yet published. The revised roadmap/design/skill plans record
 the approved follow-up work separately from that implementation.
 Next: review and publish the M5a increment, then the Dungeon visual baseline (#72), expandable panels/shortcuts (#63)
@@ -33,7 +33,8 @@ historical right-panel study remain in `design/quest-encounters/`. Current map a
   in user repos. The RPG theme exists only in the app UI; anything written to git or GitHub uses neutral wording. GitHub
   write-back is opt-in, off by default.
 - **State files** (`campaigns.json`, `sessions.json`, `party.toml`) live in the user config dir (`DUNGEON_HOME`
-  overrides it), written atomically with 0600/0700 permissions (protected user ACLs on Windows). Derived data (git root, owner/repo) is recomputed on
+  overrides it), written atomically with 0600/0700 permissions (protected user ACLs on Windows). Derived data (git root,
+  owner/repo) is recomputed on
   load, never persisted.
 - **Execution config stays local.** Heroes (model, flags, env, binary path) live in the user's `party.toml`, never in
   anything a repo can supply.
@@ -72,7 +73,8 @@ historical right-panel study remain in `design/quest-encounters/`. Current map a
 
 Campaign = registered working directory (issues come from the git root's remote). Quest = GitHub issue. Hero = a
 registered Claude configuration. Spell = skill. Expedition = live session. Briefing = generated context file. Dungeon
-= an epic (a top-level issue with sub-issues) on the map; Tavern = quests that belong to no epic. Keep these terms out of GitHub-facing text and out of Go identifiers where a
+= an epic (a top-level issue with sub-issues) on the map; Tavern = quests that belong to no epic. Keep these terms out
+of GitHub-facing text and out of Go identifiers where a
 neutral name is clearer.
 
 ## Layout
@@ -137,7 +139,8 @@ built separately, never by the portable build.
   `_probe/`.
 - Never build a command line through a shell; exec argv directly.
 - **GitHub issues have a shape.** Every issue you create uses the `issue-shape` skill (`.claude/skills/issue-shape`;
-  contract in `docs/design/issue-shape.md`): effort/method labels, observable completion criteria, native sub-issues and true prerequisite links, neutral
+  contract in `docs/design/issue-shape.md`): effort/method labels, observable completion criteria, native sub-issues and
+  true prerequisite links, neutral
   wording. Preserve existing identities and verify relationships after changes.
 - Module path is `github.com/dkage/dungeon-master`. The product name "Dungeon Master" is provisional: it appears in
   prose and UI text only, while the binary, config directory and `DUNGEON_HOME` keep the short `dungeon` name so a later
@@ -169,7 +172,9 @@ design so the work can start from a shared reference.
 - One logical change per commit. Commit only when asked. When asked to commit finished work, commit each step
   separately (for example the package, then the server wiring, then docs), not one commit for everything.
 - **Always name the GitHub issue (the card).** Put it in the footer, after the body and a blank line:
-  `Closes #N` when the commit finishes the issue, `Refs #N` otherwise (one footer line per issue). Keep issue
+  `Closes #N` when the commit finishes the issue, `Refs #N` otherwise (one footer line per issue). Every commit that
+  implements issue work carries one of the two. Before choosing `Refs`, check the issue's "Done when"; if this commit
+  completes it, use `Closes`, because GitHub only auto-closes on `Closes`/`Fixes`. Keep issue
   numbers out of the subject line. For big work, add a short summary of what changed to the body (bullets per
   area), still before the footer.
 - **Several agent sessions share this working tree**, so other sessions' uncommitted work is usually present. Never
