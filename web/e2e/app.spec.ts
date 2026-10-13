@@ -475,6 +475,42 @@ test('campaigns and expeditions survive a page reload, with scrollback replayed'
   await expect(screenText(page)).toContainText('FAKE-CLAUDE')
 })
 
+test('a Nerd Font glyph resolves to the bundled symbols font and keeps the column count', async ({ page }) => {
+  test.skip(process.platform === 'win32', 'printf is POSIX')
+  await open(page)
+  await hero(page, 'Shell').click()
+  const pane = page.locator('.pane:not([hidden])')
+  await pane.locator('.xterm').click()
+  const cols = () => pane.locator('.xterm-screen').evaluate((e) => Math.round(e.getBoundingClientRect().width))
+  await page.evaluate(() => document.fonts.ready)
+  const before = await cols()
+  // U+F015 (house) and U+E0B0 (powerline arrow) live in the private-use area; no installed font has them.
+  await page.keyboard.type("printf 'ICON-\\357\\200\\225-\\356\\202\\260-END\\n'")
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('-END')
+  // The machine running the test may have a Nerd Font installed. Rebuild the
+  // app's own stack without those names, as on a machine with none, and ask
+  // the browser which font draws the glyphs.
+  const family = await pane.locator('.xterm-rows').evaluate((e) => getComputedStyle(e).fontFamily)
+  const bare = family.split(/,\s*/).filter((n) => !/Nerd Font|NF"?$/.test(n)).join(', ')
+  expect(bare).toContain('Dungeon Symbols')
+  await page.evaluate((f) => {
+    const probe = document.createElement('span')
+    probe.id = 'glyph-probe'
+    probe.style.fontFamily = f
+    probe.textContent = '\uf015\ue0b0'
+    document.body.append(probe)
+  }, bare)
+  const cdp = await page.context().newCDPSession(page)
+  await cdp.send('DOM.enable')
+  await cdp.send('CSS.enable')
+  const { root } = await cdp.send('DOM.getDocument', { depth: 0 })
+  const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#glyph-probe' })
+  const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId })
+  expect(fonts.filter((f) => f.glyphCount > 0).map((f) => f.familyName).join('|')).toMatch(/Symbols/i)
+  expect(await cols()).toBe(before)
+})
+
 test('the terminal renders with its own font, colours and selection (CSP must allow xterm styles)', async ({ page }) => {
   // xterm builds its font, colour and selection rules as <style> elements. A
   // Content-Security-Policy that blocks them leaves a proportional font, no
