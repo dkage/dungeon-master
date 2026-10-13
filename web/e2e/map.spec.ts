@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, type Page } from '@playwright/test'
-import { test } from './fixtures'
+import { setAppearance, test } from './fixtures'
 
 // The map (M5a) on the sample project, whose shape is made to show it:
 // two epics with a line between them, a hall, a chain, strays for the
@@ -185,7 +185,7 @@ test('still works with every image blocked', async ({ page }) => {
 })
 
 test('draws the plain graph under the Neutral theme, with no art', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('dungeon.appearance', JSON.stringify({ theme: 'neutral' })))
+  await setAppearance(page, { theme: 'neutral' })
   await openSample(page)
   await expect(crumbs(page)).toContainText('All epics')
   await map(page).getByRole('button', { name: /^Epic #1 Ship the onboarding flow/ }).dblclick()
@@ -198,7 +198,7 @@ test('draws the plain graph under the Neutral theme, with no art', async ({ page
 })
 
 async function listWith(page: Page, theme: 'dungeon' | 'neutral') {
-  await page.addInitScript((t) => localStorage.setItem('dungeon.appearance', JSON.stringify({ theme: t })), theme)
+  await setAppearance(page, { theme })
   await openSample(page)
   await panel(page).getByRole('group', { name: 'Show as' }).getByRole('button', { name: 'List' }).click()
   await panel(page).locator('.qlist .qbtn').first().click()
@@ -251,7 +251,7 @@ test('remembers the split between the map and the detail', async ({ page }) => {
 
 for (const theme of ['dungeon', 'neutral'] as const) {
   test(`finds the panel header and footer controls by role in the ${theme} appearance`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('dungeon.appearance', JSON.stringify({ theme: t })), theme)
+    await setAppearance(page, { theme })
     await openSample(page)
     const toggle = panel(page).getByRole('group', { name: 'Show as' })
     await toggle.getByRole('button', { name: 'List' }).click()
@@ -281,7 +281,7 @@ for (const theme of ['dungeon', 'neutral'] as const) {
 
 for (const theme of ['dungeon', 'neutral'] as const) {
   test(`keeps the keyboard order of the header and footer controls in the ${theme} appearance`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('dungeon.appearance', JSON.stringify({ theme: t })), theme)
+    await setAppearance(page, { theme })
     await openSample(page)
     const active = () => page.evaluate(() => {
       const e = document.activeElement as HTMLElement | null

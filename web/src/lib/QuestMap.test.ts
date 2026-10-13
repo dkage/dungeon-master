@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from './appearance'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/svelte'
 import QuestMap from './QuestMap.svelte'
@@ -35,6 +36,8 @@ function client(): Client {
     adoptStarterHeroes: vi.fn(), getHeroesConfig: vi.fn(), saveHeroesConfig: vi.fn(),
     setEffortLabels: vi.fn(async (_id: string, labels) => camp({ effortLabels: labels })),
     setEffortOverride: vi.fn(async (_id: string, n: number, tier) => camp({ effortOverrides: tier ? { [n]: tier } : {} })),
+    getAppearance: vi.fn(async () => ({ settings: DEFAULT_SETTINGS, stored: false })),
+    saveAppearance: vi.fn(async (s) => ({ settings: { ...DEFAULT_SETTINGS, ...s }, stored: true })),
   } as unknown as Client
 }
 

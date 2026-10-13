@@ -33,7 +33,7 @@ historical right-panel study remain in `design/quest-encounters/`. Current map a
 - **Invisible to the team.** All config is local (user state dir). No committed config files and no `.dungeon/` folder
   in user repos. The RPG theme exists only in the app UI; anything written to git or GitHub uses neutral wording. GitHub
   write-back is opt-in, off by default.
-- **State files** (`campaigns.json`, `sessions.json`, `party.toml`) live in the user config dir (`DUNGEON_HOME`
+- **State files** (`campaigns.json`, `sessions.json`, `party.toml`, `appearance.json`) live in the user config dir (`DUNGEON_HOME`
   overrides it), written atomically with 0600/0700 permissions (protected user ACLs on Windows). Derived data (git root,
   owner/repo) is recomputed on
   load, never persisted.

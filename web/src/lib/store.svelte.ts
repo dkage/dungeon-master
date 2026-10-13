@@ -11,14 +11,15 @@ import { stillWaiting, unattended } from './attention'
 import { buildModel, placeOf, type MapModel } from './map/model'
 import { pickToNotify } from './notify'
 import { TERMINAL_ACTION } from './termSearch'
-import { DEFAULT_TERMINAL_SIZE, clampSize, zoomed, type Zoom } from './termSize'
+import { zoomed, type Zoom } from './termSize'
+import { DEFAULT_SETTINGS, parseSettings, type UISettings } from './appearance'
 
 export type Client = Pick<
   typeof realApi,
   | 'getState' | 'getSessions' | 'createSession' | 'deleteSession' | 'addCampaign' | 'updateCampaign' | 'removeCampaign'
   | 'getQuests' | 'getQuest' | 'previewQuestLaunch' | 'getGithub' | 'setScope' | 'getScopeOptions' | 'getProjectSuggestions' | 'createSampleCampaign'
   | 'adoptStarterHeroes' | 'getHeroesConfig' | 'saveHeroesConfig' | 'pickFolder' | 'openCampaignFolder'
-  | 'setEffortLabels' | 'setEffortOverride'
+  | 'setEffortLabels' | 'setEffortOverride' | 'getAppearance' | 'saveAppearance'
 >
 
 const CAMPAIGN_KEY = 'dungeon.campaign'
@@ -51,44 +52,18 @@ export interface Failure {
   message: string
 }
 
-export type ReadingFont = 'almendra' | 'eb-garamond' | 'alegreya'
-export type WordMode = 'hints' | 'themed' | 'plain'
-export type ThemePack = 'dungeon' | 'neutral'
-export interface UISettings {
-  font: ReadingFont
-  sidebarSize: number
-  terminalSize: number
-  questsSize: number
-  wordMode: WordMode
-  theme: ThemePack
-  /** Desktop notification when a session waits and this window is not in front. Off until the user asks. */
-  notifications: boolean
-}
+export type { ReadingFont, WordMode, ThemePack, UISettings } from './appearance'
 
 const SETTINGS_KEY = 'dungeon.appearance'
-const DEFAULT_SETTINGS: UISettings = {
-  font: 'almendra', sidebarSize: 14, terminalSize: DEFAULT_TERMINAL_SIZE, questsSize: 14, wordMode: 'hints', theme: 'dungeon', notifications: false,
-}
 
-function loadSettings(): UISettings {
+/** What this browser last showed: the first paint and the one-time import into the server's copy. */
+function loadCache(): { settings: UISettings; present: boolean } {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
-    if (!raw) return { ...DEFAULT_SETTINGS }
-    const parsed = JSON.parse(raw) as Partial<UISettings>
-    const allowed = <T extends string>(value: unknown, values: readonly T[], fallback: T): T =>
-      values.includes(value as T) ? value as T : fallback
-    const size = clampSize
-    return {
-      font: allowed(parsed.font, ['almendra', 'eb-garamond', 'alegreya'], DEFAULT_SETTINGS.font),
-      sidebarSize: size(parsed.sidebarSize, DEFAULT_SETTINGS.sidebarSize),
-      terminalSize: size(parsed.terminalSize, DEFAULT_SETTINGS.terminalSize),
-      questsSize: size(parsed.questsSize, DEFAULT_SETTINGS.questsSize),
-      wordMode: allowed(parsed.wordMode, ['hints', 'themed', 'plain'], DEFAULT_SETTINGS.wordMode),
-      theme: allowed(parsed.theme, ['dungeon', 'neutral'], DEFAULT_SETTINGS.theme),
-      notifications: parsed.notifications === true,
-    }
+    if (!raw) return { settings: { ...DEFAULT_SETTINGS }, present: false }
+    return { settings: parseSettings(JSON.parse(raw)), present: true }
   } catch {
-    return { ...DEFAULT_SETTINGS }
+    return { settings: { ...DEFAULT_SETTINGS }, present: false }
   }
 }
 
@@ -285,7 +260,13 @@ export class AppStore {
   firstRunDismissed = $state(load('dungeon.first-run.dismissed') === '1')
   /** The user asked for the guide on purpose; it covers an open session until they pick something else. */
   guideOpen = $state(false)
-  appearance = $state<UISettings>(loadSettings())
+  private cached = loadCache()
+  appearance = $state<UISettings>(this.cached.settings)
+  /** Why the last attempt to keep the appearance on this computer failed; the page keeps showing what it has. */
+  appearanceError = $state<string | null>(null)
+  private appearanceSynced = false
+  private appearanceSaving = false
+  private appearanceDirty = false
 
   // Responses that arrive after a newer request, or after the selection moved
   // on, are dropped so one campaign's quests never show under another.
@@ -333,6 +314,7 @@ export class AppStore {
   }
 
   async refresh() {
+    void this.syncAppearance()
     try {
       const st = await this.client.getState()
       this.version = st.version
@@ -461,8 +443,48 @@ export class AppStore {
     this.updateAppearance({ terminalSize: zoomed(this.appearance.terminalSize, step) })
   }
   updateAppearance(patch: Partial<UISettings>) {
-    this.appearance = { ...this.appearance, ...patch }
+    this.appearance = parseSettings({ ...this.appearance, ...patch })
     save(SETTINGS_KEY, JSON.stringify(this.appearance))
+    this.appearanceDirty = true
+    void this.pushAppearance()
+  }
+  /** Sends the latest settings; edits made while a save is running go in one follow-up save. */
+  private async pushAppearance() {
+    if (this.appearanceSaving || !this.appearanceSynced) return
+    this.appearanceSaving = true
+    try {
+      while (this.appearanceDirty) {
+        this.appearanceDirty = false
+        await this.client.saveAppearance(this.appearance)
+        this.appearanceError = null
+      }
+    } catch (e) {
+      this.appearanceError = failure(e).message
+    } finally {
+      this.appearanceSaving = false
+    }
+  }
+  /**
+   * Takes the settings kept on this computer. The first time (nothing saved
+   * yet) the choices this browser already holds are handed over instead, so
+   * nobody loses theirs; after that the saved copy is the source of truth.
+   */
+  async syncAppearance() {
+    if (this.appearanceSynced) return
+    try {
+      const got = await this.client.getAppearance()
+      const hasLocal = this.cached.present || this.appearanceDirty
+      const next = got.stored || !hasLocal ? got : await this.client.saveAppearance(this.appearance)
+      if (!got.stored && hasLocal) this.appearanceDirty = false
+      this.appearance = parseSettings(next.settings)
+      save(SETTINGS_KEY, JSON.stringify(this.appearance))
+      this.appearanceSynced = true
+      this.appearanceError = null
+      // A change made before the first answer arrived still has to be sent.
+      if (this.appearanceDirty) void this.pushAppearance()
+    } catch (e) {
+      this.appearanceError = failure(e).message
+    }
   }
 
   /** Keep the selection pointing at things that exist. */

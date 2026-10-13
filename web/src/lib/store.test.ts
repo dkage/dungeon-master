@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from './appearance'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, type AppState, type Campaign, type GithubStatus, type Quest, type QuestDetail, type QuestResult, type ScopeOptions, type SessionInfo } from './api'
 import { AppStore, type Client } from './store.svelte'
@@ -42,6 +43,8 @@ function fakeClient(over: Partial<Client> = {}, state: Partial<AppState> = {}): 
     saveHeroesConfig: vi.fn(async () => ({ saved: true })),
     setEffortLabels: vi.fn(async (id, labels) => camp(id, { effortLabels: labels })),
     setEffortOverride: vi.fn(async (id, n, tier) => camp(id, { effortOverrides: tier ? { [n]: tier } : {} })),
+    getAppearance: vi.fn(async () => ({ settings: DEFAULT_SETTINGS, stored: false })),
+    saveAppearance: vi.fn(async (s) => ({ settings: { ...DEFAULT_SETTINGS, ...s }, stored: true })),
     ...over,
   }
 }
@@ -199,15 +202,86 @@ describe('onboarding and appearance preferences', () => {
     first.updateAppearance({ font: 'eb-garamond', sidebarSize: 17, terminalSize: 11, questsSize: 19, wordMode: 'plain', theme: 'neutral' })
     const second = new AppStore(fakeClient())
     expect(second.appearance).toEqual({
-      font: 'eb-garamond', sidebarSize: 17, terminalSize: 11, questsSize: 19, wordMode: 'plain', theme: 'neutral', notifications: false,
+      ...DEFAULT_SETTINGS, font: 'eb-garamond', sidebarSize: 17, terminalSize: 11, questsSize: 19, wordMode: 'plain', theme: 'neutral',
     })
   })
 
   it('recovers from invalid appearance data with safe defaults', () => {
     localStorage.setItem('dungeon.appearance', '{broken')
     const s = new AppStore(fakeClient())
-    expect(s.appearance).toEqual({
-      font: 'almendra', sidebarSize: 14, terminalSize: 13, questsSize: 14, wordMode: 'hints', theme: 'dungeon', notifications: false,
+    expect(s.appearance).toEqual(DEFAULT_SETTINGS)
+  })
+
+  describe('appearance kept on this computer', () => {
+    const saved = { ...DEFAULT_SETTINGS, theme: 'neutral' as const, terminalSize: 19 }
+
+    it('takes the saved settings over what this browser holds', async () => {
+      localStorage.setItem('dungeon.appearance', JSON.stringify({ theme: 'dungeon', terminalSize: 11 }))
+      const c = fakeClient({ getAppearance: vi.fn(async () => ({ settings: saved, stored: true })) })
+      const s = new AppStore(c)
+      await s.refresh()
+      expect(s.appearance).toEqual(saved)
+      expect(c.saveAppearance).not.toHaveBeenCalled()
+      expect(JSON.parse(localStorage.getItem('dungeon.appearance')!)).toMatchObject({ theme: 'neutral', terminalSize: 19 })
+    })
+
+    it('hands this browser\'s choices over once when nothing is saved yet', async () => {
+      localStorage.setItem('dungeon.appearance', JSON.stringify({ theme: 'neutral', terminalSize: 17 }))
+      const c = fakeClient()
+      const s = new AppStore(c)
+      await s.refresh()
+      expect(c.saveAppearance).toHaveBeenCalledOnce()
+      expect(c.saveAppearance).toHaveBeenCalledWith(expect.objectContaining({ theme: 'neutral', terminalSize: 17 }))
+      expect(s.appearance).toMatchObject({ theme: 'neutral', terminalSize: 17 })
+    })
+
+    it('imports nothing for a browser with no choices of its own', async () => {
+      const c = fakeClient()
+      const s = new AppStore(c)
+      await s.refresh()
+      expect(c.saveAppearance).not.toHaveBeenCalled()
+      expect(s.appearance).toEqual(DEFAULT_SETTINGS)
+    })
+
+    it('sends every change, one save at a time, ending with the latest values', async () => {
+      const order: number[] = []
+      let release!: () => void
+      const gate = new Promise<void>((r) => (release = r))
+      const c = fakeClient({
+        saveAppearance: vi.fn(async (x) => {
+          order.push(x.terminalSize!)
+          if (order.length === 1) await gate
+          return { settings: { ...DEFAULT_SETTINGS, ...x }, stored: true }
+        }),
+      })
+      const s = new AppStore(c)
+      await s.refresh()
+      s.updateAppearance({ terminalSize: 14 })
+      s.updateAppearance({ terminalSize: 15 })
+      s.updateAppearance({ terminalSize: 16 })
+      release()
+      await vi.waitFor(() => expect(order).toEqual([14, 16]))
+    })
+
+    it('keeps the values and reports a failed save, then recovers', async () => {
+      const save = vi.fn().mockRejectedValueOnce(new Error('disk full'))
+      const c = fakeClient({ saveAppearance: save.mockImplementation(async (x) => ({ settings: { ...DEFAULT_SETTINGS, ...x }, stored: true })) })
+      const s = new AppStore(c)
+      await s.refresh()
+      s.updateAppearance({ theme: 'neutral' })
+      await vi.waitFor(() => expect(s.appearanceError).toBe('disk full'))
+      expect(s.appearance.theme).toBe('neutral')
+      s.updateAppearance({ terminalSize: 15 })
+      await vi.waitFor(() => expect(s.appearanceError).toBeNull())
+    })
+
+    it('keeps the cached look and reports it when the server cannot be asked', async () => {
+      localStorage.setItem('dungeon.appearance', JSON.stringify({ theme: 'neutral' }))
+      const c = fakeClient({ getAppearance: vi.fn(async () => { throw new Error('offline') }) })
+      const s = new AppStore(c)
+      await s.refresh()
+      expect(s.appearance.theme).toBe('neutral')
+      expect(s.appearanceError).toBe('offline')
     })
   })
 

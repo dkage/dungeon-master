@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from './appearance'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/svelte'
 import { tick } from 'svelte'
@@ -36,6 +37,8 @@ function store(setup: (s: AppStore) => void = () => {}) {
     getHeroesConfig: vi.fn(async () => ({ defaultHero: 'opus', heroes: [{ id: 'opus', label: 'Opus', args: ['--model', 'm1'], env: ['API_KEY='] }] })),
     saveHeroesConfig: vi.fn(async () => ({ saved: true })),
     setEffortLabels: vi.fn(async (id) => camp(id)), setEffortOverride: vi.fn(async (id) => camp(id)),
+    getAppearance: vi.fn(async () => ({ settings: DEFAULT_SETTINGS, stored: false })),
+    saveAppearance: vi.fn(async (s) => ({ settings: { ...DEFAULT_SETTINGS, ...s }, stored: true })),
   })
   s.heroes = [{ id: 'opus', label: 'Opus' }, { id: 'sonnet', label: 'Sonnet' }]
   s.campaigns = [camp('c1'), camp('c2', { repo: undefined })]

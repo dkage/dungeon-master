@@ -380,6 +380,24 @@ test('the whole output can be copied and saved as plain text', async ({ page, co
   expect(readFileSync(path, 'utf8')).toBe(copied + '\n')
 })
 
+test('a look chosen in one browser origin shows in another origin of the same server and survives a restart of the page', async ({ page, browser }) => {
+  await open(page)
+  await page.getByRole('button', { name: 'Settings' }).first().click()
+  await page.getByLabel('Reading font').selectOption('eb-garamond')
+  await page.getByLabel(/^Theme/).selectOption('neutral')
+  await expect(page.locator('.app')).toHaveAttribute('data-font', 'eb-garamond')
+  // The save is a request of its own: wait until the server has it.
+  await expect.poll(async () => (await (await page.request.get('/api/appearance')).json()).settings.theme).toBe('neutral')
+
+  // localhost is another origin than 127.0.0.1, so it has its own browser storage and cookie.
+  const other = await browser.newContext()
+  const second = await other.newPage()
+  await second.goto(url.replace('127.0.0.1', 'localhost'))
+  await expect(second.locator('.app')).toHaveAttribute('data-font', 'eb-garamond')
+  await expect(second.locator('.app')).toHaveAttribute('data-theme', 'neutral')
+  await other.close()
+})
+
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()

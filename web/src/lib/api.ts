@@ -322,3 +322,13 @@ export interface UploadedFile {
 /** Stores a pasted or dropped file for a live session and returns where it now lives. */
 export const uploadToSession = (id: string, name: string, data: string) =>
   call<UploadedFile>('POST', `/api/sessions/${encodeURIComponent(id)}/uploads`, { name, data }) as Promise<UploadedFile>
+
+import type { UISettings } from './appearance'
+export interface AppearanceState {
+  settings: UISettings
+  /** False until something was saved; the page then imports what the browser held, once. */
+  stored: boolean
+}
+export const getAppearance = () => call<AppearanceState>('GET', '/api/appearance') as Promise<AppearanceState>
+export const saveAppearance = (settings: Partial<UISettings>) =>
+  call<AppearanceState>('PUT', '/api/appearance', settings) as Promise<AppearanceState>

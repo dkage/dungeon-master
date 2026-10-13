@@ -284,10 +284,17 @@
   <ShortcutsSettings {store} />
   </div>
 
-  <footer><p>Changes apply immediately and stay on this computer.</p><button type="button" onclick={close}>Done</button></footer>
+  <footer>
+    {#if store.appearanceError}
+      <p class="save-error" role="alert">Could not keep your look settings: {store.appearanceError}. They still apply here.</p>
+    {:else}
+      <p>Changes apply immediately and stay on this computer, in every browser.</p>
+    {/if}<button type="button" onclick={close}>Done</button>
+  </footer>
 </dialog>
 
 <style>
+  .save-error { color: var(--error); }
   .settings { width: min(620px, calc(100vw - 32px)); max-height: min(88vh, 800px); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); box-shadow: 0 24px 80px #0009; overflow: hidden; }
   .settings[open] { display: flex; flex-direction: column; }
   /* Only the body scrolls, so the rounded frame, shadow and backdrop are never repainted by the scroll. The bar is
