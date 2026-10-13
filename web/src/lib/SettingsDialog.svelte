@@ -394,7 +394,8 @@
   .settings[open] { display: flex; flex-direction: column; }
   /* Only the body scrolls, so the rounded frame, shadow and backdrop are never repainted by the scroll. The bar is
      drawn by the page, not the overlay kind, so it stays put instead of fading in and out. */
-  .body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  /* Positioned, so the visually hidden labels inside it stay in the scrolling body and never extend the dialog. */
+  .body { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
   .body::-webkit-scrollbar { width: 12px; }
   .body::-webkit-scrollbar-track { background: var(--bg); }
   .body::-webkit-scrollbar-thumb { border: 3px solid var(--bg); border-radius: 8px; background: var(--muted); }
