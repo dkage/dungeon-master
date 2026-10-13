@@ -3,7 +3,9 @@
   import type { AppStore } from './store.svelte'
   import type { QuestRef } from './api'
   import type { LaunchPreview } from './api'
+  import type { EffortTier } from './api'
   import { STATE_LABEL, labelText, timeAgo } from './quests'
+  import { TIERS, effortWord } from './map/art'
   import { renderMarkdown } from './markdown'
   import { wordLabel } from './words'
 
@@ -13,6 +15,37 @@
   const body = $derived(d ? renderMarkdown(d.body) : '')
   const safeUrl = $derived(d && /^https:\/\//i.test(d.url) && !store.campaign?.demo ? d.url : '')
   const existingQuestSession = $derived(store.campaignId ? store.questSessionForCampaign(store.campaignId) : undefined)
+  const inList = $derived(d ? store.mapModel.quests.get(d.number) : undefined)
+  const openBlockers = $derived(d ? d.blockedBy.filter((b) => !b.closed) : [])
+  const parentInScope = $derived(d?.parent ? store.mapModel.quests.has(d.parent) : true)
+  let jumpOpen = $state(false)
+  let newLabel = $state('')
+  let newTier = $state<EffortTier>('moderate')
+  const mapping = $derived(store.campaign?.effortLabels ?? {})
+  const EFFORT_SOURCE = { override: 'set here', label: 'from its label', mapping: 'from a mapped label' }
+
+  function jumpToPrerequisite() {
+    if (openBlockers.length === 1) void store.jumpToQuest(openBlockers[0].number)
+    else jumpOpen = !jumpOpen
+  }
+
+  function changeEffort(value: string) {
+    if (!d) return
+    void store.setEffortOverride(d.number, value as EffortTier | '')
+  }
+
+  function addMapping() {
+    if (!newLabel) return
+    void store.setEffortLabels({ ...mapping, [newLabel.toLowerCase()]: newTier })
+    newLabel = ''
+  }
+
+  function removeMapping(label: string) {
+    const next = { ...mapping }
+    delete next[label]
+    void store.setEffortLabels(next)
+  }
+
   let briefDialog = $state<HTMLDialogElement>()
   let launchPreview = $state<LaunchPreview | null>(null)
   let selectedHero = $state('')
@@ -66,7 +99,7 @@
       <ul>
         {#each list as r (r.number)}
           <li>
-            <button type="button" class="link" onclick={() => store.selectQuest(r.number)}>
+            <button type="button" class="link" onclick={() => store.jumpToQuest(r.number)}>
               <span class="mark" class:done={r.closed}>{r.closed ? '✓' : '○'}</span>
               #{r.number}{r.title ? ` ${r.title}` : ''}
             </button>
@@ -112,13 +145,77 @@
         </p>
       {/if}
 
+      {#if !inList && store.quests}
+        <p class="scope-note" role="note">This issue is outside the current scope; it is shown because another issue points to it.</p>
+      {/if}
+
+      <section class="rel effort-row" aria-label="Effort">
+        <h3>Effort</h3>
+        <p>
+          <strong>{effortWord(d.effort)}</strong>
+          {#if d.effort && d.effortSource}<span class="hint">({EFFORT_SOURCE[d.effortSource]})</span>{/if}
+          {#if !d.effort && !d.effortConflict?.length}<span class="hint">No effort label, so no creature is chosen.</span>{/if}
+        </p>
+        {#if d.effortConflict?.length}
+          <p class="conflict" role="note">These labels disagree: {d.effortConflict.join(', ')}. Remove one on GitHub, or set the effort here.</p>
+        {/if}
+        {#if d.priorityConflict?.length}
+          <p class="conflict" role="note">These priority labels disagree: {d.priorityConflict.join(', ')}.</p>
+        {/if}
+        <label class="effort-set">
+          <span>Set here</span>
+          <select value={store.campaign?.effortOverrides?.[d.number] ?? ''} onchange={(e) => changeEffort(e.currentTarget.value)}>
+            <option value="">From labels</option>
+            {#each TIERS as tier (tier)}<option value={tier}>{effortWord(tier)}</option>{/each}
+          </select>
+        </label>
+        <details class="effort-map">
+          <summary>Effort labels for this project</summary>
+          <p class="hint">Labels named <code>effort:trivial</code> to <code>effort:extreme</code> work everywhere. Map your own labels here; this stays on this computer.</p>
+          {#if Object.keys(mapping).length > 0}
+            <ul>
+              {#each Object.entries(mapping) as [label, tier] (label)}
+                <li><code>{label}</code> → {effortWord(tier)} <button type="button" class="ghost" aria-label={`Stop mapping ${label}`} onclick={() => removeMapping(label)}>×</button></li>
+              {/each}
+            </ul>
+          {/if}
+          {#if d.labels.length > 0}
+            <div class="map-add">
+              <select aria-label="Label" bind:value={newLabel}>
+                <option value="">Choose a label…</option>
+                {#each d.labels.filter((l) => !mapping[l.name.toLowerCase()]) as l (l.name)}<option value={l.name}>{l.name}</option>{/each}
+              </select>
+              <select aria-label="Effort for that label" bind:value={newTier}>
+                {#each TIERS as tier (tier)}<option value={tier}>{effortWord(tier)}</option>{/each}
+              </select>
+              <button type="button" onclick={addMapping} disabled={!newLabel}>Map</button>
+            </div>
+          {/if}
+        </details>
+      </section>
+
       {#if d.parent}
         <section class="rel">
           <h3>Part of</h3>
-          <button type="button" class="link" onclick={() => d.parent && store.selectQuest(d.parent)}>
+          <button type="button" class="link" onclick={() => d.parent && store.jumpToQuest(d.parent)}>
             #{d.parent}{d.parentTitle ? ` ${d.parentTitle}` : ''}
           </button>
+          {#if !parentInScope}<span class="hint"> (not in scope)</span>{/if}
         </section>
+      {/if}
+      {#if openBlockers.length > 0}
+        <div class="jump">
+          <button type="button" class="jump-button" aria-expanded={openBlockers.length > 1 ? jumpOpen : undefined} onclick={jumpToPrerequisite}>
+            Jump to prerequisite{openBlockers.length === 1 ? ` #${openBlockers[0].number}` : ''}
+          </button>
+          {#if jumpOpen && openBlockers.length > 1}
+            <ul class="jump-list" aria-label="Prerequisites">
+              {#each openBlockers as b (b.number)}
+                <li><button type="button" class="link" onclick={() => { jumpOpen = false; void store.jumpToQuest(b.number) }}>#{b.number}{b.title ? ` ${b.title}` : ''}</button></li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
       {/if}
       {@render refs('Blocked by', d.blockedBy)}
       {@render refs('Blocking', d.blocking)}
@@ -162,15 +259,21 @@
         {#if store.heroes.length === 0}<option value="">No heroes configured</option>{/if}
         {#each store.heroes as h (h.id)}<option value={h.id}>{h.label}</option>{/each}
       </select>
-      <button type="button" class="launch-button" onclick={openBrief} disabled={!d || d.state === 'cleared' || !selectedHero || previewBusy || store.busy || !!existingQuestSession}>
+      <button type="button" class="launch-button" onclick={openBrief} disabled={!d || d.state === 'cleared' || d.state === 'locked' || !selectedHero || previewBusy || store.busy || !!existingQuestSession}>
         {previewBusy ? 'Preparing…' : 'Review launch'}
       </button>
       {#if existingQuestSession}
         <p class="launch-note">{existingQuestSession.title} is already running in this working tree.</p>
         <button type="button" class="go-session" onclick={() => store.goToSession(existingQuestSession.id)}>Go to session</button>
-      {:else if d.state === 'locked'}<p class="launch-note">Resolve the blockers before starting this issue.</p>
+      {:else if d.state === 'locked'}
+        <p class="launch-note">
+          Blocked by
+          {#each openBlockers as b, i (b.number)}{i > 0 ? ', ' : ''}<button type="button" class="link" onclick={() => store.jumpToQuest(b.number)}>#{b.number}</button>{/each}.
+          It can start once {openBlockers.length === 1 ? 'that is' : 'those are'} closed.
+        </p>
       {:else if d.state === 'cleared'}<p class="launch-note">Closed issues cannot be started.</p>
-      {:else if !store.claude.found}<p class="launch-note">Claude Code is unavailable. Check Settings.</p>{/if}
+      {:else if !store.claude.found}<p class="launch-note">Claude Code is unavailable. Check Settings.</p>
+      {:else if d.assignees.length > 0}<p class="launch-note">Assigned to {d.assignees.map((a) => `@${a}`).join(', ')}.</p>{/if}
     </footer>
     <dialog bind:this={briefDialog} class="brief-dialog" aria-labelledby="brief-title">
       <header>
@@ -201,6 +304,22 @@
 </div>
 
 <style>
+  .scope-note, .conflict { margin: 8px 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--warn); background: var(--warn-bg); font-size: 12px; }
+  .effort-row { margin: 10px 0; }
+  .effort-row h3 { margin: 0 0 4px; }
+  .effort-row p { margin: 0 0 4px; }
+  .effort-row strong { color: var(--text); }
+  .effort-row .hint { color: var(--muted); font-size: 12px; }
+  .effort-set { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .effort-set select, .map-add select { padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; font-size: 12px; }
+  .effort-map { margin-top: 6px; font-size: 12px; }
+  .effort-map summary { cursor: pointer; color: var(--accent); }
+  .effort-map ul { margin: 4px 0; padding-left: 16px; }
+  .map-add { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .map-add button { padding: 3px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--text); }
+  .jump { margin: 8px 0 0; }
+  .jump-button { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 6px; background: transparent; color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; }
+  .jump-list { margin: 4px 0 0; padding-left: 16px; }
   .launch-footer { flex: 0 0 auto; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--panel); }
   .launch-footer label { color: var(--muted); font-size: 11px; }
   .launch-footer select { min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: var(--bg); color: var(--text); font: inherit; }

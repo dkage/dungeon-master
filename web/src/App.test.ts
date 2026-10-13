@@ -245,6 +245,9 @@ describe('App', () => {
   })
 
   describe('quests', () => {
+    // These are about the list; the map has its own tests.
+    beforeEach(() => localStorage.setItem('dungeon.panel.view', 'list'))
+
     it('shows the selected campaign\'s issues in the right panel and opens one', async () => {
       const calls = fakeServer()
       render(App)
@@ -338,6 +341,8 @@ describe('App', () => {
   })
 
   describe('budget and background polling', () => {
+    beforeEach(() => localStorage.setItem('dungeon.panel.view', 'list'))
+
     it('shows the rations next to the quests', async () => {
       fakeServer()
       render(App)
@@ -389,6 +394,9 @@ describe('App', () => {
   })
 
   describe('first connection to a repository', () => {
+    // These are about the list; the map has its own tests.
+    beforeEach(() => localStorage.setItem('dungeon.panel.view', 'list'))
+
     it('asks which issues to show, then loads them and says what is shown', async () => {
       const calls = fakeServer({ noScope: true })
       render(App)

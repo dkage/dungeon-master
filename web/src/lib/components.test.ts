@@ -34,6 +34,7 @@ function store(setup: (s: AppStore) => void = () => {}) {
     adoptStarterHeroes: vi.fn(async () => ({ saved: true })),
     getHeroesConfig: vi.fn(async () => ({ defaultHero: 'opus', heroes: [{ id: 'opus', label: 'Opus', args: ['--model', 'm1'], env: ['API_KEY='] }] })),
     saveHeroesConfig: vi.fn(async () => ({ saved: true })),
+    setEffortLabels: vi.fn(async (id) => camp(id)), setEffortOverride: vi.fn(async (id) => camp(id)),
   })
   s.heroes = [{ id: 'opus', label: 'Opus' }, { id: 'sonnet', label: 'Sonnet' }]
   s.campaigns = [camp('c1'), camp('c2', { repo: undefined })]
@@ -293,6 +294,8 @@ function questStore(result: QuestResult | null, setup: (s: AppStore) => void = (
   return store((s) => {
     s.quests = result
     s.questsFor = 'c1'
+    // Most of these tests are about the list; the map tests switch to it.
+    s.panelView = 'list'
     setup(s)
   })
 }
@@ -305,28 +308,55 @@ describe('QuestsPanel', () => {
     quest(5, { title: 'Mine', state: 'claimed', assignees: ['alice'], prs: [{ number: 9, url: 'u', state: 'open' }] }),
   ]
 
-  it('lists quests with state, labels, progress, blockers, assignees and pull requests', () => {
-    render(QuestsPanel, { store: questStore(questResult(sample)) })
+  it('lists quests with state, effort, relations, labels, progress, assignees and pull requests', () => {
+    const s = questStore(questResult([...sample, quest(4, { title: 'Blocker' })]))
+    render(QuestsPanel, { store: s })
     expect(screen.getByText('acme/c1')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /#1 Epic/ })).toBeInTheDocument()
     expect(screen.getByText('epic')).toBeInTheDocument()
     expect(screen.getByTitle('Sub-issues done')).toHaveTextContent('1/2')
-    expect(screen.getByText('blocked by #4')).toBeInTheDocument()
+    expect(screen.getByText('Blocked by #4')).toBeInTheDocument()
+    expect(screen.getByText('Blocks #3')).toBeInTheDocument()
     expect(screen.getByText('@alice')).toBeInTheDocument()
     expect(screen.getByText('PR #9 open')).toBeInTheDocument()
-    // Accessible state text for each row.
-    expect(screen.getAllByText(/^(Open|Locked|In progress|Cleared):$/).map((e) => e.textContent)).toEqual([
-      'Open:', 'Cleared:', 'Locked:', 'In progress:',
-    ])
+    // The state in words at the right of each row, not colour alone.
+    const tags = [...document.querySelectorAll('.qlist .statetag')].map((e) => e.textContent)
+    expect(tags).toEqual(['Ready', 'Cleared', 'Blocked', 'Assigned', 'Ready'])
+    // Unknown effort is said, never guessed.
+    expect(screen.getAllByText('Unknown').length).toBe(5)
   })
 
-  it('shows state counts', () => {
+  it('shows the effort word and creature for a quest with a tier, and a diamond without one', () => {
+    const s = questStore(questResult([quest(7, { title: 'Sized', effort: 'moderate', creature: 'goblin-scout' }), quest(8, { title: 'Unsized' })]))
+    render(QuestsPanel, { store: s })
+    const sized = screen.getByRole('button', { name: /#7 Sized/ })
+    expect(sized).toHaveTextContent('Moderate')
+    expect(sized.querySelector('.thumb')!.getAttribute('style')).toMatch(/goblin-idle-strip/)
+    expect(sized.querySelector('.thumb')).toHaveAttribute('title', 'Goblin scout (Moderate effort)')
+    expect(screen.getByRole('button', { name: /#8 Unsized/ }).querySelector('.thumb.unknown')).not.toBeNull()
+  })
+
+  it('shows state filters with counts', () => {
     render(QuestsPanel, { store: questStore(questResult(sample)) })
-    const tally = screen.getByLabelText('Quests counts')
-    expect(tally).toHaveTextContent('1 open')
-    expect(tally).toHaveTextContent('1 in progress')
-    expect(tally).toHaveTextContent('1 locked')
-    expect(tally).toHaveTextContent('1 cleared')
+    const filters = screen.getByRole('group', { name: 'Filter by state' })
+    expect(within(filters).getByRole('button', { name: /All/ })).toHaveTextContent('All 4')
+    expect(within(filters).getByRole('button', { name: /Ready/ })).toHaveTextContent('Ready 1')
+    expect(within(filters).getByRole('button', { name: /In progress/ })).toHaveTextContent('In progress 1')
+    expect(within(filters).getByRole('button', { name: /Blocked/ })).toHaveTextContent('Blocked 1')
+    expect(within(filters).getByRole('button', { name: /Cleared/ })).toHaveTextContent('Cleared 1')
+  })
+
+  it('narrows the list by state and by dungeon, flattening the nesting', async () => {
+    const quests = [...sample, quest(6, { title: 'Stray' })]
+    render(QuestsPanel, { store: questStore(questResult(quests)) })
+    await fireEvent.click(screen.getByRole('button', { name: /^Blocked/ }))
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
+    expect(screen.getAllByRole('listitem')[0].getAttribute('style')).toMatch(/--depth:\s*0/)
+    await fireEvent.click(screen.getByRole('button', { name: /^All/ }))
+    const place = screen.getByRole('combobox', { name: 'Dungeon' })
+    expect([...place.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['All', '#1 Epic', 'Tavern (no epic)'])
+    await fireEvent.change(place, { target: { value: 'tavern' } })
+    expect(screen.getAllByRole('listitem').map((li) => li.textContent)).toEqual([expect.stringContaining('Mine'), expect.stringContaining('Stray')])
   })
 
   it('nests children under their parent', () => {
@@ -338,7 +368,7 @@ describe('QuestsPanel', () => {
     expect(items[1]).toHaveTextContent('Child done')
   })
 
-  it('filters by text and can hide cleared quests', async () => {
+  it('filters by text and can show only cleared quests', async () => {
     render(QuestsPanel, { store: questStore(questResult(sample)) })
     await fireEvent.input(screen.getByLabelText('Filter quests'), { target: { value: 'locked' } })
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
@@ -346,9 +376,9 @@ describe('QuestsPanel', () => {
     await fireEvent.input(screen.getByLabelText('Filter quests'), { target: { value: 'zzz' } })
     expect(screen.getByText('No quests match.')).toBeInTheDocument()
     await fireEvent.input(screen.getByLabelText('Filter quests'), { target: { value: '' } })
-    await fireEvent.click(screen.getByLabelText('Hide cleared'))
-    expect(screen.queryByText('Child done')).not.toBeInTheDocument()
-    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    await fireEvent.click(screen.getByRole('button', { name: /^Cleared/ }))
+    expect(screen.getAllByRole('listitem')).toHaveLength(1)
+    expect(screen.getByText('Child done')).toBeInTheDocument()
   })
 
   it('opens a quest when clicked', async () => {
@@ -489,7 +519,7 @@ describe('QuestDetail', () => {
     expect(screen.getByRole('heading', { name: /#3 Build the form/ })).toBeInTheDocument()
     expect(screen.getByText('Locked')).toBeInTheDocument()
     expect(screen.getByText('opened by @alice')).toBeInTheDocument()
-    expect(screen.getByText('feature')).toBeInTheDocument()
+    expect(screen.getByText('feature', { selector: '.label' })).toBeInTheDocument()
     expect(screen.getByText('@bob')).toBeInTheDocument()
     expect(screen.getByText('milestone: v1')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '#1 The epic' })).toBeInTheDocument()
@@ -840,7 +870,7 @@ describe('QuestsPanel scope', () => {
     const counts = { openTotal: 312, assigned: 3, login: 'me', labels: [{ name: 'tracked', open: 14 }] }
     const open = questStore(questResult(issues), (st) => { st.pickingScope = true; st.scopeOptions = counts })
     const { unmount } = render(QuestsPanel, { store: open })
-    expect(screen.getByRole('group')).toBeInTheDocument() // the fieldset
+    expect(screen.getAllByRole('group').some((g) => g.tagName === 'FIELDSET')).toBe(true)
     expect(screen.queryByLabelText('Filter quests')).not.toBeInTheDocument()
     unmount()
     const first = questStore(null, (st) => {
@@ -848,7 +878,7 @@ describe('QuestsPanel scope', () => {
       st.questsError = { code: 'scope_needed', message: 'Choose which of this repository\'s issues to show.' }
     })
     render(QuestsPanel, { store: first })
-    expect(screen.getByRole('group')).toBeInTheDocument()
+    expect(screen.getAllByRole('group').some((g) => g.tagName === 'FIELDSET')).toBe(true)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument() // not shown as an error
     vi.restoreAllMocks()
   })

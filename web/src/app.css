@@ -425,13 +425,16 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .quests {
   display: grid;
-  grid-template-rows: minmax(0, 1.05fr) minmax(260px, .95fr);
+  grid-template-rows: minmax(0, var(--split, 52%)) 7px minmax(200px, 1fr);
   gap: 0;
   overflow: hidden;
   border-left: 2px solid #3d1418;
   background: #100507;
 }
-.quest-browser { min-height: 0; overflow-y: auto; background: #100507; border-bottom: 2px solid #7b462e; }
+.quest-browser { min-height: 0; overflow-y: auto; background: #100507; }
+.quest-browser.mapmode { display: flex; flex-direction: column; overflow: hidden; }
+.splitter { height: 7px; background: linear-gradient(#7b462e, #4a2318); cursor: row-resize; touch-action: none; }
+.splitter:hover, .splitter:focus-visible { background: #b88a44; outline: none; }
 .qhead { background: linear-gradient(180deg, #24090d, #170609); border-color: #562024; }
 .qhead h2 { color: #e5cfaa; font-family: 'Cinzel', var(--reading-font, serif); letter-spacing: .06em; }
 .qhead .ghost { color: #c6a56b; }
@@ -514,3 +517,33 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   .sidebar { max-height: 40vh; border-right: none; border-bottom: 2px solid #3d1418; }
   .term-wrap { padding: 10px; }
 }
+
+/* --- map | list toggle, list filters and rows (M5a) --- */
+.viewtoggle { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-right: 4px; }
+.viewtoggle button { padding: 2px 9px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.viewtoggle button[aria-pressed='true'] { background: var(--accent); color: var(--accent-text); }
+.placefilter { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.placefilter select { flex: 1 1 auto; min-width: 0; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
+.statefilters { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 12px 0; }
+.statefilter { padding: 1px 8px; border: 1px solid var(--line); border-radius: 10px; background: none; color: var(--text); font: inherit; font-size: 11px; line-height: 18px; cursor: pointer; }
+.statefilter[aria-pressed='true'] { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
+.statefilter .n { opacity: .7; }
+.qlist { border-top: 1px solid var(--line); margin-top: 8px; }
+.qbtn .thumb { flex: 0 0 auto; width: 27px; height: 36px; background-size: 400% 100%; background-position: 0 0; background-repeat: no-repeat; display: grid; place-items: center; color: var(--muted); font-size: 18px; }
+.qitem.cleared .thumb, .qitem.locked .thumb { opacity: .5; filter: grayscale(.8); }
+.qbtn .qmain { flex: 1 1 auto; min-width: 0; }
+.qbtn .effort { font-size: 11px; color: var(--muted); }
+.qbtn .rel-chip { font-variant-numeric: tabular-nums; }
+.statetag { flex: 0 0 auto; align-self: center; padding: 1px 7px; border: 1px solid var(--line); border-radius: 10px; font-size: 11px; white-space: nowrap; color: var(--muted); }
+.statetag.ready { border-color: #4e95ae; color: #8fc3ff; }
+.statetag.running { border-color: #b8742a; color: #ffae45; }
+.statetag.needs-you { border-color: #b8992a; color: #ffd75e; }
+.statetag.assigned { border-color: #7b6a4d; color: #c6b28c; }
+.statetag.locked { border-color: #6d5d55; color: #a8968a; }
+.statetag.cleared { border-color: #3f7f52; color: #6cc785; }
+.app[data-theme='neutral'] .statetag.ready { color: #2f6fb3; }
+.app[data-theme='neutral'] .statetag.running { color: #b35f00; }
+.app[data-theme='neutral'] .statetag.needs-you { color: #8a5f00; }
+.app[data-theme='neutral'] .statetag.assigned { color: #6b5b40; }
+.app[data-theme='neutral'] .statetag.locked { color: #5f5f5a; }
+.app[data-theme='neutral'] .statetag.cleared { color: #2e7d45; }

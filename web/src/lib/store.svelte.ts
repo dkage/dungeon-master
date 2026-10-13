@@ -1,9 +1,10 @@
 import * as realApi from './api'
 import type {
-  AppState, Campaign, CampaignInput, CampaignPatch, GithubStatus, Hero, HeroesConfig, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
+  AppState, Campaign, CampaignInput, CampaignPatch, EffortTier, GithubStatus, Hero, HeroesConfig, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
   SessionInfo,
 } from './api'
 import { stillWaiting, unattended } from './attention'
+import { buildModel, placeOf, type MapModel } from './map/model'
 import { pickToNotify } from './notify'
 
 export type Client = Pick<
@@ -11,9 +12,14 @@ export type Client = Pick<
   | 'getState' | 'getSessions' | 'createSession' | 'deleteSession' | 'addCampaign' | 'updateCampaign' | 'removeCampaign'
   | 'getQuests' | 'getQuest' | 'previewQuestLaunch' | 'getGithub' | 'setScope' | 'getScopeOptions' | 'getProjectSuggestions' | 'createSampleCampaign'
   | 'adoptStarterHeroes' | 'getHeroesConfig' | 'saveHeroesConfig' | 'pickFolder' | 'openCampaignFolder'
+  | 'setEffortLabels' | 'setEffortOverride'
 >
 
 const CAMPAIGN_KEY = 'dungeon.campaign'
+const VIEW_KEY = 'dungeon.panel.view'
+
+/** Which level of the map is shown (docs/design/map.md §3, Levels). */
+export type MapLevel = { kind: 'world' } | { kind: 'dungeon'; id: number } | { kind: 'tavern' }
 
 function load(key: string): string {
   try {
@@ -120,6 +126,11 @@ export class AppStore {
   github = $state<GithubStatus | null>(null)
   /** Whether the quest panel is open on narrow screens. */
   questsOpen = $state(false)
+  /** The right panel shows the map or the list of the same quests. */
+  panelView = $state<'map' | 'list'>(load(VIEW_KEY) === 'list' ? 'list' : 'map')
+  mapLevel = $state<MapLevel>({ kind: 'world' })
+  /** One view of every quest, shared by the map and the list so they agree. */
+  mapModel: MapModel = $derived(buildModel(this.quests?.quests ?? [], this.sessions, this.campaignId))
   /**
    * The server refused this tab's credentials (it was restarted with another
    * token, or this browser never opened the signed-in link). Shown as its own
@@ -310,6 +321,7 @@ export class AppStore {
 
   private pickCampaign(id: string | null) {
     if (id !== this.campaignId) {
+      this.mapLevel = { kind: 'world' }
       this.pickingScope = false
       this.scopeOptions = null
       this.scopeOptionsError = null
@@ -426,6 +438,74 @@ export class AppStore {
     } finally {
       if (seq === this.detailSeq) this.detailLoading = false
     }
+  }
+
+  setPanelView(view: 'map' | 'list') {
+    this.panelView = view
+    save(VIEW_KEY, view)
+    if (view === 'map' && this.questNumber !== null) this.revealQuest(this.questNumber)
+  }
+
+  /** Moves the map to the level that shows a quest; quests outside the list stay where the map is. */
+  revealQuest(n: number) {
+    const at = placeOf(this.mapModel, n)
+    if (at === null) return
+    const here = this.mapLevel
+    if (at === 'world') {
+      this.mapLevel = { kind: 'world' }
+    } else if (at === 'tavern') {
+      if (here.kind !== 'tavern') this.mapLevel = { kind: 'tavern' }
+    } else if (here.kind !== 'dungeon' || here.id !== at) {
+      this.mapLevel = { kind: 'dungeon', id: at }
+    }
+  }
+
+  /** Selects a quest and moves the map to it: "Jump to prerequisite". */
+  async jumpToQuest(n: number) {
+    this.revealQuest(n)
+    await this.selectQuest(n)
+  }
+
+  /** Opens a dungeon or the Tavern from the world map. */
+  enterPlace(id: number | 'tavern') {
+    this.mapLevel = id === 'tavern' ? { kind: 'tavern' } : { kind: 'dungeon', id }
+  }
+
+  /** Goes up one level: a dungeon or the Tavern back to the world. */
+  leavePlace() {
+    this.mapLevel = { kind: 'world' }
+  }
+
+  /** Sets one issue's effort tier locally ('' lets the labels decide again). */
+  async setEffortOverride(n: number, tier: EffortTier | ''): Promise<boolean> {
+    const id = this.campaignId
+    if (!id) return false
+    try {
+      const c = await this.client.setEffortOverride(id, n, tier)
+      this.campaigns = this.campaigns.map((x) => (x.id === c.id ? c : x))
+    } catch (e) {
+      this.error = this.fail(e)
+      return false
+    }
+    await this.loadQuests(false, true)
+    if (this.questNumber === n) await this.selectQuest(n)
+    return true
+  }
+
+  /** Replaces the campaign's own-label to tier mapping. */
+  async setEffortLabels(labels: Record<string, EffortTier>): Promise<boolean> {
+    const id = this.campaignId
+    if (!id) return false
+    try {
+      const c = await this.client.setEffortLabels(id, labels)
+      this.campaigns = this.campaigns.map((x) => (x.id === c.id ? c : x))
+    } catch (e) {
+      this.error = this.fail(e)
+      return false
+    }
+    await this.loadQuests(false, true)
+    if (this.questNumber !== null) await this.selectQuest(this.questNumber)
+    return true
   }
 
   closeQuest() {

@@ -1,7 +1,10 @@
 <script lang="ts">
   import type { AppStore } from './store.svelte'
-  import { STATE_LABEL, counts, labelText, scopeText, timeAgo, typeChips, visibleRows } from './quests'
+  import { labelText, scopeText, timeAgo, typeChips, visibleRows } from './quests'
   import QuestDetail from './QuestDetail.svelte'
+  import QuestMap from './QuestMap.svelte'
+  import { CREATURES, effortWord } from './map/art'
+  import { STATE_FILTERS, STATE_WORDS, inPlace, inStateFilter, stateCounts, type ListFilter } from './map/model'
   import Rations from './Rations.svelte'
   import ScopePicker from './ScopePicker.svelte'
   import Term from './Term.svelte'
@@ -10,20 +13,79 @@
   let { store }: { store: AppStore } = $props()
 
   let text = $state('')
-  let hideCleared = $state(false)
   let types = $state<string[]>([])
+  let stateFilter = $state<ListFilter['state']>('all')
+  let placeFilter = $state<ListFilter['place']>('all')
 
   // A different campaign starts with a clean filter.
   $effect(() => {
     void store.campaignId
     types = []
     text = ''
+    stateFilter = 'all'
+    placeFilter = 'all'
   })
 
   const result = $derived(store.quests)
-  const rows = $derived(result ? visibleRows(result.quests, { text, hideCleared, labels: types }) : [])
-  const tally = $derived(result ? counts(result.quests) : null)
+  const model = $derived(store.mapModel)
+  // A state or epic filter flattens the forest like a search does, so a match
+  // never hangs under a parent that is filtered out.
+  const narrowed = $derived(stateFilter !== 'all' || placeFilter !== 'all')
+  const rows = $derived.by(() => {
+    if (!result) return []
+    const base = visibleRows(result.quests, { text, hideCleared: false, labels: types })
+    const out = base.filter(({ quest }) => {
+      const v = model.quests.get(quest.number)
+      return !v || (inStateFilter(v, stateFilter) && inPlace(v, placeFilter))
+    })
+    return narrowed ? out.map((r) => ({ ...r, depth: 0 })) : out
+  })
+  const tally = $derived(stateCounts([...model.quests.values()].filter((v) => inPlace(v, placeFilter))))
   const chips = $derived(result ? typeChips(result.quests) : [])
+  const view = $derived(store.panelView)
+  const plain = $derived(store.appearance.wordMode === 'plain')
+  const relations = (n: number) => {
+    const v = model.quests.get(n)
+    if (!v) return []
+    const out: string[] = []
+    if (v.blocks.length) out.push(`Blocks ${v.blocks.map((b) => `#${b}`).join(', ')}`)
+    const open = [...v.openBlockers, ...v.outside.filter((r) => !r.closed).map((r) => r.number)]
+    if (open.length) out.push(`Blocked by ${open.map((b) => `#${b}`).join(', ')}`)
+    return out
+  }
+
+  // The split between the map or list and the detail, as a share of the panel.
+  const SPLIT_KEY = 'dungeon.panel.split'
+  let split = $state(readSplit())
+  let panel = $state<HTMLElement>()
+  function readSplit(): number {
+    try {
+      const n = Number(localStorage.getItem(SPLIT_KEY))
+      return Number.isFinite(n) && n >= 20 && n <= 80 ? n : 52
+    } catch {
+      return 52
+    }
+  }
+  function setSplit(n: number) {
+    split = Math.max(20, Math.min(80, Math.round(n)))
+    try { localStorage.setItem(SPLIT_KEY, String(split)) } catch { /* not remembered */ }
+  }
+  let dragging = false
+  function splitDown(event: PointerEvent) {
+    dragging = true
+    ;(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId)
+  }
+  function splitMove(event: PointerEvent) {
+    if (!dragging || !panel) return
+    const box = panel.getBoundingClientRect()
+    if (box.height > 0) setSplit(((event.clientY - box.top) / box.height) * 100)
+  }
+  function splitKey(event: KeyboardEvent) {
+    const step = { ArrowUp: -5, ArrowDown: 5, Home: 20 - split, End: 80 - split }[event.key]
+    if (step === undefined) return
+    event.preventDefault()
+    setSplit(split + step)
+  }
   const openShown = $derived(result ? result.quests.filter((q) => !q.closed).length : 0)
   const asking = $derived(store.questsError?.code === 'scope_needed' || store.pickingScope)
 
@@ -34,8 +96,8 @@
   const sample = $derived(store.campaign?.sample === true)
 </script>
 
-<aside class="quests" class:open={store.questsOpen} aria-label={wordLabel('quest', store.appearance.wordMode, true)}>
-  <section class="quest-browser" aria-label="Quest browser">
+<aside class="quests" class:open={store.questsOpen} aria-label={wordLabel('quest', store.appearance.wordMode, true)} bind:this={panel} style={`--split:${split}%`}>
+  <section class="quest-browser" class:mapmode={view === 'map' && !!result && !asking} aria-label="Quest browser">
     <header class="qhead">
       <div class="qtitle">
         <h2><Term word="quest" mode={store.appearance.wordMode} /></h2>
@@ -46,6 +108,10 @@
         {/if}
       </div>
       <div class="qtools">
+        <div class="viewtoggle" role="group" aria-label="Show as">
+          <button type="button" aria-pressed={view === 'map'} onclick={() => store.setPanelView('map')}>Map</button>
+          <button type="button" aria-pressed={view === 'list'} onclick={() => store.setPanelView('list')}>List</button>
+        </div>
         {#if result}<span class="age">{timeAgo(result.fetchedAt)}</span>{/if}
         <button
           type="button"
@@ -111,10 +177,28 @@
       <p class="hint pad">Select a campaign to see its quests.</p>
     {:else if !result && store.questsLoading}
       <p class="hint pad" role="status">Loading {wordLabel('quest', store.appearance.wordMode, true).toLowerCase()}…</p>
+    {:else if result && view === 'map'}
+      <QuestMap {store} />
     {:else if result}
       <div class="filters">
         <input type="search" placeholder="Filter by title, label or #number" aria-label={`Filter ${wordLabel('quest', store.appearance.wordMode, true).toLowerCase()}`} bind:value={text} />
-        <label class="check"><input type="checkbox" bind:checked={hideCleared} /> Hide cleared</label>
+        {#if model.dungeons.length > 0}
+          <label class="placefilter">
+            <span>{plain ? 'Epic' : 'Dungeon'}</span>
+            <select bind:value={placeFilter}>
+              <option value="all">All</option>
+              {#each model.dungeons as d (d.id)}<option value={d.id}>#{d.id} {d.title}</option>{/each}
+              <option value="tavern">{plain ? 'No epic' : 'Tavern (no epic)'}</option>
+            </select>
+          </label>
+        {/if}
+      </div>
+      <div class="statefilters" role="group" aria-label="Filter by state">
+        {#each STATE_FILTERS as f (f.id)}
+          <button type="button" class="statefilter" aria-pressed={stateFilter === f.id} onclick={() => (stateFilter = f.id)}>
+            {f.label} <span class="n">{tally[f.id]}</span>
+          </button>
+        {/each}
       </div>
       {#if chips.length > 1}
         <div class="typechips" role="group" aria-label="Filter by label">
@@ -131,14 +215,6 @@
           {/each}
         </div>
       {/if}
-      {#if tally}
-        <p class="tally" aria-label={`${wordLabel('quest', store.appearance.wordMode, true)} counts`}>
-          <span class="s open">{tally.open} open</span>
-          <span class="s claimed">{tally.claimed} in progress</span>
-          <span class="s locked">{tally.locked} locked</span>
-          <span class="s cleared">{tally.cleared} cleared</span>
-        </p>
-      {/if}
 
       {#if result.quests.length === 0}
         <p class="hint pad">No issues in this repository yet.</p>
@@ -147,30 +223,32 @@
       {:else}
         <ul class="qlist">
           {#each rows as { quest: q, depth } (q.number)}
-            <li class="qitem {q.state}" style={`--depth:${depth}`}>
+            {@const v = model.quests.get(q.number)}
+            {@const art = v?.creature && !plain ? CREATURES[v.creature] : undefined}
+            <li class="qitem {q.state} {v?.state ?? ''}" style={`--depth:${depth}`}>
               <button type="button" class="qbtn" class:selected={store.questNumber === q.number} aria-current={store.questNumber === q.number ? 'true' : undefined} onclick={() => store.selectQuest(q.number)}>
-                <span class="state {q.state}" title={STATE_LABEL[q.state]}>
-                  <span class="sr">{STATE_LABEL[q.state]}:</span>
-                </span>
+                {#if art}
+                  <span class="thumb" style={`background-image:url(${art.strip})`} title={`${art.name} (${effortWord(q.effort)} effort)`}></span>
+                {:else}
+                  <span class="thumb unknown" title={`${effortWord(q.effort)} effort`} aria-hidden="true">◇</span>
+                {/if}
                 <span class="qmain">
                   <span class="qline">
                     <span class="num">#{q.number}</span>
                     <span class="qname">{q.title}</span>
                   </span>
                   <span class="meta">
+                    <span class="effort">{effortWord(q.effort)}</span>
+                    {#each relations(q.number) as rel (rel)}<span class="chip rel-chip">{rel}</span>{/each}
                     {#each q.labels as l (l.name)}
                       <span class="label" style={`background:#${l.color ?? '999999'};color:${labelText(l.color)}`}>{l.name}</span>
                     {/each}
                     {#if q.subTotal > 0}<span class="chip" title="Sub-issues done">{q.subDone}/{q.subTotal}</span>{/if}
-                    {#if q.state === 'locked'}
-                      <span class="chip lock" title="Blocked by open issues">
-                        blocked by {q.blockedBy.filter((b) => !b.closed).map((b) => `#${b.number}`).join(', ')}
-                      </span>
-                    {/if}
                     {#each q.assignees as a (a)}<span class="chip">@{a}</span>{/each}
                     {#each q.prs as p (p.number)}<span class="chip pr {p.state}">PR #{p.number} {p.state}</span>{/each}
                   </span>
                 </span>
+                {#if v}<span class="statetag {v.state}">{STATE_WORDS[v.state]}</span>{/if}
               </button>
             </li>
           {/each}
@@ -178,6 +256,22 @@
       {/if}
     {/if}
   </section>
+
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+  <div
+    class="splitter"
+    role="separator"
+    aria-orientation="horizontal"
+    aria-label="Resize the map and the detail"
+    aria-valuemin={20}
+    aria-valuemax={80}
+    aria-valuenow={split}
+    tabindex="0"
+    onpointerdown={splitDown}
+    onpointermove={splitMove}
+    onpointerup={() => (dragging = false)}
+    onkeydown={splitKey}
+  ></div>
 
   {#if store.questNumber !== null}
     <section class="quest-detail-slot" aria-label="Selected issue detail">

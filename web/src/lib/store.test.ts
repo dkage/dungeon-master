@@ -40,6 +40,8 @@ function fakeClient(over: Partial<Client> = {}, state: Partial<AppState> = {}): 
     adoptStarterHeroes: vi.fn(async () => ({ saved: true })),
     getHeroesConfig: vi.fn(async () => ({ defaultHero: 'opus', heroes: [{ id: 'opus', label: 'Opus', args: [], env: [] }] })),
     saveHeroesConfig: vi.fn(async () => ({ saved: true })),
+    setEffortLabels: vi.fn(async (id, labels) => camp(id, { effortLabels: labels })),
+    setEffortOverride: vi.fn(async (id, n, tier) => camp(id, { effortOverrides: tier ? { [n]: tier } : {} })),
     ...over,
   }
 }
@@ -817,5 +819,93 @@ describe('desktop notifications', () => {
     s.activeId = 'a'
     s.attend(true)
     expect(s.takeNotifications(false)).toEqual([])
+  })
+})
+
+describe('map levels and effort', () => {
+  const shaped = [
+    quest(1), quest(2, { parent: 1 }), quest(3, { parent: 1 }),
+    quest(11), quest(12, { parent: 11 }),
+    quest(6),
+  ]
+  async function loaded(over: Partial<Client> = {}) {
+    const s = new AppStore(fakeClient({ getQuests: vi.fn(async () => result(shaped)), ...over }))
+    await s.refresh()
+    await s.loadQuests()
+    return s
+  }
+
+  it('opens on the map and remembers the list when chosen', async () => {
+    const s = await loaded()
+    expect(s.panelView).toBe('map')
+    s.setPanelView('list')
+    expect(new AppStore(fakeClient()).panelView).toBe('list')
+  })
+
+  it('reveals a quest in its dungeon, the Tavern or the world, and leaves outside quests alone', async () => {
+    const s = await loaded()
+    s.revealQuest(12)
+    expect(s.mapLevel).toEqual({ kind: 'dungeon', id: 11 })
+    s.revealQuest(6)
+    expect(s.mapLevel).toEqual({ kind: 'tavern' })
+    s.revealQuest(1)
+    expect(s.mapLevel).toEqual({ kind: 'world' })
+    s.enterPlace(1)
+    s.revealQuest(999)
+    expect(s.mapLevel).toEqual({ kind: 'dungeon', id: 1 })
+    s.leavePlace()
+    expect(s.mapLevel).toEqual({ kind: 'world' })
+  })
+
+  it('jumps to a prerequisite: selects it and moves the map', async () => {
+    const s = await loaded()
+    await s.jumpToQuest(2)
+    expect(s.questNumber).toBe(2)
+    expect(s.mapLevel).toEqual({ kind: 'dungeon', id: 1 })
+  })
+
+  it('shows the selection on the map when switching back from the list', async () => {
+    const s = await loaded()
+    s.setPanelView('list')
+    await s.selectQuest(12)
+    s.setPanelView('map')
+    expect(s.mapLevel).toEqual({ kind: 'dungeon', id: 11 })
+  })
+
+  it('starts each campaign on the world level', async () => {
+    const s = await loaded()
+    s.enterPlace(11)
+    s.selectCampaign('c2')
+    expect(s.mapLevel).toEqual({ kind: 'world' })
+  })
+
+  it('sets and clears an effort override, then re-reads quests and the open detail', async () => {
+    const setEffortOverride = vi.fn(async (id: string, n: number, tier: string) => camp(id, { effortOverrides: tier ? { [n]: tier as 'high' } : {} }))
+    const s = await loaded({ setEffortOverride })
+    await s.selectQuest(2)
+    const reads = (s as unknown as { client: Client }).client.getQuest as ReturnType<typeof vi.fn>
+    const before = reads.mock.calls.length
+    expect(await s.setEffortOverride(2, 'high')).toBe(true)
+    expect(setEffortOverride).toHaveBeenCalledWith('c1', 2, 'high')
+    expect(s.campaign?.effortOverrides).toEqual({ 2: 'high' })
+    expect(reads.mock.calls.length).toBe(before + 1)
+    await s.setEffortOverride(2, '')
+    expect(s.campaign?.effortOverrides).toEqual({})
+  })
+
+  it('saves the label mapping and reports a failure', async () => {
+    const s = await loaded()
+    expect(await s.setEffortLabels({ 'size/s': 'low' })).toBe(true)
+    expect(s.campaign?.effortLabels).toEqual({ 'size/s': 'low' })
+    const bad = await loaded({ setEffortLabels: err(400, 'unknown effort tier') })
+    expect(await bad.setEffortLabels({ x: 'low' })).toBe(false)
+    expect(bad.error).toBe('unknown effort tier')
+  })
+
+  it('builds one shared model from the quests and live sessions', async () => {
+    const s = await loaded()
+    expect(s.mapModel.dungeons.map((d) => d.id)).toEqual([1, 11])
+    s.sessions = [sess('x', 'c1', { quest: 2, activity: 'needs-you' })]
+    expect(s.mapModel.quests.get(2)!.state).toBe('needs-you')
   })
 })

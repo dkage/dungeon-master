@@ -28,6 +28,13 @@ async function captureMilestoneScreen(page: Page, name: string) {
   await page.screenshot({ path: join(dir, `${name}.png`), fullPage: true })
 }
 
+// These tests drive the quest list; the map has its own spec (map.spec.ts).
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('dungeon.panel.view')) localStorage.setItem('dungeon.panel.view', 'list')
+  })
+})
+
 async function addCampaign(page: Page, dir: string, name: string) {
   await page.getByRole('button', { name: 'Add project', exact: true }).click()
   await page.getByPlaceholder('/absolute/path/to/project').fill(dir)
@@ -317,10 +324,11 @@ test("the quest panel lists the repository's issues with their states and relati
   await expect(panel.getByText('acme/demo')).toBeVisible()
   await expect(panel.getByRole('button', { name: /#1 \[demo\] Epic/ })).toBeVisible()
   await expect(panel.getByRole('button', { name: /#5 \[demo\] Bug/ })).toContainText('@dkage') // assigned
-  await expect(panel.getByRole('button', { name: /#3 \[demo\] Render rooms/ })).toContainText('blocked by #2') // locked
+  await expect(panel.getByRole('button', { name: /#3 \[demo\] Render rooms/ })).toContainText('Blocked by #2') // locked
   await expect(panel.getByTitle('Sub-issues done')).toHaveText('0/2')
-  await expect(panel.getByLabel('Quests counts')).toContainText('1 locked')
-  await expect(panel.getByLabel('Quests counts')).toContainText('1 in progress')
+  const states = panel.getByRole('group', { name: 'Filter by state' })
+  await expect(states.getByRole('button', { name: /^Blocked/ })).toHaveText('Blocked 1')
+  await expect(states.getByRole('button', { name: /^In progress/ })).toHaveText('In progress 1')
 
   // The two sub-issues are nested under the epic.
   const rows = await panel.getByRole('listitem').evaluateAll((els) =>
@@ -411,7 +419,7 @@ test('a campaign without a GitHub repository can open the separate sample projec
   await expect(panel.getByText('sample project', { exact: true })).toBeVisible()
   await expect(panel.getByText(/separate sample project/)).toBeVisible()
   await expect(panel.getByRole('button', { name: /Build the signup form/ })).toBeVisible()
-  await expect(panel.getByRole('button', { name: /Suspend a user/ })).toContainText('blocked by #12')
+  await expect(panel.getByRole('button', { name: /Suspend a user/ })).toContainText('Blocked by #12, #40')
 
   // Demo detail, with its relations, and no GitHub link for sample data.
   await panel.getByRole('button', { name: /Build the signup form/ }).click()
@@ -432,11 +440,9 @@ test('a campaign without a GitHub repository can open the separate sample projec
   await detail.getByRole('button', { name: /← Quests/ }).click()
   await panel.getByRole('region', { name: 'Quest browser' }).getByRole('button', { name: /Send the welcome email/ }).click()
   const blockedDetail = panel.getByRole('region', { name: 'Selected issue detail' })
-  await blockedDetail.getByRole('button', { name: 'Review launch' }).click()
-  const blockedPlan = page.getByRole('dialog', { name: 'Review launch plan' })
-  await expect(blockedPlan.getByRole('button', { name: 'Start expedition' })).toBeDisabled()
-  await expect(blockedPlan.getByRole('status')).toContainText('Blocked by #4, #7')
-  await blockedPlan.getByRole('button', { name: 'Close briefing' }).click()
+  // A locked quest cannot be started: the button is disabled and says why.
+  await expect(blockedDetail.getByRole('button', { name: 'Review launch' })).toBeDisabled()
+  await expect(blockedDetail.locator('.launch-note')).toContainText('Blocked by #4, #7.')
   await blockedDetail.getByRole('button', { name: /← Quests/ }).click()
   await panel.getByRole('region', { name: 'Quest browser' }).getByRole('button', { name: /#2 Design the welcome screen/ }).click()
   const closedDetail = panel.getByRole('region', { name: 'Selected issue detail' })
