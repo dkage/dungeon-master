@@ -1,9 +1,17 @@
 name: ci
 
+# Private-repository minutes are metered, and macOS and Windows runners cost more
+# per minute: skip runs that only touch prose, and stop a run a newer push supersedes.
 on:
   push:
     branches: [master]
+    paths-ignore: ['**/*.md', 'docs/**', 'design/**']
   pull_request:
+    paths-ignore: ['**/*.md', 'docs/**', 'design/**']
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
