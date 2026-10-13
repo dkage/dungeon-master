@@ -58,7 +58,7 @@ checks, committed/published code and a closed milestone. Keep existing issue num
 
 #69 can run alongside the source/attention work: decide ownership before implementing desktop-window shutdown.
 #72's children have no prerequisites; #76 restyles the panel headers that #64 later extends, so keep room for its
-controls. #77 settles the reference's Clear/Reload buttons before anyone builds them.
+controls. #77 decided to omit the reference's Clear/Reload buttons.
 Finish the existing visual baseline (#72); new prototypes test expanded planning, terminal and reading at ordinary
 window sizes. Keep one workspace model, existing art and the RPG/Neutral presentations. No generic pane manager, plugin
 platform, alternate tracker, native-framework rewrite or provider registry is required by this reset.

@@ -371,8 +371,9 @@ choice, ships the glossary and font controls, and establishes the right-panel sp
 multiple palettes, pack completeness and contrast tests are deferred until a second pack is approved; do not build a
 generic pack framework ahead of that need. The reference's remaining textures and frames (parchment terminal page,
 slate side panels, framed detail, list rows and headers) are Dungeon baseline work in #72, done with theme tokens and
-plain CSS rather than per-pack component variants; whether the terminal header gets the reference's Clear and Reload
-buttons is decision #77. M5a fills the reserved map area with the sprite-backed interactive graph. New packs, such
+plain CSS rather than per-pack component variants. The reference's Clear and Reload buttons are intentionally omitted
+(decision #77): the terminal's own commands cover clearing, and reattaching to a running session covers
+reconnecting. M5a fills the reserved map area with the sprite-backed interactive graph. New packs, such
 as a starship pack, are a later initiative in `docs/ideas.md`.
 
 ## 7. Keyboard and platform conventions
