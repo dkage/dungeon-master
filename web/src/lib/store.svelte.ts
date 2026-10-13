@@ -132,6 +132,11 @@ export class AppStore {
   /** One view of every quest, shared by the map and the list so they agree. */
   mapModel: MapModel = $derived(buildModel(this.quests?.quests ?? [], this.sessions, this.campaignId))
   /**
+   * The same quests without sessions, for the map layout. Positions do not depend on who is
+   * working where, so a sessions poll must not rebuild the graph and re-key the drawing.
+   */
+  layoutModel: MapModel = $derived(buildModel(this.quests?.quests ?? []))
+  /**
    * The server refused this tab's credentials (it was restarted with another
    * token, or this browser never opened the signed-in link). Shown as its own
    * screen: an empty list would look like lost data.

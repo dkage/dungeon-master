@@ -18,9 +18,9 @@
   const place = $derived<Place | undefined>(
     level.kind === 'dungeon' ? model.dungeons.find((d) => d.id === level.id) : level.kind === 'tavern' ? model.tavern : undefined,
   )
-  const world = $derived<WorldLayout | null>(level.kind === 'world' ? layoutWorld(model) : null)
+  const world = $derived<WorldLayout | null>(level.kind === 'world' ? layoutWorld(store.layoutModel) : null)
   const rooms = $derived<Layout | null>(
-    level.kind === 'dungeon' ? layoutDungeon(model, level.id) : level.kind === 'tavern' ? layoutTavern(model) : null,
+    level.kind === 'dungeon' ? layoutDungeon(store.layoutModel, level.id) : level.kind === 'tavern' ? layoutTavern(store.layoutModel) : null,
   )
   const size = $derived(world ?? rooms ?? { width: 400, height: 300 })
   // Plain mode and the Neutral theme draw the plain graph: no art, plain words.

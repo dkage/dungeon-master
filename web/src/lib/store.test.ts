@@ -927,4 +927,12 @@ describe('map levels and effort', () => {
     s.sessions = [sess('x', 'c1', { quest: 2, activity: 'needs-you' })]
     expect(s.mapModel.quests.get(2)!.state).toBe('needs-you')
   })
+
+  it('keeps the layout model when only the sessions change', async () => {
+    const s = await loaded()
+    const before = s.layoutModel
+    s.sessions = [sess('x', 'c1', { quest: 2, activity: 'needs-you' })]
+    expect(s.layoutModel).toBe(before)
+    expect(s.layoutModel.quests.get(2)!.session).toBeUndefined()
+  })
 })
