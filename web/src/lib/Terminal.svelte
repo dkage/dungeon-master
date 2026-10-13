@@ -10,6 +10,7 @@
   import { TERM_THEMES, dimStyles } from './termTheme'
   import { terminalTypography } from './termOptions'
   import { keyInput } from './termKeys'
+  import { DEFAULT_TERMINAL_SIZE, MAX_SIZE, MIN_SIZE, type Zoom } from './termSize'
   import { SEARCH_DECORATIONS, TERMINAL_ACTION, matchLabel, scrolledUp } from './termSearch'
   import { fileToBase64, filesOf, pathsText, refusal } from './termUpload'
 
@@ -18,7 +19,14 @@
     fontSize = 13,
     theme = 'dungeon',
     onexit,
-  }: { sessionId: string; fontSize?: number; theme?: 'dungeon' | 'neutral'; onexit: (code: number) => void } = $props()
+    onzoom,
+  }: {
+    sessionId: string
+    fontSize?: number
+    theme?: 'dungeon' | 'neutral'
+    onexit: (code: number) => void
+    onzoom?: (step: Zoom) => void
+  } = $props()
 
   let host: HTMLDivElement
   let terminal = $state.raw<Terminal>()
@@ -36,8 +44,13 @@
   let search: SearchAddon | undefined
   let noteTimer: ReturnType<typeof setTimeout> | undefined
 
+  let refit: (() => void) | undefined
   $effect(() => {
-    if (terminal) terminal.options.fontSize = fontSize
+    if (!terminal) return
+    terminal.options.fontSize = fontSize
+    // The cells changed size but the frame did not, so refit: the new
+    // columns and rows reach the session and the scrollback stays.
+    requestAnimationFrame(() => refit?.())
   })
   $effect(() => {
     if (terminal) terminal.options.theme = TERM_THEMES[theme]
@@ -127,6 +140,13 @@
       }
     }).catch(() => {})
     const fit = new FitAddon()
+    refit = () => {
+      try {
+        fit.fit()
+      } catch {
+        /* hidden or zero-sized: fit on the next resize */
+      }
+    }
     term.loadAddon(fit)
     search = new SearchAddon()
     term.loadAddon(search)
@@ -256,6 +276,7 @@
 
     return () => {
       ro.disconnect()
+      refit = undefined
       window.removeEventListener(TERMINAL_ACTION, onAction)
       scrolled.dispose()
       parsed.dispose()
@@ -281,6 +302,13 @@
     <div class="term-host" bind:this={host}></div>
   </div>
   <div class="term-tools">
+    {#if onzoom}
+      <button type="button" class="term-tool" onclick={() => onzoom('out')} disabled={fontSize <= MIN_SIZE} aria-label="Smaller text">A−</button>
+      <button type="button" class="term-tool" onclick={() => onzoom('in')} disabled={fontSize >= MAX_SIZE} aria-label="Larger text">A+</button>
+      {#if fontSize !== DEFAULT_TERMINAL_SIZE}
+        <button type="button" class="term-tool" onclick={() => onzoom('reset')} aria-label={`Reset text size (${fontSize}px)`}>{fontSize}px ↺</button>
+      {/if}
+    {/if}
     {#if latest}
       <button type="button" class="term-tool" onclick={toLatest} aria-label="Jump to latest output">Latest ↓</button>
     {/if}

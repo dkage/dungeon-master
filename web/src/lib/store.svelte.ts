@@ -11,6 +11,7 @@ import { stillWaiting, unattended } from './attention'
 import { buildModel, placeOf, type MapModel } from './map/model'
 import { pickToNotify } from './notify'
 import { TERMINAL_ACTION } from './termSearch'
+import { DEFAULT_TERMINAL_SIZE, clampSize, zoomed, type Zoom } from './termSize'
 
 export type Client = Pick<
   typeof realApi,
@@ -66,7 +67,7 @@ export interface UISettings {
 
 const SETTINGS_KEY = 'dungeon.appearance'
 const DEFAULT_SETTINGS: UISettings = {
-  font: 'almendra', sidebarSize: 14, terminalSize: 13, questsSize: 14, wordMode: 'hints', theme: 'dungeon', notifications: false,
+  font: 'almendra', sidebarSize: 14, terminalSize: DEFAULT_TERMINAL_SIZE, questsSize: 14, wordMode: 'hints', theme: 'dungeon', notifications: false,
 }
 
 function loadSettings(): UISettings {
@@ -76,8 +77,7 @@ function loadSettings(): UISettings {
     const parsed = JSON.parse(raw) as Partial<UISettings>
     const allowed = <T extends string>(value: unknown, values: readonly T[], fallback: T): T =>
       values.includes(value as T) ? value as T : fallback
-    const size = (value: unknown, fallback: number) =>
-      typeof value === 'number' && Number.isFinite(value) ? Math.max(10, Math.min(24, Math.round(value))) : fallback
+    const size = clampSize
     return {
       font: allowed(parsed.font, ['almendra', 'eb-garamond', 'alegreya'], DEFAULT_SETTINGS.font),
       sidebarSize: size(parsed.sidebarSize, DEFAULT_SETTINGS.sidebarSize),
@@ -241,6 +241,9 @@ export class AppStore {
       case 'show-map': this.reveal('map'); return this.setPanelView('map')
       case 'show-list': this.reveal('map'); return this.setPanelView('list')
       case 'open-settings': return openSettings()
+      case 'terminal-zoom-in': return this.zoomTerminal('in')
+      case 'terminal-zoom-out': return this.zoomTerminal('out')
+      case 'terminal-zoom-reset': return this.zoomTerminal('reset')
       case 'search-terminal':
       case 'terminal-latest':
         // The visible terminal listens; this is not layout state.
@@ -454,6 +457,9 @@ export class AppStore {
     save('dungeon.first-run.dismissed', '0')
   }
 
+  zoomTerminal(step: Zoom) {
+    this.updateAppearance({ terminalSize: zoomed(this.appearance.terminalSize, step) })
+  }
   updateAppearance(patch: Partial<UISettings>) {
     this.appearance = { ...this.appearance, ...patch }
     save(SETTINGS_KEY, JSON.stringify(this.appearance))

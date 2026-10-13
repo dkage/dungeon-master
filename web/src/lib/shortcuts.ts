@@ -6,7 +6,7 @@
 export type ActionId =
   | 'expand-projects' | 'expand-terminal' | 'expand-map' | 'expand-detail' | 'restore-split'
   | 'show-map' | 'show-list' | 'open-settings' | 'next-session' | 'previous-session'
-  | 'search-terminal' | 'terminal-latest'
+  | 'search-terminal' | 'terminal-latest' | 'terminal-zoom-in' | 'terminal-zoom-out' | 'terminal-zoom-reset'
 
 export type Action = { id: ActionId; label: string; default: string | null }
 
@@ -27,6 +27,10 @@ export const ACTIONS: readonly Action[] = [
   { id: 'previous-session', label: 'Previous session', default: 'Ctrl+PageUp' },
   { id: 'search-terminal', label: 'Search terminal output', default: 'Ctrl+Shift+F' },
   { id: 'terminal-latest', label: 'Jump to latest output', default: 'Ctrl+Shift+End' },
+  // Unbound by default: the browser owns Ctrl and Cmd with plus, minus and zero for page zoom.
+  { id: 'terminal-zoom-in', label: 'Terminal text larger', default: null },
+  { id: 'terminal-zoom-out', label: 'Terminal text smaller', default: null },
+  { id: 'terminal-zoom-reset', label: 'Terminal text default size', default: null },
 ]
 
 export type Platform = 'mac' | 'other'

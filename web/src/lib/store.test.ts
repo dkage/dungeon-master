@@ -171,6 +171,29 @@ describe('onboarding and appearance preferences', () => {
     expect(s.defaultHeroes).toBe(false)
   })
 
+  it('zooms the terminal text within the range, keeps it, and runs the zoom actions', () => {
+    const s = new AppStore(fakeClient())
+    s.runAction('terminal-zoom-in')
+    expect(s.appearance.terminalSize).toBe(14)
+    expect(new AppStore(fakeClient()).appearance.terminalSize).toBe(14)
+    for (let i = 0; i < 30; i++) s.runAction('terminal-zoom-in')
+    expect(s.appearance.terminalSize).toBe(24)
+    for (let i = 0; i < 30; i++) s.zoomTerminal('out')
+    expect(s.appearance.terminalSize).toBe(10)
+    s.runAction('terminal-zoom-reset')
+    expect(s.appearance.terminalSize).toBe(13)
+  })
+
+  it('falls back to the default terminal size for bad stored data', () => {
+    for (const bad of ['"big"', 'null', '{"terminalSize":"20"}', '{"terminalSize":null}', 'not json']) {
+      localStorage.setItem('dungeon.appearance', bad)
+      expect(new AppStore(fakeClient()).appearance.terminalSize).toBe(13)
+    }
+    localStorage.setItem('dungeon.appearance', '{"terminalSize":400}')
+    expect(new AppStore(fakeClient()).appearance.terminalSize).toBe(24)
+    localStorage.removeItem('dungeon.appearance')
+  })
+
   it('persists independent sizes, font, word mode and theme', () => {
     const first = new AppStore(fakeClient())
     first.updateAppearance({ font: 'eb-garamond', sidebarSize: 17, terminalSize: 11, questsSize: 19, wordMode: 'plain', theme: 'neutral' })

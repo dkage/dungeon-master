@@ -314,6 +314,39 @@ test('search finds matches in the scrollback, steps through them and jumps back 
   await expect(screenText(page)).toContainText('echo:after')
 })
 
+test('the text size can be changed from the terminal, resizes the session, keeps the output and survives a reload', async ({ page }) => {
+  const sizes: { cols: number; rows: number }[] = []
+  page.on('websocket', (ws) => ws.on('framesent', (f) => {
+    if (typeof f.payload === 'string') {
+      const m = JSON.parse(f.payload) as { type?: string; cols: number; rows: number }
+      if (m.type === 'resize') sizes.push({ cols: m.cols, rows: m.rows })
+    }
+  }))
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  const pane = page.locator('.pane:not([hidden])')
+  const fontSize = () => pane.locator('.xterm-rows').evaluate((e) => getComputedStyle(e).fontSize)
+  await expect.poll(fontSize).toBe('13px')
+  const before = sizes.at(-1)!
+
+  await pane.getByRole('button', { name: 'Larger text' }).click()
+  await pane.getByRole('button', { name: 'Larger text' }).click()
+  await expect.poll(fontSize).toBe('15px')
+  await expect.poll(() => sizes.at(-1)!.cols).toBeLessThan(before.cols)
+  await expect.poll(() => sizes.at(-1)!.rows).toBeLessThan(before.rows)
+  // The scrollback and the session are untouched.
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+
+  await page.reload()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await expect.poll(fontSize).toBe('15px')
+
+  await pane.getByRole('button', { name: 'Reset text size (15px)' }).click()
+  await expect.poll(fontSize).toBe('13px')
+  await expect(pane.getByRole('button', { name: /Reset text size/ })).toHaveCount(0)
+})
+
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()

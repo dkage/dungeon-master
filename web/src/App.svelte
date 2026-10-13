@@ -209,7 +209,7 @@
     <main class="stage">
       {#each live as s (s.id)}
         <div class="pane" hidden={s.id !== store.activeId || store.guideOpen}>
-          <Terminal sessionId={s.id} fontSize={store.appearance.terminalSize} theme={store.appearance.theme} onexit={(code) => store.markExited(s.id, code)} />
+          <Terminal sessionId={s.id} fontSize={store.appearance.terminalSize} theme={store.appearance.theme} onexit={(code) => store.markExited(s.id, code)} onzoom={(step) => store.zoomTerminal(step)} />
         </div>
       {/each}
       {#if store.guideShown}
