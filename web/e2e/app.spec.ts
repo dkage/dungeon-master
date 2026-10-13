@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, type Page } from '@playwright/test'
@@ -535,6 +535,52 @@ test('a typed font that is not installed is reported next to the setting, and th
   await settings.getByLabel('Terminal font').selectOption('system')
   await expect(notice).toHaveCount(0)
   expect(foreign).toEqual([])
+})
+
+test('appearance settings can be exported, changed, and imported back after a preview', async ({ page }, testInfo) => {
+  await open(page)
+  await page.getByRole('button', { name: 'Settings' }).first().click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+  await settings.getByLabel(/^Theme/).selectOption('neutral')
+  await settings.getByLabel('Terminal colours').selectOption('light')
+  await settings.getByLabel('Line height').selectOption('1.5')
+
+  const [download] = await Promise.all([page.waitForEvent('download'), settings.getByRole('button', { name: 'Export appearance' }).click()])
+  expect(download.suggestedFilename()).toBe('dungeon-appearance.json')
+  const saved = join(testInfo.outputDir, 'appearance.json')
+  await download.saveAs(saved)
+  const file = JSON.parse(readFileSync(saved, 'utf8'))
+  expect(file.settings).toMatchObject({ theme: 'neutral', terminalColors: 'light', terminalLineHeight: 1.5 })
+  expect(Object.keys(file.settings)).not.toContain('token')
+
+  await settings.getByLabel(/^Theme/).selectOption('dungeon')
+  await settings.getByLabel('Terminal colours').selectOption('default')
+  await settings.getByLabel('Line height').selectOption('1.3')
+  await expect(page.locator('.app')).toHaveAttribute('data-theme', 'dungeon')
+
+  // Choosing a file only previews; nothing changes until it is confirmed.
+  await settings.getByLabel('Appearance file').setInputFiles(saved)
+  const preview = settings.getByRole('region', { name: 'Import preview' })
+  await expect(preview).toContainText('Theme: dungeon → neutral')
+  await expect(preview).toContainText('Terminal colours: default → light')
+  await expect(preview).toContainText('Line height: 1.3 → 1.5')
+  await expect(page.locator('.app')).toHaveAttribute('data-theme', 'dungeon')
+  await preview.getByRole('button', { name: 'Cancel' }).click()
+  await expect(preview).toHaveCount(0)
+  await expect(page.locator('.app')).toHaveAttribute('data-theme', 'dungeon')
+
+  await settings.getByLabel('Appearance file').setInputFiles(saved)
+  await settings.getByRole('button', { name: 'Apply import' }).click()
+  await expect(page.locator('.app')).toHaveAttribute('data-theme', 'neutral')
+  await expect(settings.getByLabel(/^Theme/)).toHaveValue('neutral')
+  await expect(settings.getByLabel('Terminal colours')).toHaveValue('light')
+  await expect(settings.getByLabel('Line height')).toHaveValue('1.5')
+
+  // A file that is not an appearance file is refused with a message.
+  const junk = join(testInfo.outputDir, 'junk.json')
+  writeFileSync(junk, '{"hello": 1}')
+  await settings.getByLabel('Appearance file').setInputFiles(junk)
+  await expect(settings.getByRole('alert').filter({ hasText: 'not a Dungeon Master appearance file' })).toBeVisible()
 })
 
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {

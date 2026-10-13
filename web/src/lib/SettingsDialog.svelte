@@ -5,6 +5,7 @@
   import { wordLabel } from './words'
   import type { TerminalColours, TerminalFontChoice } from './appearance'
   import { PLAIN_FONT_NAME, fallbackFontName } from './termOptions'
+  import { FILE_NAME, exportText, labelOf, planImport, show, type ImportPlan } from './appearanceFile'
   import { canvasMeasure, fontStatus, missingNotice, type FontStatus } from './termFont'
   import ShortcutsSettings from './ShortcutsSettings.svelte'
   import { permission as notifyPermission, requestPermission } from './notify'
@@ -118,6 +119,36 @@
       window.removeEventListener('focus', check)
     }
   })
+  // Export and import of the appearance settings (#156). An import only previews until confirmed.
+  let plan = $state<ImportPlan | null>(null)
+  let fileInput: HTMLInputElement | undefined = $state()
+  function exportAppearance() {
+    const url = URL.createObjectURL(new Blob([exportText(store.appearance)], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = FILE_NAME
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+  async function chooseFile(event: Event) {
+    const input = event.currentTarget as HTMLInputElement
+    const file = input.files?.[0]
+    input.value = ''
+    if (!file) return
+    plan = file.size > 16 * 1024
+      ? { ok: false, error: 'That file is too large to be an appearance file.' }
+      : planImport(await file.text(), store.appearance)
+  }
+  function applyImport() {
+    if (plan?.ok) {
+      store.updateAppearance(plan.next)
+      // Show the imported choices, not what was typed or picked before.
+      choosing = null
+      typing = null
+      fontNameError = ''
+    }
+    plan = null
+  }
   function setTerminalColours(event: Event) {
     store.updateAppearance({ terminalColors: (event.currentTarget as HTMLSelectElement).value as TerminalColours })
   }
@@ -374,6 +405,37 @@
         <option value="light">Light</option>
       </select>
     </label>
+  </section>
+
+  <section aria-labelledby="backup-title">
+    <h2 id="backup-title">Back up appearance</h2>
+    <small class="hint">A small file with your look settings only: no tokens, folders, heroes or issue text. Import shows what would change first.</small>
+    <div class="editor-actions">
+      <button type="button" onclick={exportAppearance}>Export appearance</button>
+      <button type="button" onclick={() => fileInput?.click()}>Import appearance…</button>
+      <input bind:this={fileInput} type="file" accept="application/json,.json" hidden aria-label="Appearance file" onchange={chooseFile} />
+    </div>
+    {#if plan && !plan.ok}
+      <p class="notice warn" role="alert">{plan.error}</p>
+    {:else if plan}
+      <div class="notice" role="region" aria-label="Import preview">
+        {#if plan.changes.length === 0}
+          <p>This file matches your current settings. Nothing would change.</p>
+        {:else}
+          <p>Importing would change:</p>
+          <ul>
+            {#each plan.changes as c (c.key)}<li>{labelOf(c.key)}: {show(c.from)} → {show(c.to)}</li>{/each}
+          </ul>
+        {/if}
+        {#if plan.invalid.length}
+          <p>Ignored, because the value is not allowed: {plan.invalid.map(labelOf).join(', ')}.</p>
+        {/if}
+        <div class="editor-actions">
+          <button type="button" onclick={() => (plan = null)}>Cancel</button>
+          <button type="button" onclick={applyImport} disabled={plan.changes.length === 0}>Apply import</button>
+        </div>
+      </div>
+    {/if}
   </section>
 
   <ShortcutsSettings {store} />
