@@ -285,7 +285,7 @@ describe('QuestDetail on the map', () => {
   it('says why a blocked quest cannot start, with each blocker a link', async () => {
     const s = await opened(4)
     const note = screen.getByText(/It can start once that is closed/)
-    expect(note).toHaveTextContent('Blocked by #3.')
+    expect(note).toHaveTextContent('Blocked by ○#3. It can start once that is closed.')
     expect(screen.getByRole('button', { name: /Review launch/ })).toBeDisabled()
     await fireEvent.click(within(note).getByRole('button', { name: '#3' }))
     expect(s.questNumber).toBe(3)
