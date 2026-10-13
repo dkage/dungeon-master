@@ -4,7 +4,8 @@
   import type { HeroConfig, HeroesConfig } from './api'
   import { wordLabel } from './words'
   import type { TerminalColours, TerminalFontChoice } from './appearance'
-  import { PLAIN_FONT_NAME } from './termOptions'
+  import { PLAIN_FONT_NAME, fallbackFontName } from './termOptions'
+  import { canvasMeasure, fontStatus, missingNotice, type FontStatus } from './termFont'
   import ShortcutsSettings from './ShortcutsSettings.svelte'
   import { permission as notifyPermission, requestPermission } from './notify'
 
@@ -98,6 +99,25 @@
   function setLineHeight(event: Event) {
     store.updateAppearance({ terminalLineHeight: Number((event.currentTarget as HTMLSelectElement).value) })
   }
+  // Is the font the terminal is actually using installed? Checked again when fonts finish loading
+  // and when the window regains focus, so installing it clears the notice without a reload.
+  let installed = $state<FontStatus>('unknown')
+  $effect(() => {
+    const applied = store.appearance
+    if (applied.terminalFont !== 'custom') {
+      installed = 'unknown'
+      return
+    }
+    const measure = canvasMeasure()
+    const check = () => (installed = fontStatus(applied.terminalFontName, measure))
+    check()
+    document.fonts?.addEventListener?.('loadingdone', check)
+    window.addEventListener('focus', check)
+    return () => {
+      document.fonts?.removeEventListener?.('loadingdone', check)
+      window.removeEventListener('focus', check)
+    }
+  })
   function setTerminalColours(event: Event) {
     store.updateAppearance({ terminalColors: (event.currentTarget as HTMLSelectElement).value as TerminalColours })
   }
@@ -333,6 +353,9 @@
         <span>Installed font name</span>
         <input type="text" value={fontName} oninput={(e) => (typing = e.currentTarget.value)} placeholder="JetBrains Mono" maxlength="64" autocomplete="off" spellcheck="false" onchange={applyFontName} aria-invalid={fontNameError ? 'true' : undefined} />
         {#if fontNameError}<small class="hint warn" role="alert">{fontNameError}</small>{/if}
+        {#if !fontNameError && store.appearance.terminalFont === 'custom' && installed === 'missing'}
+          <small class="hint warn" role="status" data-testid="font-missing">{missingNotice(store.appearance.terminalFontName, fallbackFontName(store.appearance))}</small>
+        {/if}
       </label>
     {/if}
     <label class="field">

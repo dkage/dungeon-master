@@ -504,6 +504,38 @@ test('the terminal colour scheme recolours a live session without restarting it,
   await expect.poll(screenBg).toBe('rgb(20, 20, 26)')
 })
 
+test('a typed font that is not installed is reported next to the setting, and the notice clears', async ({ page }) => {
+  // Detection reads widths in the page; the name only goes to this computer's own settings.
+  const foreign: string[] = []
+  page.on('request', (r) => {
+    if (!r.url().startsWith(new URL(url).origin) && (r.url() + (r.postData() ?? '')).includes('Zzyzx')) foreign.push(r.url())
+  })
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await page.getByRole('button', { name: 'Settings' }).first().click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+  const notice = settings.getByTestId('font-missing')
+
+  await settings.getByLabel('Terminal font').selectOption('custom')
+  await settings.getByLabel('Installed font name').fill('Zzyzx Not Installed')
+  await settings.getByLabel('Installed font name').blur()
+  await expect(notice).toHaveText('“Zzyzx Not Installed” is not installed on this computer, so the terminal uses Fira Code instead.')
+  // The terminal keeps working with the fallback.
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await expect.poll(() => page.locator('.pane:not([hidden]) .xterm-rows').evaluate((e) => getComputedStyle(e).fontFamily)).toContain('Fira Code')
+
+  await settings.getByLabel('Terminal font').selectOption('bundled')
+  await expect(notice).toHaveCount(0)
+
+  // Choosing it again brings the notice back; a bundled option clears it.
+  await settings.getByLabel('Terminal font').selectOption('custom')
+  await expect(notice).toBeVisible()
+  await settings.getByLabel('Terminal font').selectOption('system')
+  await expect(notice).toHaveCount(0)
+  expect(foreign).toEqual([])
+})
+
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()
