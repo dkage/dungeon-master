@@ -101,10 +101,8 @@
       <ul>
         {#each list as r (r.number)}
           <li>
-            <button type="button" class="link" onclick={() => store.jumpToQuest(r.number)}>
-              <span class="mark" class:done={r.closed}>{r.closed ? '✓' : '○'}</span>
-              #{r.number}{r.title ? ` ${r.title}` : ''}
-            </button>
+            <span class="mark" class:done={r.closed}>{r.closed ? '✓' : '○'}</span>
+            <button type="button" class="link" onclick={() => store.jumpToQuest(r.number)}>#{r.number}{r.title ? ` ${r.title}` : ''}</button>
           </li>
         {/each}
       </ul>

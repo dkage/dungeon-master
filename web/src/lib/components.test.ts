@@ -597,6 +597,16 @@ describe('QuestDetail', () => {
     expect(screen.getByLabelText('Comments').querySelector('.md strong')?.textContent).toBe('good')
   })
 
+  it('keeps the open/closed mark outside the underlined link so no stray underline precedes the number', () => {
+    render(QuestDetail, { store: open(detail()) })
+    for (const [name, mark] of [[/#8 Sub/, '✓'], [/#4 Validate/, '○']] as const) {
+      const link = screen.getByRole('button', { name })
+      expect(link.textContent?.startsWith('#')).toBe(true)
+      expect(link.querySelector('.mark')).toBeNull()
+      expect(link.parentElement?.querySelector('.mark')?.textContent).toBe(mark)
+    }
+  })
+
   it('never renders script from an issue body', () => {
     const { container } = render(QuestDetail, { store: open(detail()) })
     expect(container.querySelector('script')).toBeNull()
