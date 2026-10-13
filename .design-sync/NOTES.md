@@ -22,3 +22,19 @@
 - No `_ds_sync.json` anchor (off-script layout): every re-sync re-verifies and re-uploads everything, which is cheap.
 - Verification: render each card in Chromium (fonts loaded, no failed requests) and look at the screenshots; check
   every class/token named in `conventions.md` exists in the built `_ds_bundle.css`.
+
+## Changing a design
+
+The sync is one-way (repo -> Claude Design); the app is the source of truth. Never edit the design-system project
+itself: the next sync re-uploads everything and overwrites it.
+
+1. Explore in a separate Claude Design project that uses the Dungeon Master design system.
+2. Bring the result back to the code: read that project's files (or a screenshot plus its CSS), then change the real
+   rules in `web/src/app.css` or the component `<style>` blocks, mapping hard-coded colours to the existing tokens
+   (`--accent`, `--brass`, ...). Update the Svelte markup if the structure changed, with tests (`make check`), and the
+   matching card in `.design-sync/cards/` if its markup changed.
+3. Run `/design-sync` so the design system catches up with the app, then commit when asked.
+
+Exploration projects keep their own copy of the markup. Shared CSS changes reach them when they re-render; markup
+changes only when Claude Design redoes them. Small tweaks (radius, a hover colour) can skip Claude Design: change the
+code directly and re-sync.
