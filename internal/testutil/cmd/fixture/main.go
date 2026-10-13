@@ -63,6 +63,10 @@ func main() {
 			if scanner.Text() == "ask me" {
 				fmt.Print("Overwrite the file? (y/n) ")
 			}
+			// The gray and dimmed text an agent prints for hints.
+			if scanner.Text() == "palette" {
+				fmt.Print("\x1b[2mdim-sample\x1b[0m \x1b[90mgray-sample\x1b[0m \x1b[2;90mdimgray-sample\x1b[0m\n")
+			}
 		}
 	case "ask":
 		fmt.Print(c.Output)

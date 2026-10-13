@@ -218,6 +218,8 @@ test('the parchment shows behind output in Dungeon, a flat page in Neutral', asy
   const image = (loc: typeof page_) => loc.evaluate((el) => getComputedStyle(el).backgroundImage)
   const screenBg = () => pane.locator('.xterm-screen canvas, .xterm-rows').first().evaluate((el) => getComputedStyle(el).backgroundColor)
   const viewport = pane.locator('.xterm-viewport')
+  // Fully transparent; the colour channels carry the parchment tone for xterm's contrast checks.
+  const clear = /^rgba\(\d+, \d+, \d+, 0\)$/
 
   expect(await image(page_)).toContain('parchment')
   // The image must actually load (CSP, path), not just be declared.
@@ -235,7 +237,7 @@ test('the parchment shows behind output in Dungeon, a flat page in Neutral', asy
   // xterm 6 retains a legacy viewport underneath its new scrollable element.
   // A transparent text layer alone does not prove the parchment is visible.
   await expect(viewport).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-  await expect(pane.locator('.xterm-scrollable-element')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(pane.locator('.xterm-scrollable-element')).toHaveCSS('background-color', clear)
 
   await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
   const settings = page.getByRole('dialog', { name: 'Settings' })
@@ -268,8 +270,51 @@ test('the parchment shows behind output in Dungeon, a flat page in Neutral', asy
   await settings.getByRole('button', { name: 'Close settings' }).click()
   expect(await image(page_)).toContain('parchment')
   await expect(viewport).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-  await expect(pane.locator('.xterm-scrollable-element')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(pane.locator('.xterm-scrollable-element')).toHaveCSS('background-color', clear)
   await expect(term).toContainText('echo:line-59')
+})
+
+test('gray and dimmed agent text reads at WCAG AA in both appearances', async ({ page }, info) => {
+  await open(page)
+  await hero(page, 'Opus').click()
+  const term = screenText(page)
+  await expect(term).toContainText('FAKE-CLAUDE')
+  const pane = page.locator('.pane:not([hidden])')
+  await pane.locator('.xterm').click()
+  await page.keyboard.type('palette')
+  await page.keyboard.press('Enter')
+  await expect(term).toContainText('dimgray-sample')
+
+  // Contrast of each sample's rendered colour (any alpha composited) on the backdrop.
+  const ratios = (backdrop: [number, number, number]) =>
+    pane.evaluate((el, bg) => {
+      const lin = (v: number) => ((v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+      const lum = (c: number[]) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2])
+      const out: Record<string, number> = {}
+      for (const text of ['dim-sample', 'gray-sample', 'dimgray-sample']) {
+        const span = [...el.querySelectorAll('.xterm-rows span')].find((s) => s.textContent === text)!
+        const [r, g, b, a = 1] = getComputedStyle(span).color.match(/[\d.]+/g)!.map(Number)
+        const c = [r, g, b].map((v, i) => bg[i] + (v - bg[i]) * a)
+        const [hi, lo] = [lum(c), lum(bg)].sort((x, y) => y - x)
+        out[text] = (hi + 0.05) / (lo + 0.05)
+      }
+      return out
+    }, backdrop)
+  const expectReadable = async (backdrop: [number, number, number], shot: string) => {
+    for (const [text, ratio] of Object.entries(await ratios(backdrop)))
+      expect(ratio, `${text} contrast`).toBeGreaterThanOrEqual(4.5)
+    await info.attach(shot, { body: await pane.locator('.term').screenshot({ path: info.outputPath(`${shot}.png`) }), contentType: 'image/png' })
+  }
+
+  // termTheme.test.ts proves #edaf53 is the darkest parchment tone behind the terminal.
+  await expectReadable([0xed, 0xaf, 0x53], 'dungeon-gray-text')
+
+  await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
+  const settings = page.getByRole('dialog', { name: 'Settings' })
+  await settings.getByLabel(/^Theme/).selectOption('neutral')
+  await settings.getByRole('button', { name: 'Close settings' }).click()
+  await expect(pane.locator('.term')).toHaveCSS('background-color', 'rgb(20, 20, 26)')
+  await expectReadable([20, 20, 26], 'neutral-gray-text')
 })
 
 test('the slate shows behind both side panels in Dungeon, not in Neutral', async ({ page }) => {
