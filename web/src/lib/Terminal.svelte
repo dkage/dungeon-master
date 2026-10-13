@@ -7,6 +7,7 @@
   import './terminal.css'
   import { termUrl, uploadToSession } from './api'
   import { TermSocket } from './termsocket'
+  import { connection } from './connection.svelte'
   import { TERM_THEMES, dimStyles, type TermThemeName } from './termTheme'
   import { terminalTypography } from './termOptions'
   import { browserPastes, keyInput } from './termKeys'
@@ -36,7 +37,7 @@
   const SCROLLBACK = 5000
   let host: HTMLDivElement
   let terminal = $state.raw<Terminal>()
-  let status = $state<'connecting' | 'live' | 'exited' | 'disconnected'>('connecting')
+  let status = $state<'connecting' | 'live' | 'reconnecting' | 'exited' | 'disconnected'>('connecting')
   let detail = $state('')
   // A short message about a refused paste or drop, and whether a drag is over the terminal.
   let note = $state('')
@@ -224,6 +225,7 @@
     const sock = new TermSocket(termUrl(sessionId), {
       onOpen() {
         status = 'live'
+        connection.reportTerminal(sessionId, true)
         fit.fit()
         sock.resize(term.cols, term.rows)
         term.focus()
@@ -234,9 +236,16 @@
         detail = `exited with code ${code}`
         onexit(code)
       },
+      onReset: () => term.reset(),
+      onReconnecting(attempt, kind) {
+        status = 'reconnecting'
+        detail = attempt > 1 ? ` (attempt ${attempt})` : ''
+        connection.reportTerminal(sessionId, kind !== 'unreachable')
+      },
       onDisconnect(reason) {
         status = 'disconnected'
         detail = reason
+        connection.reportTerminal(sessionId, true) // refused is not unreachable: the app answered
       },
     })
 
@@ -341,6 +350,7 @@
       data.dispose()
       resized.dispose()
       sock.close()
+      connection.reportTerminal(sessionId, true)
       term.dispose()
     }
   })
@@ -389,7 +399,7 @@
   {/if}
   {#if status !== 'live'}
     <div class="term-status" data-status={status} role="status">
-      {status === 'connecting' ? 'Connecting…' : status === 'exited' ? `Session ${detail}` : `Disconnected: ${detail}`}
+      {status === 'connecting' ? 'Connecting…' : status === 'reconnecting' ? `Reconnecting…${detail}` : status === 'exited' ? `Session ${detail}` : detail}
     </div>
   {/if}
 </div>

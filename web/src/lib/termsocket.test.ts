@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { TermSocket, type SocketLike } from './termsocket'
+import { TermSocket, classify, defaultBackoff, type SocketLike } from './termsocket'
 
 class FakeSocket implements SocketLike {
   binaryType = ''
@@ -25,11 +25,23 @@ class FakeSocket implements SocketLike {
   }
 }
 
-function setup() {
-  const sock = new FakeSocket()
-  const h = { onOutput: vi.fn(), onExit: vi.fn(), onDisconnect: vi.fn(), onOpen: vi.fn() }
-  const ts = new TermSocket('ws://x/y', h, () => sock)
-  return { sock, h, ts }
+function setup(probe: (url: string) => Promise<number> = () => Promise.resolve(426)) {
+  const socks: FakeSocket[] = []
+  const factory = () => {
+    const s = new FakeSocket()
+    socks.push(s)
+    return s
+  }
+  const h = {
+    onOutput: vi.fn(),
+    onExit: vi.fn(),
+    onDisconnect: vi.fn(),
+    onOpen: vi.fn(),
+    onReconnecting: vi.fn(),
+    onReset: vi.fn(),
+  }
+  const ts = new TermSocket('ws://x/y', h, factory, { backoff: () => 10, probe })
+  return { sock: socks[0], socks, h, ts }
 }
 
 describe('TermSocket', () => {
@@ -72,13 +84,112 @@ describe('TermSocket', () => {
     expect(h.onDisconnect).not.toHaveBeenCalled()
   })
 
-  it('reports a disconnect when closed without an exit frame', () => {
-    const { sock, h } = setup()
+  it('reattaches after an abnormal close and clears the screen before the replay', async () => {
+    vi.useFakeTimers()
+    const { sock, socks, h } = setup()
+    sock.open()
+    sock.onclose?.({ code: 1006 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(h.onReconnecting).toHaveBeenCalledWith(1, undefined)
+    expect(h.onDisconnect).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(10)
+    expect(socks).toHaveLength(2)
+    socks[1].open()
+    expect(h.onReset).toHaveBeenCalledTimes(1)
+    expect(h.onOpen).toHaveBeenCalledTimes(2)
+    socks[1].msg(new TextEncoder().encode('replay').buffer)
+    expect(h.onOutput).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+
+  it('does not reset on the first connection and routes input to the live socket', async () => {
+    vi.useFakeTimers()
+    const { sock, socks, h, ts } = setup()
+    sock.open()
+    expect(h.onReset).not.toHaveBeenCalled()
+    sock.onclose?.({ code: 1006 })
+    await vi.advanceTimersByTimeAsync(10)
+    socks[1].open()
+    ts.sendInput('a')
+    expect(sock.sent).toHaveLength(0)
+    expect(socks[1].sent).toHaveLength(1)
+    vi.useRealTimers()
+  })
+
+  it('reattaches at once when dropped for being slow, without asking the server first', async () => {
+    const probe = vi.fn()
+    const { sock, socks, h } = setup(probe)
+    sock.open()
     sock.onclose?.({ code: 1013, reason: 'too slow, reattach' })
-    expect(h.onDisconnect).toHaveBeenCalledWith('too slow, reattach')
+    expect(socks).toHaveLength(2)
+    expect(probe).not.toHaveBeenCalled()
+    expect(h.onDisconnect).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    [401, 'token'],
+    [404, 'gone'],
+    [410, 'lost'],
+  ])('stops retrying when the server answers %i', async (status, kind) => {
+    const { sock, socks, h } = setup(() => Promise.resolve(status))
+    sock.open()
+    sock.onclose?.({ code: 1006 })
+    await new Promise((r) => setTimeout(r, 30))
+    expect(h.onDisconnect).toHaveBeenCalledTimes(1)
+    expect(h.onDisconnect.mock.calls[0][1]).toBe(kind)
+    expect(socks).toHaveLength(1)
+  })
+
+  it('keeps retrying with backoff while the server is unreachable, then recovers', async () => {
+    vi.useFakeTimers()
+    let up = false
+    const { sock, socks, h } = setup(() => (up ? Promise.resolve(426) : Promise.reject(new Error('down'))))
+    sock.open()
+    sock.onclose?.({ code: 1006 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(h.onReconnecting).toHaveBeenLastCalledWith(1, 'unreachable')
+    await vi.advanceTimersByTimeAsync(10)
+    socks[1].onclose?.({ code: 1006 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(h.onReconnecting).toHaveBeenLastCalledWith(2, 'unreachable')
+    up = true
+    await vi.advanceTimersByTimeAsync(10)
+    socks[2].open()
+    socks[2].onclose?.({ code: 1006 })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(h.onReconnecting).toHaveBeenLastCalledWith(1, undefined) // a good open resets the count
+    expect(h.onDisconnect).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  it('does not reattach after the session exited or the page closed it', async () => {
+    const a = setup()
+    a.sock.msg(JSON.stringify({ type: 'exit', code: 0 }))
+    a.sock.onclose?.({ code: 1000 })
     const b = setup()
-    b.sock.onclose?.({ code: 1006 })
-    expect(b.h.onDisconnect).toHaveBeenCalledWith('closed (1006)')
+    b.ts.close()
+    b.sock.onclose?.({ code: 1000 })
+    await new Promise((r) => setTimeout(r, 30))
+    expect(a.socks).toHaveLength(1)
+    expect(b.socks).toHaveLength(1)
+    expect(a.h.onReconnecting).not.toHaveBeenCalled()
+  })
+
+  it('cancels a pending reattach when closed', async () => {
+    vi.useFakeTimers()
+    const { sock, socks, ts } = setup()
+    sock.onclose?.({ code: 1006 })
+    await vi.advanceTimersByTimeAsync(0)
+    ts.close()
+    await vi.advanceTimersByTimeAsync(100)
+    expect(socks).toHaveLength(1)
+    vi.useRealTimers()
+  })
+
+  it('classifies the probe answers and doubles the backoff up to a cap', () => {
+    expect(classify(426)).toBeUndefined()
+    expect(classify(500)).toBeUndefined()
+    expect([1, 2, 3, 10].map(defaultBackoff)).toEqual([500, 1000, 2000, 15000])
   })
 
   it('ignores malformed or unknown control frames', () => {

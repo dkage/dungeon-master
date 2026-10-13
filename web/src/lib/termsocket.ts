@@ -1,6 +1,9 @@
 // Client side of the terminal websocket protocol:
 //   server → client  binary: terminal output; text: {"type":"exit","code":N}
 //   client → server  binary: keystrokes;      text: {"type":"resize","cols":N,"rows":N}
+// A connection that drops while the session may still run is reattached with a
+// bounded backoff; the server replays the scrollback on every attach, so the
+// caller clears its screen first (onReset).
 
 export interface SocketLike {
   binaryType: string
@@ -13,33 +16,116 @@ export interface SocketLike {
   onerror: ((ev: unknown) => void) | null
 }
 
+/** Why the terminal stopped reconnecting, or what it is waiting out. */
+export type Refusal = 'token' | 'gone' | 'lost' | 'unreachable'
+
 export interface TermHandlers {
   onOutput(data: Uint8Array): void
   onExit(code: number): void
-  /** Closed without an exit frame: connection lost or server dropped us. */
-  onDisconnect(reason: string): void
+  /** Gave up reconnecting: retrying cannot help. */
+  onDisconnect(reason: string, kind?: Refusal): void
   onOpen?(): void
+  /** The connection dropped and a reattach is scheduled. */
+  onReconnecting?(attempt: number, kind?: Refusal): void
+  /** A reattach opened: the replay that follows repeats what is on screen, so clear it first. */
+  onReset?(): void
+}
+
+export interface TermOptions {
+  /** Delay before reconnect attempt n (1-based), in ms. */
+  backoff?: (attempt: number) => number
+  /** Asks the server about the session over plain HTTP; resolves to the status, rejects when unreachable. */
+  probe?: (url: string) => Promise<number>
 }
 
 const OPEN = 1
+const TRY_AGAIN_LATER = 1013 // the server dropped a viewer that fell behind a burst
+
+export const defaultBackoff = (attempt: number) => Math.min(15000, 500 * 2 ** (attempt - 1))
+
+const defaultProbe = async (url: string) => (await fetch(url, { credentials: 'same-origin' })).status
+
+/** What the server's answer to a plain GET of the terminal URL means. */
+export function classify(status: number): Refusal | undefined {
+  if (status === 401 || status === 403) return 'token'
+  if (status === 404) return 'gone'
+  if (status === 410) return 'lost'
+  return undefined // 426 (upgrade required) and anything else: the session is there, try again
+}
+
+export const REFUSAL_MESSAGE: Record<Refusal, string> = {
+  token: 'The access token changed. Open the sign-in link printed by `dungeon serve`, then reload.',
+  gone: 'This session no longer exists, probably because the app restarted. Start a new one.',
+  lost: 'This session ended when the app was last stopped. Start a new one.',
+  unreachable: 'The app cannot be reached.',
+}
 
 export class TermSocket {
-  private ws: SocketLike
+  private ws!: SocketLike
   private exited = false
+  private stopped = false
+  private attempt = 0
+  private reopened = false
+  private timer: ReturnType<typeof setTimeout> | undefined
   private enc = new TextEncoder()
+  private backoff: (attempt: number) => number
+  private probe: (url: string) => Promise<number>
 
   constructor(
-    url: string,
+    private url: string,
     private h: TermHandlers,
-    factory: (url: string) => SocketLike = (u) => new WebSocket(u) as unknown as SocketLike,
+    private factory: (url: string) => SocketLike = (u) => new WebSocket(u) as unknown as SocketLike,
+    opts: TermOptions = {},
   ) {
-    this.ws = factory(url)
-    this.ws.binaryType = 'arraybuffer'
-    this.ws.onopen = () => this.h.onOpen?.()
-    this.ws.onmessage = (ev) => this.message(ev.data)
-    this.ws.onclose = (ev) => {
-      if (!this.exited) this.h.onDisconnect(ev.reason || `closed (${ev.code})`)
+    this.backoff = opts.backoff ?? defaultBackoff
+    this.probe = opts.probe ?? defaultProbe
+    this.connect()
+  }
+
+  private connect() {
+    const ws = this.factory(this.url)
+    this.ws = ws
+    ws.binaryType = 'arraybuffer'
+    ws.onopen = () => {
+      if (ws !== this.ws) return
+      this.attempt = 0
+      if (this.reopened) this.h.onReset?.()
+      this.reopened = true
+      this.h.onOpen?.()
     }
+    ws.onmessage = (ev) => {
+      if (ws === this.ws) this.message(ev.data)
+    }
+    ws.onclose = (ev) => {
+      if (ws !== this.ws || this.exited || this.stopped) return
+      void this.recover(ev.code)
+    }
+  }
+
+  private async recover(code: number) {
+    this.attempt++
+    if (code === TRY_AGAIN_LATER) {
+      // Fell behind a burst: the session is fine, reattach now and replay.
+      this.h.onReconnecting?.(this.attempt)
+      this.connect()
+      return
+    }
+    let kind: Refusal | undefined
+    try {
+      kind = classify(await this.probe(this.url.replace(/^ws/, 'http')))
+    } catch {
+      kind = 'unreachable'
+    }
+    if (this.exited || this.stopped) return
+    if (kind && kind !== 'unreachable') {
+      this.stopped = true
+      this.h.onDisconnect(REFUSAL_MESSAGE[kind], kind)
+      return
+    }
+    this.h.onReconnecting?.(this.attempt, kind)
+    this.timer = setTimeout(() => {
+      if (!this.exited && !this.stopped) this.connect()
+    }, this.backoff(this.attempt))
   }
 
   private message(data: unknown) {
@@ -75,6 +161,7 @@ export class TermSocket {
 
   close() {
     this.exited = true // closing on purpose is not a disconnect
+    clearTimeout(this.timer)
     this.ws.close(1000, 'bye')
   }
 }

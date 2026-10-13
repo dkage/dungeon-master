@@ -188,3 +188,31 @@ func TestSessionFinishesWhenProcessExits(t *testing.T) {
 		t.Fatal("session never finished after its process exited")
 	}
 }
+
+// A viewer that does not keep up with a burst is dropped, and attaching again
+// replays the scrollback so it ends on the last line.
+func TestSlowViewerDroppedCanReattachAndReplay(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs seq")
+	}
+	m := NewManager()
+	defer m.Shutdown()
+	s, err := m.Spawn(Spec{Argv: []string{"sh", "-c", "sleep 0.3; seq 1 400000"}, Env: Environ()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, slow := s.Attach() // never read while the burst runs
+	<-s.Done()
+	n := 0
+	for range slow.C {
+		n++
+	}
+	if n > subBuffer {
+		t.Fatalf("viewer received %d chunks; it should have been dropped at %d", n, subBuffer)
+	}
+	replay, again := s.Attach()
+	defer s.Detach(again)
+	if !strings.Contains(string(replay), "400000") {
+		t.Fatalf("replay does not end on the last line: %q", replay[max(0, len(replay)-40):])
+	}
+}

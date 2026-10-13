@@ -56,3 +56,18 @@ appear as committed files or folders the team sees. Tabs for moving between the 
 Use real PTYs running stubs for disconnect, reconnect, process termination and failure handling; browser tests for
 reopening and scrollback; native desktop checks for window closure. Record the decision and platform results here.
 Implementation can start only after the investigation identifies the ownership boundary and testable failure modes.
+
+## Terminal connection (#136)
+
+Delivered: the server pings each terminal websocket every 20 s and closes a peer that does not answer in 10 s; one log
+line per closed connection records the session id, duration, silence and cause (never input, output or tokens). The page
+reattaches after an abnormal close with a bounded backoff (0.5 s doubling to 15 s), clears its screen and takes the
+replayed scrollback, so output is never shown twice. After a close it asks the server with a plain `GET` of the terminal
+URL: 401 means the access token changed, 404 the session is gone (restart), 410 it was lost, a network error means the
+app is unreachable (keep retrying), 426 means the session is alive. The first three stop retrying and say what to do.
+
+Decision for #173: the browser reattaches (close code 1013 reattaches at once, without the probe) rather than the server
+keeping a slow viewer attached, because the server's bounded subscription buffer protects memory and the replay already
+restores everything. A footer note shows when the API or any terminal cannot reach the backend (a 4 s heartbeat detects
+a stopped backend). Browser tests simulate drops and a changed token with Playwright websocket and request routing;
+restarting the shared test server under an open page is not done.
