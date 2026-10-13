@@ -1,7 +1,7 @@
 ---
 status: current
 milestone: delivered foundations and planned extensions
-github_issues: [28, 43, 63, 67, 68, 69, 70, 71]
+github_issues: [28, 43, 63, 67, 68, 69, 70, 71, 79]
 tracking: in-gh-issues
 next: review/publish the committed map; use the roadmap for order and design docs for extensions
 verified: 2026-10-13
@@ -120,5 +120,6 @@ remains provisional; binary/config names remain `dungeon`.
 
 ## 14. Later capabilities
 
-`docs/ideas.md` holds unpromoted ideas. Another provider, worktree isolation, alternative trackers, richer pane layouts,
-transcript/cost parsing and theme galleries require demonstrated demand and separate bounded plans.
+`docs/ideas.md` holds unpromoted ideas. Another provider, alternative trackers, richer pane layouts, transcript/cost
+parsing and theme galleries require demonstrated demand and separate bounded plans. Separate working copies for
+parallel issue sessions were promoted to #79.

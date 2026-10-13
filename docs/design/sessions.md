@@ -1,7 +1,7 @@
 ---
 status: investigation
 milestone: session continuity
-github_issues: [69, 70]
+github_issues: [69, 70, 79, 80, 81]
 tracking: in-gh-issues
 next: record the ownership decision before implementing recovery or wiring desktop-window shutdown
 verified: 2026-10-13
@@ -39,6 +39,17 @@ No restart flow may claim an old PTY is still alive because only its historical 
 Desktop packaging and focus notifications consume the chosen lifecycle; they do not decide it implicitly. True backend
 restart survival is a separate acceptance boundary from UI closure. Conversation resume remains a later capability
 until its provider identifiers and behavior have a dedicated verification plan.
+
+## Parallel issue sessions
+
+Today the server refuses a second issue session in the same Git working tree (`quest_session_active`), so two issues
+of one project cannot run at once; free sessions and shells are not limited. #79 lifts that limit. #80 decides how
+each issue session gets its own working copy (a `git worktree` per session is the first candidate; a separate clone
+or letting planning-only sessions share the tree are the alternatives), including location in local state, branch
+naming, untracked files a new copy needs, cleanup and uncommitted work, with platform checks. #81 implements the
+recorded answer: one active session per issue and one per working copy, shown in the launch review. Copies never
+appear as committed files or folders the team sees. Tabs for moving between the sessions are #82 (`docs/design/ui.md`
+§4.2). Record #80's answer and its dated probe evidence here.
 
 ## Evidence required
 

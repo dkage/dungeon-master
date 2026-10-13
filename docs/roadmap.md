@@ -1,7 +1,7 @@
 ---
 status: current
 milestone: all
-github_issues: [28, 72, 63, 78, 43, 45, 67, 68, 61, 69, 70, 71, 44, 58, 35, 36, 37, 38, 39]
+github_issues: [28, 72, 63, 78, 79, 43, 45, 67, 68, 61, 69, 70, 71, 44, 58, 35, 36, 37, 38, 39]
 tracking: in-gh-issues
 next: review and publish the committed map increment, then workspace focus and source-backed skill launch
 verified: 2026-10-13
@@ -47,12 +47,13 @@ checks, committed/published code and a closed milestone. Keep existing issue num
 | 1 | M5a: review and publish the map/list implementation | five local commits; checks passed; milestone open | #28 (#24–#27, #59, #60, #62) | `docs/design/map.md` |
 | 2 | Dungeon visual baseline: parchment terminal, slate panels, framed detail/list/headers | planned | #72 (#73–#77) | `docs/design/art-direction.md` |
 | 3 | Workspace focus: resizable columns, expand/restore panels and configurable shortcuts | planned | #63 (#78, #64, #65) | `docs/design/workspace.md` |
-| 4 | M5b: registered skill sources mapped to projects, verified method delivery and picker | planned | #43 (#51, #49, #66, #50) | `docs/design/skills.md` |
-| 5 | M7: trustworthy session attention | probe before implementation | #48 → #45; #52 provides real-CLI fixtures | `docs/design/experience.md` |
-| 6 | Ready work and planning before issues | planned | #67, #68; #61 publishes shaped issues | `docs/design/campaign-loop.md` |
-| 7 | Session ownership and continuity | investigation, then implementation | #69 → #70 | `docs/design/sessions.md` |
-| 8 | Outcome review and continuation | planned | #71; #47 verifies killed outcomes on Windows | `docs/design/campaign-loop.md` |
-| 9 | M8: verified portable release and desktop packaging | planned; lifecycle decision precedes shell wiring | #35–#38, #36/#57 | `release/PLAN_RELEASE.md` |
+| 4 | Parallel work: several issue sessions of one project, each in its own working copy, with session tabs | research, then implementation | #79 (#80 → #81, #82) | `docs/design/sessions.md` |
+| 5 | M5b: registered skill sources mapped to projects, verified method delivery and picker | planned | #43 (#51, #49, #66, #50) | `docs/design/skills.md` |
+| 6 | M7: trustworthy session attention | probe before implementation | #48 → #45; #52 provides real-CLI fixtures | `docs/design/experience.md` |
+| 7 | Ready work and planning before issues | planned | #67, #68; #61 publishes shaped issues | `docs/design/campaign-loop.md` |
+| 8 | Session ownership and continuity | investigation, then implementation | #69 → #70 | `docs/design/sessions.md` |
+| 9 | Outcome review and continuation | planned | #71; #47 verifies killed outcomes on Windows | `docs/design/campaign-loop.md` |
+| 10 | M8: verified portable release and desktop packaging | planned; lifecycle decision precedes shell wiring | #35–#38, #36/#57 | `release/PLAN_RELEASE.md` |
 | Later | M6: additional map presentation | deferred until the full workflow is usable | #44 | `docs/design/map.md` |
 
 #69 can run alongside the source/attention work: decide ownership before implementing desktop-window shutdown.
@@ -92,6 +93,10 @@ Snapshot verified 2026-10-13. These are planned issues, not delivered functional
 | [#64](https://github.com/dkage/dungeon-master/issues/64) | Expand and restore individual workspace panels | moderate | task | #63 | — |
 | [#65](https://github.com/dkage/dungeon-master/issues/65) | Configure workspace shortcuts in Settings | moderate | task | #63 | #64 |
 | [#78](https://github.com/dkage/dungeon-master/issues/78) | Resize the three workspace panels by dragging their borders | moderate | task | #63 | — |
+| [#79](https://github.com/dkage/dungeon-master/issues/79) | Work on several issues of one project at the same time | high | task | — | — |
+| [#80](https://github.com/dkage/dungeon-master/issues/80) | Choose how parallel issue sessions get separate working copies | moderate | research | #79 | — |
+| [#81](https://github.com/dkage/dungeon-master/issues/81) | Start each issue session in its own working copy | high | task | #79 | #80 |
+| [#82](https://github.com/dkage/dungeon-master/issues/82) | Switch between live sessions with tabs above the terminal | moderate | task | #79 | — |
 | [#66](https://github.com/dkage/dungeon-master/issues/66) | Verify and preserve the selected skill invocation contract | high | task | #43 | #49 |
 | [#67](https://github.com/dkage/dungeon-master/issues/67) | Show ready work and waiting sessions with trustworthy dependency reasons | high | task | — | — |
 | [#68](https://github.com/dkage/dungeon-master/issues/68) | Start a planning session before publishing issues | moderate | task | — | #61, #50 |

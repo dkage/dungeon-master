@@ -1,7 +1,7 @@
 ---
 status: parking-lot
 milestone: after v1
-github_issues: []
+github_issues: [79]
 tracking: none
 next: ideas only; promote an idea to an issue when v1 is stable
 verified: 2026-10-13
@@ -54,11 +54,11 @@ Do not use this parking lot as a second plan or imply these approved additions a
 
 ## Sessions
 
-- `git worktree` per expedition to allow parallel heroes in one repo.
+- Parallel issue sessions in one repository are planned in #79 (working copies #80/#81, session tabs #82).
 - Persistent-session technology is decided by #69/#70; do not preselect tmux here.
 - Claude transcript parsing: auto titles, token usage and cost per expedition.
 - Provider conversation resume after verifying identifiers and recovery semantics; distinct from live reattachment.
-- Concurrent agents with worktree isolation; sequential method review is planned in #71.
+- Agents coordinating with or reviewing each other's parallel work; sequential method review is planned in #71.
 
 ## Dungeon map
 

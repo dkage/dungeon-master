@@ -1,7 +1,7 @@
 ---
 status: current
 milestone: cockpit and workspace focus
-github_issues: [28, 43, 63, 64, 65, 67, 68, 71, 72, 77]
+github_issues: [28, 43, 63, 64, 65, 67, 68, 71, 72, 77, 82]
 tracking: in-gh-issues
 next: finish prototype parity, then expansion/shortcuts; see the roadmap for priority
 verified: 2026-10-13
@@ -135,8 +135,10 @@ and its spell.
 
 ### 4.2 Terminal
 
-The selected expedition's terminal at full height. Sessions stay mounted while hidden, as today. No tabs in the centre:
-the left panel is the session list, so tabs would be a second copy of it.
+The selected expedition's terminal at full height. Sessions stay mounted while hidden, as today. Tabs above the
+terminal list the live sessions with their attention state, so parallel work on several issues is one click apart
+(#82, under #79). This replaces the earlier no-tabs rule: the left panel still lists sessions by project, and the
+tabs follow the same selection.
 
 ## 5. Right panel
 
@@ -419,8 +421,9 @@ Decided (2026-10-08; updated 2026-10-09):
 3. The **scratch shell** stays, as `>_` next to the campaigns header (§2.2).
 4. Skill presets are **global** for now. Per-campaign presets are a later idea (`docs/ideas.md`).
 5. A locked quest **cannot be started**: no "start anyway" override (`docs/design/map.md` §3).
-6. The terminal stays in the centre while the right panel holds the map/list and quest detail; no centre stage tabs
-   (`docs/design/experience.md` §3, `docs/design/map.md` §2).
+6. The terminal stays in the centre while the right panel holds the map/list and quest detail
+   (`docs/design/experience.md` §3, `docs/design/map.md` §2). Updated 2026-10-13: session tabs above the terminal are
+   wanted for parallel work (#82), replacing the earlier "no centre stage tabs" rule.
 
 Still open:
 
