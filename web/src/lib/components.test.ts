@@ -610,6 +610,17 @@ describe('QuestDetail', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     expect(select).toHaveBeenCalledWith(3)
   })
+  it('blocks a second launch in a busy working tree unless the project allows several', () => {
+    const busy = (s: AppStore) => { s.sessions = [sess('s9', 'c1', { quest: 9, title: '#9 Other' })] }
+    const { unmount } = render(QuestDetail, { store: open(detail({ state: 'open', blockedBy: [] }), busy) })
+    expect(screen.getByRole('button', { name: 'Review launch' })).toBeDisabled()
+    expect(screen.getByText('#9 Other is already running in this working tree.')).toBeInTheDocument()
+    unmount()
+    render(QuestDetail, { store: open(detail({ state: 'open', blockedBy: [] }), (s) => { busy(s); s.campaigns[0].parallelQuests = true }) })
+    expect(screen.getByRole('button', { name: 'Review launch' })).toBeEnabled()
+    expect(screen.queryByText(/already running in this working tree/)).not.toBeInTheDocument()
+  })
+
 })
 
 describe('Toolbar quests toggle', () => {
@@ -1003,5 +1014,17 @@ describe('desktop notifications switch', () => {
     await fireEvent.click(screen.getByRole('checkbox', { name: /Desktop notifications/ }))
     expect(s.appearance.notifications).toBe(false)
     expect(request).not.toHaveBeenCalled()
+  })
+})
+
+describe('parallel quests switch', () => {
+  it('saves the choice for the selected project', async () => {
+    const s = store()
+    const update = vi.spyOn(s, 'updateCampaign').mockResolvedValue(true)
+    render(SettingsDialog, { store: s, onclose: () => {} })
+    const box = screen.getByRole('checkbox', { name: /Allow several quests at once/ })
+    expect(box).not.toBeChecked()
+    await fireEvent.click(box)
+    expect(update).toHaveBeenCalledWith('c1', { parallelQuests: true })
   })
 })

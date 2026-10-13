@@ -516,6 +516,13 @@ export class AppStore {
     this.detailLoading = false
   }
 
+  /** Allows or forbids several quest sessions at once in the selected campaign's working tree. */
+  async setParallelQuests(on: boolean): Promise<boolean> {
+    const id = this.campaignId
+    if (!id) return false
+    return this.updateCampaign(id, { parallelQuests: on })
+  }
+
   /** Switches the selected campaign between sample quests and real issues. */
   async setDemo(on: boolean): Promise<boolean> {
     const id = this.campaignId

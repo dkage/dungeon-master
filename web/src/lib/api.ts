@@ -37,6 +37,8 @@ export interface Campaign {
   scope: Scope | null
   /** Shows built-in sample quests instead of GitHub issues. */
   demo: boolean
+  /** Allows several quest sessions at once in one Git working tree. */
+  parallelQuests?: boolean
   /** Built-in scratch campaign; its workspace lives under the local state directory. */
   sample?: boolean
   gitRoot?: string
@@ -89,7 +91,7 @@ export interface CampaignInput {
   remote?: string
 }
 
-export type CampaignPatch = Partial<Omit<CampaignInput, 'dir'>> & { demo?: boolean }
+export type CampaignPatch = Partial<Omit<CampaignInput, 'dir'>> & { demo?: boolean; parallelQuests?: boolean }
 
 export interface CreateRequest {
   campaign: string

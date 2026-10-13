@@ -206,6 +206,12 @@
       <small class="hint">Tell me when a session is waiting for me and this window is not in front. Off unless you turn it on.</small>
       {#if notifyMessage}<p class="notice warn" role="alert">{notifyMessage}</p>{/if}
     </div>
+    {#if store.campaign}
+      <div class="field">
+        <label class="check"><input type="checkbox" checked={store.campaign.parallelQuests === true} onchange={(e) => void store.setParallelQuests(e.currentTarget.checked)} /> <span>Allow several quests at once in {store.campaign.name}</span></label>
+        <small class="hint">By default one quest runs per Git working tree, because agents would edit the same files. Turn this on to start more, for example when each works on separate files. Off unless you turn it on.</small>
+      </div>
+    {/if}
   </section>
 
   <section class="hero-section" aria-labelledby="heroes-title">

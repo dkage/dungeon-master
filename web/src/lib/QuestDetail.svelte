@@ -15,6 +15,7 @@
   const body = $derived(d ? renderMarkdown(d.body) : '')
   const safeUrl = $derived(d && /^https:\/\//i.test(d.url) && !store.campaign?.demo ? d.url : '')
   const existingQuestSession = $derived(store.campaignId ? store.questSessionForCampaign(store.campaignId) : undefined)
+  const blockedBySession = $derived(existingQuestSession && !store.campaign?.parallelQuests ? existingQuestSession : undefined)
   const inList = $derived(d ? store.mapModel.quests.get(d.number) : undefined)
   const openBlockers = $derived(d ? d.blockedBy.filter((b) => !b.closed) : [])
   const parentInScope = $derived(d?.parent ? store.mapModel.quests.has(d.parent) : true)
@@ -263,12 +264,12 @@
         {#if store.heroes.length === 0}<option value="">No heroes configured</option>{/if}
         {#each store.heroes as h (h.id)}<option value={h.id}>{h.label}</option>{/each}
       </select>
-      <button type="button" class="launch-button" onclick={openBrief} disabled={!d || d.state === 'cleared' || d.state === 'locked' || !selectedHero || previewBusy || store.busy || !!existingQuestSession}>
+      <button type="button" class="launch-button" onclick={openBrief} disabled={!d || d.state === 'cleared' || d.state === 'locked' || !selectedHero || previewBusy || store.busy || !!blockedBySession}>
         {previewBusy ? 'Preparing…' : 'Review launch'}
       </button>
-      {#if existingQuestSession}
-        <p class="launch-note">{existingQuestSession.title} is already running in this working tree.</p>
-        <button type="button" class="go-session" onclick={() => store.goToSession(existingQuestSession.id)}>Go to session</button>
+      {#if blockedBySession}
+        <p class="launch-note">{blockedBySession.title} is already running in this working tree.</p>
+        <button type="button" class="go-session" onclick={() => store.goToSession(blockedBySession.id)}>Go to session</button>
       {:else if d.state === 'locked'}
         <p class="launch-note">
           Blocked by
