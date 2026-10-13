@@ -1,9 +1,9 @@
 ---
 status: current
 milestone: M5a, M6
-github_issues: [28, 44, 72, 73, 74, 75, 76, 96]
+github_issues: [28, 44, 72, 73, 74, 75, 76, 77, 93, 96, 97, 98, 99]
 tracking: in-gh-issues
-next: finish the reference's textures and frames in #72; review as later art is added
+next: review as later art is added
 verified: 2026-10-13
 ---
 
@@ -116,6 +116,22 @@ padding can map. Options live in `web/src/lib/termOptions.ts`.
 Planned differences (cannot map to a cell grid): the serif body and log lines,
 the bold code pills, and the prompt input box. #72's side-by-side comparison
 cites this section for each.
+
+## Accepted differences from the v4 reference
+
+The #72 comparison (2026-10-13) set the running cockpit beside the three reference screens. Textures, frames, panel
+headers, the left panel grouping and the launch bar match. These differences remain on purpose; the plans win where
+they disagree with the reference.
+
+| Reference | Cockpit | Reason |
+|---|---|---|
+| Clear, Reload and Expand buttons in the terminal header | Omitted | #77 (Clear, Reload); panel expansion is #64. |
+| "Expedition: #3 …" chip, hero buttons in the right panel | Project name, state chip and hero buttons in the terminal header | The header is the workspace's only place to start a free session; the plans keep it. |
+| Skill selector and the spell shortcut bar | Slot kept free in the launch bar; no spell bar | Skill choice and delivery are #50, #43 and #51. |
+| Quest rows with title, effort line and state pill only | Rows also show labels, relations and progress | The list must show scope labels, blockers and progress (`docs/design/ui.md`). |
+| Quest detail with three badges and a boxed blocker | Effort source and setting, parent, blocked-by and blocking lists, prerequisite jump | Effort is settable locally and relations are navigable (`docs/design/map.md`). |
+| An opened dungeon laid out in a grid inside a hall frame | One row per chain, outskirts below, no hall frame | Layout follows `docs/design/map.md`; richer grouping is #44. |
+| No starter-hero banner | Banner while the built-in heroes are in use | It is state the user must see until they keep or edit them. |
 
 ## Review at actual size
 

@@ -45,7 +45,7 @@ checks, committed/published code and a closed milestone. Keep existing issue num
 | Order | Increment | Status | Issues | Design |
 |---|---|---|---|---|
 | 1 | M5a: review and publish the map/list implementation | five local commits; checks passed; milestone open | #28 (#24–#27, #59, #60, #62) | `docs/design/map.md` |
-| 2 | Dungeon visual baseline: parchment terminal, slate panels, framed detail/list/headers | planned | #72 (#73–#77) | `docs/design/art-direction.md` |
+| 2 | Dungeon visual baseline: parchment terminal, slate panels, framed detail/list/headers | done; differences recorded in `docs/design/art-direction.md` | #72 (#73–#77, #93, #96–#99) | `docs/design/art-direction.md` |
 | 3 | Workspace focus: resizable columns, expand/restore panels and configurable shortcuts | planned | #63 (#78, #64, #65) | `docs/design/workspace.md` |
 | 4 | Parallel work: several issue sessions of one project, each in its own working copy, with session tabs | research, then implementation | #79 (#80 → #81, #82) | `docs/design/sessions.md` |
 | 5 | M5b: registered skill sources mapped to projects, verified method delivery and picker | planned | #43 (#51, #49, #66, #50) | `docs/design/skills.md` |
@@ -57,9 +57,9 @@ checks, committed/published code and a closed milestone. Keep existing issue num
 | Later | M6: additional map presentation | deferred until the full workflow is usable | #44 | `docs/design/map.md` |
 
 #69 can run alongside the source/attention work: decide ownership before implementing desktop-window shutdown.
-#72's children have no prerequisites; #76 restyles the panel headers that #64 later extends, so keep room for its
-controls. #77 decided to omit the reference's Clear/Reload buttons.
-Finish the existing visual baseline (#72); new prototypes test expanded planning, terminal and reading at ordinary
+#72 is done: #76 restyled the panel headers that #64 later extends, so keep room for its controls. #77 decided to omit
+the reference's Clear/Reload buttons.
+New prototypes test expanded planning, terminal and reading at ordinary
 window sizes. Keep one workspace model, existing art and the RPG/Neutral presentations. No generic pane manager, plugin
 platform, alternate tracker, native-framework rewrite or provider registry is required by this reset.
 
