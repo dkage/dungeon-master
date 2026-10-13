@@ -117,6 +117,32 @@ export function layers(nodes: number[], blockersOf: (n: number) => number[]): { 
   return { layer, cycle }
 }
 
+type Pt = { x: number; y: number }
+
+/** The point at `t` on the cubic Bézier through p0..p3, so a marker sits exactly on its line. */
+function bezier(p0: Pt, p1: Pt, p2: Pt, p3: Pt, t: number): Pt {
+  const u = 1 - t
+  const f = (a: number, b: number, c: number, d: number) => u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d
+  return { x: f(p0.x, p1.x, p2.x, p3.x), y: f(p0.y, p1.y, p2.y, p3.y) }
+}
+
+const GATE_T = 0.82
+
+/** Where the gate stands on the line `curve` draws, a little before the blocked room. */
+function curveGate(x1: number, y1: number, x2: number, y2: number): Pt {
+  if (x2 > x1 + 8) {
+    const mx = (x1 + x2) / 2
+    return bezier({ x: x1, y: y1 }, { x: mx, y: y1 }, { x: mx, y: y2 }, { x: x2, y: y2 }, GATE_T)
+  }
+  const dip = Math.max(y1, y2) + ROOM.h * 0.75
+  return bezier({ x: x1, y: y1 }, { x: x1 + 60, y: dip }, { x: x2 - 60, y: dip }, { x: x2, y: y2 }, GATE_T)
+}
+
+/** The same for the line from an outskirts stub at (sx, sy) up to a room's entrance. */
+function stubGate(sx: number, sy: number, tx: number, ty: number): Pt {
+  return bezier({ x: sx, y: sy }, { x: sx, y: sy - 40 }, { x: tx - 40, y: ty }, { x: tx, y: ty }, GATE_T)
+}
+
 function curve(x1: number, y1: number, x2: number, y2: number): string {
   if (x2 > x1 + 8) {
     const mx = (x1 + x2) / 2
@@ -253,13 +279,13 @@ function finish(model: MapModel, boxes: RoomBox[], halls: HallBox[], width: numb
       if (src) {
         links.push({
           from: blocker, to: b.n, kind: 'block', open: bv.quest.closed, cycle: cycle.has(`${blocker}>${b.n}`),
-          d: curve(src.x + src.w, src.y + src.h / 2, tx, ty), gate: { x: tx - 14, y: ty },
+          d: curve(src.x + src.w, src.y + src.h / 2, tx, ty), gate: curveGate(src.x + src.w, src.y + src.h / 2, tx, ty),
         })
       } else {
         const s = stubFor(blocker, bv.quest.title, bv.quest.closed, bv.place)
         links.push({
           from: blocker, to: b.n, kind: 'stub', open: bv.quest.closed, cycle: false,
-          d: `M${s.x + s.w / 2},${s.y} C${s.x + s.w / 2},${s.y - 40} ${tx - 40},${ty} ${tx},${ty}`, gate: { x: tx - 14, y: ty },
+          d: `M${s.x + s.w / 2},${s.y} C${s.x + s.w / 2},${s.y - 40} ${tx - 40},${ty} ${tx},${ty}`, gate: stubGate(s.x + s.w / 2, s.y, tx, ty),
         })
       }
     }
@@ -267,7 +293,7 @@ function finish(model: MapModel, boxes: RoomBox[], halls: HallBox[], width: numb
       const s = stubFor(ref.number, ref.title ?? '', ref.closed, 'outside')
       links.push({
         from: ref.number, to: b.n, kind: 'stub', open: ref.closed, cycle: false,
-        d: `M${s.x + s.w / 2},${s.y} C${s.x + s.w / 2},${s.y - 40} ${tx - 40},${ty} ${tx},${ty}`, gate: { x: tx - 14, y: ty },
+        d: `M${s.x + s.w / 2},${s.y} C${s.x + s.w / 2},${s.y - 40} ${tx - 40},${ty} ${tx},${ty}`, gate: stubGate(s.x + s.w / 2, s.y, tx, ty),
       })
     }
   }
@@ -315,7 +341,7 @@ export function layoutWorld(model: MapModel): WorldLayout {
     const y1 = a.y + a.h / 2
     const x2 = b.x
     const y2 = b.y + b.h / 2
-    return { ...l, d: curve(x1, y1, x2, y2), gate: { x: x2 - 16, y: y2 }, label: { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 10 } }
+    return { ...l, d: curve(x1, y1, x2, y2), gate: curveGate(x1, y1, x2, y2), label: { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 10 } }
   })
   const width = Math.max(...nodes.map((n) => n.x + n.w), NODE.w) + PAD
   const height = Math.max(...nodes.map((n) => n.y + n.h), NODE.h) + PAD

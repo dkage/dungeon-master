@@ -128,6 +128,8 @@
     const [, , w, h] = viewBox.split(' ').map(Number)
     return Math.max(w, h)
   }
+  /** Gate art is drawn at 1.0x of its 24x40 box: about 24 by 40 px on the map. */
+  const GATE_SCALE = 1
   const short = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s)
 
   const BADGE: Record<MapState, IconName> = {
@@ -170,6 +172,12 @@
   })
   const crumbPlace = $derived(place && place.id !== 'tavern' ? place : undefined)
 </script>
+
+{#snippet gateIcon(open: boolean, x: number, y: number)}
+  <!-- The gate is 24x40 in its own box; centre the doorway (about y=26) on the line so the line runs through it. -->
+  <circle cx={x} cy={y} r="14" class="gate-backing" />
+  {@render icon(open ? 'gateOpen' : 'gateClosed', x - 0.5 * 24 * GATE_SCALE, y - 26 * GATE_SCALE, 40 * GATE_SCALE)}
+{/snippet}
 
 {#snippet icon(name: IconName, x: number, y: number, s: number)}
   {@const ic = ICONS[name]}
@@ -252,7 +260,7 @@
             <g class="wedge" class:open={e.open}>
               <path d={e.d} />
               <text x={e.label.x} y={e.label.y} text-anchor="middle">{e.count}</text>
-              <g class="gate">{@render icon(e.open ? 'gateOpen' : 'gateClosed', e.gate.x - 7, e.gate.y - 12, 24)}</g>
+              <g class="gate">{@render gateIcon(e.open, e.gate.x, e.gate.y)}</g>
             </g>
           {/each}
           {#each world.nodes as node (node.id)}
@@ -343,7 +351,7 @@
           {#each rooms.links as l (`${l.kind}${l.from}>${l.to}`)}
             <g class="link {l.kind}" class:open={l.open} class:cycle={l.cycle} class:lit={selected !== null && (l.from === selected || l.to === selected)}>
               <path d={l.d} />
-              <g class="gate">{@render icon(l.open ? 'gateOpen' : 'gateClosed', l.gate.x - 6, l.gate.y - 10, 20)}</g>
+              <g class="gate">{@render gateIcon(l.open, l.gate.x, l.gate.y)}</g>
             </g>
           {/each}
 
@@ -484,6 +492,7 @@
   .wedge.open path { stroke-dasharray: 2 6; opacity: .6; }
   .wedge text { font-size: 12px; font-weight: 700; fill: var(--ink); paint-order: stroke; stroke: #0009; stroke-width: 3; }
   .gate { color: var(--locked); }
+  .gate-backing { fill: var(--bg, #14110d); opacity: 0.85; stroke: none; }
   .wedge.open .gate, .link.open .gate { color: var(--cleared); }
 
   /* Dungeon and Tavern */

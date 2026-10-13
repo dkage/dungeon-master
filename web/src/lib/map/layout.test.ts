@@ -72,6 +72,16 @@ describe('layoutDungeon', () => {
     expect(layoutDungeon(m, 1).links[0].open).toBe(true)
   })
 
+  it('stands every gate on its line, before the blocked room', () => {
+    const m = dungeon(quest(2), quest(3, { blockedBy: blocked(2) }), quest(4, { blockedBy: blocked(3) }))
+    for (const k of layoutDungeon(m, 1).links) {
+      const room = layoutDungeon(m, 1).rooms.find((r) => r.n === k.to)!
+      expect(k.gate.x).toBeLessThan(room.x)
+      expect(k.gate.x).toBeGreaterThan(room.x - 60)
+      expect(Math.abs(k.gate.y - (room.y + room.h / 2))).toBeLessThan(40)
+    }
+  })
+
   it('draws a hall around its children, apart from every other room', () => {
     const m = dungeon(
       quest(2), quest(3, { blockedBy: blocked(2) }),
