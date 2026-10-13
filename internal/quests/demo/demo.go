@@ -102,16 +102,23 @@ func (s *Source) now() time.Time {
 func (s *Source) quests() []quests.Quest { return s.build(items) }
 
 // everything also includes the issues outside the scope, for Get.
-func (s *Source) everything() []quests.Quest {
-	return s.build(append(slices.Clone(items), outside...))
-}
+func (s *Source) everything() []quests.Quest { return s.build(combined) }
+
+// combined lists the sample and the issues outside its scope; byNumber finds any of them.
+// Neither is ever changed, so they are built once.
+var (
+	combined = slices.Concat(items, outside)
+	byNumber = func() map[int]item {
+		m := make(map[int]item, len(combined))
+		for _, it := range combined {
+			m[it.n] = it
+		}
+		return m
+	}()
+)
 
 func (s *Source) build(list []item) []quests.Quest {
 	now := s.now()
-	byNum := map[int]item{}
-	for _, it := range append(slices.Clone(outside), items...) {
-		byNum[it.n] = it
-	}
 	subs := map[int][2]int{} // parent → total, done
 	for _, it := range list {
 		if it.parent != 0 {
@@ -144,7 +151,7 @@ func (s *Source) build(list []item) []quests.Quest {
 			q.Labels = append(q.Labels, quests.Label{Name: l, Color: colors[l]})
 		}
 		for _, b := range it.blockedBy {
-			q.BlockedBy = append(q.BlockedBy, quests.Ref{Number: b, Title: byNum[b].title, Closed: byNum[b].closed})
+			q.BlockedBy = append(q.BlockedBy, quests.Ref{Number: b, Title: byNumber[b].title, Closed: byNumber[b].closed})
 		}
 		out = append(out, quests.Finish(q))
 	}
@@ -208,12 +215,7 @@ func (s *Source) Get(_ context.Context, _ quests.Repo, number int) (quests.Detai
 	if base == nil {
 		return quests.Detail{}, quests.ErrNotFound
 	}
-	var it item
-	for _, c := range append(slices.Clone(items), outside...) {
-		if c.n == number {
-			it = c
-		}
-	}
+	it := byNumber[number]
 	now := s.now()
 	d := quests.Detail{
 		Quest:       *base,

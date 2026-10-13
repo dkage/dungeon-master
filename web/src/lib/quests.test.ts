@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Quest } from './api'
-import { contrastRatio, counts, labelStyle, labelText, labelTone, matches, questRows, scopeText, timeAgo, typeChips, visibleRows } from './quests'
+import { contrastRatio, labelStyle, labelText, labelTone, matches, questRows, scopeText, timeAgo, typeChips, visibleRows } from './quests'
 
 const q = (number: number, over: Partial<Quest> = {}): Quest => ({
   number, title: `Quest ${number}`, state: 'open', closed: false, url: '', labels: [], assignees: [],
@@ -45,26 +45,15 @@ describe('filtering', () => {
     expect(matches(list[0], '   ')).toBe(true)
   })
 
-  it('hides cleared quests on request', () => {
-    expect(visibleRows(list, { text: '', hideCleared: true }).map((r) => r.quest.number)).toEqual([1, 12])
-    expect(visibleRows(list, { text: '', hideCleared: false }).map((r) => r.quest.number)).toEqual([1, 2, 12])
-  })
-
   it('searches flat and browses nested', () => {
-    const nested = visibleRows(list, { text: '', hideCleared: false })
+    const nested = visibleRows(list, { text: '' })
     expect(nested.find((r) => r.quest.number === 2)?.depth).toBe(1)
-    const flat = visibleRows(list, { text: 'sign', hideCleared: false })
+    const flat = visibleRows(list, { text: 'sign' })
     expect(flat.map((r) => [r.quest.number, r.depth])).toEqual([[2, 0]])
   })
 })
 
 describe('helpers', () => {
-  it('counts by state', () => {
-    expect(counts([q(1), q(2, { state: 'locked' }), q(3, { state: 'locked' }), q(4, { state: 'cleared' })])).toEqual({
-      open: 1, locked: 2, claimed: 0, cleared: 1,
-    })
-  })
-
   it('formats relative times', () => {
     const now = new Date('2026-10-08T12:00:00Z')
     expect(timeAgo('2026-10-08T11:59:30Z', now)).toBe('just now')
@@ -125,15 +114,13 @@ describe('label filters and scope text', () => {
 
   it('filters by any of the chosen labels, case-insensitively', () => {
     const list = [withLabels(1, 'Bug'), withLabels(2, 'feature'), withLabels(3), withLabels(4, 'bug', 'feature')]
-    const f = (labels: string[]) => visibleRows(list, { text: '', hideCleared: false, labels }).map((r) => r.quest.number)
+    const f = (labels: string[]) => visibleRows(list, { text: '', labels }).map((r) => r.quest.number)
     expect(f([])).toEqual([1, 2, 3, 4])
     expect(f(['bug'])).toEqual([1, 4])
     expect(f(['BUG', 'feature'])).toEqual([1, 2, 4])
     expect(f(['nope'])).toEqual([])
-    // Combines with the text filter and "hide cleared".
-    const list2 = [withLabels(1, 'bug'), { ...withLabels(2, 'bug'), closed: true }]
-    expect(visibleRows(list2, { text: '', hideCleared: true, labels: ['bug'] }).map((r) => r.quest.number)).toEqual([1])
-    expect(visibleRows(list, { text: '#4', hideCleared: false, labels: ['bug'] }).map((r) => r.quest.number)).toEqual([4])
+    // Combines with the text filter.
+    expect(visibleRows(list, { text: '#4', labels: ['bug'] }).map((r) => r.quest.number)).toEqual([4])
   })
 
   it('lists the most common labels first, by name on ties, up to a limit', () => {

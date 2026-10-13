@@ -157,7 +157,7 @@ describe('QuestMap dungeon', () => {
     expect(container.querySelectorAll('.link.stub')).toHaveLength(2)
   })
 
-  it('selects on click and on double-click, and never starts a session', async () => {
+  it('selects on click and Enter, and never starts a session', async () => {
     const s = inside()
     const select = vi.spyOn(s, 'selectQuest')
     const launch = vi.spyOn(s, 'launchQuest')
@@ -166,7 +166,8 @@ describe('QuestMap dungeon', () => {
     await fireEvent.click(room)
     await fireEvent.dblClick(room)
     await fireEvent.keyDown(room, { key: 'Enter' })
-    expect(select).toHaveBeenCalledTimes(3)
+    // A double click is two clicks; it adds no selection of its own.
+    expect(select).toHaveBeenCalledTimes(2)
     expect(select).toHaveBeenCalledWith(3)
     expect(launch).not.toHaveBeenCalled()
   })

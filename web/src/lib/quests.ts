@@ -39,7 +39,6 @@ export function questRows(quests: Quest[]): Row[] {
 
 export interface Filter {
   text: string
-  hideCleared: boolean
   /** Show only quests carrying at least one of these labels (empty: all). */
   labels?: string[]
 }
@@ -61,7 +60,7 @@ export function matches(q: Quest, text: string): boolean {
  * with no search it is the nested forest.
  */
 export function visibleRows(quests: Quest[], f: Filter): Row[] {
-  let pool = f.hideCleared ? quests.filter((q) => !q.closed) : quests
+  let pool = quests
   if (f.labels && f.labels.length > 0) {
     const want = new Set(f.labels.map((l) => l.toLowerCase()))
     pool = pool.filter((q) => q.labels.some((l) => want.has(l.name.toLowerCase())))
@@ -77,12 +76,6 @@ export const STATE_LABEL: Record<QuestState, string> = {
   locked: 'Locked',
   claimed: 'In progress',
   cleared: 'Cleared',
-}
-
-export function counts(quests: Quest[]): Record<QuestState, number> {
-  const c: Record<QuestState, number> = { open: 0, locked: 0, claimed: 0, cleared: 0 }
-  for (const q of quests) c[q.state]++
-  return c
 }
 
 /** "just now", "5 min ago", "3 h ago", "2 d ago". */

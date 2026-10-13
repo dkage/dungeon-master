@@ -40,7 +40,7 @@
   const narrowed = $derived(stateFilter !== 'all' || placeFilter !== 'all')
   const rows = $derived.by(() => {
     if (!result) return []
-    const base = visibleRows(result.quests, { text, hideCleared: false, labels: types })
+    const base = visibleRows(result.quests, { text, labels: types })
     const out = base.filter(({ quest }) => {
       const v = model.quests.get(quest.number)
       return !v || (inStateFilter(v, stateFilter) && inPlace(v, placeFilter))

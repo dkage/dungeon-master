@@ -128,8 +128,8 @@
     const [, , w, h] = viewBox.split(' ').map(Number)
     return Math.max(w, h)
   }
-  /** Gate art is drawn at 1.0x of its 24x40 box: about 24 by 40 px on the map. */
-  const GATE_SCALE = 1
+  /** Gate art is drawn at 1.5x of its 24x40 box: about 36 by 60 px on the map, so the bars stay readable. */
+  const GATE_SCALE = 1.5
   const short = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s)
 
   const BADGE: Record<MapState, IconName> = {
@@ -175,7 +175,7 @@
 
 {#snippet gateIcon(open: boolean, x: number, y: number)}
   <!-- The gate is 24x40 in its own box; centre the doorway (about y=26) on the line so the line runs through it. -->
-  <circle cx={x} cy={y} r="14" class="gate-backing" />
+  <rect x={x - 12 * GATE_SCALE} y={y - 26 * GATE_SCALE} width={24 * GATE_SCALE} height={40 * GATE_SCALE} rx={10 * GATE_SCALE} class="gate-backing" />
   {@render icon(open ? 'gateOpen' : 'gateClosed', x - 0.5 * 24 * GATE_SCALE, y - 26 * GATE_SCALE, 40 * GATE_SCALE)}
 {/snippet}
 
@@ -398,7 +398,6 @@
               aria-pressed={r.n === selected}
               transform={`translate(${r.x},${r.y})`}
               onclick={() => store.selectQuest(r.n)}
-              ondblclick={() => store.selectQuest(r.n)}
               onkeydown={(ev) => activate(ev, r, () => store.selectQuest(r.n))}
             >
               <title>#{v.number} {v.quest.title} · {STATE_WORDS[v.state]}</title>
@@ -492,7 +491,7 @@
   .wedge.open path { stroke-dasharray: 2 6; opacity: .6; }
   .wedge text { font-size: 12px; font-weight: 700; fill: var(--ink); paint-order: stroke; stroke: #0009; stroke-width: 3; }
   .gate { color: var(--locked); }
-  .gate-backing { fill: var(--bg, #14110d); opacity: 0.85; stroke: none; }
+  .gate-backing { fill: var(--bg, #14110d); opacity: 1; stroke: none; }
   .wedge.open .gate, .link.open .gate { color: var(--cleared); }
 
   /* Dungeon and Tavern */
