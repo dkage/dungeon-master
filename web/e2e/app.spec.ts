@@ -1508,3 +1508,83 @@ test('a desktop notification fires once for a session that asks while the window
   await page.waitForTimeout(4000) // several polls later it is still the only one
   expect(await shown()).toHaveLength(1)
 })
+
+// --- Terminal connection ---
+
+// Passes every terminal websocket through to the real server, and lets a test cut or refuse them.
+async function watchTerminals(page: Page) {
+  const state = { refuse: false, live: [] as Array<{ close(): void }>, opened: 0 }
+  await page.routeWebSocket(/\/api\/sessions\/[^/]+\/term$/, (ws) => {
+    state.opened++
+    if (state.refuse) {
+      ws.close({ code: 1006 })
+      return
+    }
+    ws.connectToServer()
+    state.live.push(ws)
+  })
+  return state
+}
+
+async function startShell(page: Page) {
+  await open(page)
+  await hero(page, 'Shell').click()
+  await expect(screenText(page)).toContainText(process.platform === 'win32' ? '>' : '$', { timeout: 25_000 })
+  await page.locator('.pane:not([hidden]) .xterm').click()
+}
+
+test('a dropped terminal connection reattaches by itself, typing works and nothing is shown twice', async ({ page }) => {
+  test.setTimeout(60_000)
+  const sockets = await watchTerminals(page)
+  await startShell(page)
+  await page.keyboard.type('echo ONE-MARK-111')
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('ONE-MARK-111')
+
+  sockets.live.forEach((ws) => ws.close())
+  await expect.poll(() => sockets.opened, { timeout: 15_000 }).toBeGreaterThan(1)
+  await expect(page.locator('.pane:not([hidden]) .term-status')).toHaveCount(0, { timeout: 15_000 })
+
+  await page.keyboard.type('echo TWO-MARK-222')
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('TWO-MARK-222')
+  const text = (await screenText(page).innerText()).replace(/\s+/g, ' ')
+  // The typed command and its output: twice, not four times.
+  expect(text.split('ONE-MARK-111').length - 1).toBe(2)
+})
+
+test('a refused reconnect says the sign-in changed and stops retrying', async ({ page }) => {
+  test.setTimeout(60_000)
+  const sockets = await watchTerminals(page)
+  await startShell(page)
+  await page.route(/\/api\/sessions\/[^/]+\/term$/, (route) => route.fulfill({ status: 401, body: '{}' }))
+  sockets.refuse = true
+  sockets.live.forEach((ws) => ws.close())
+  const status = page.locator('.pane:not([hidden]) .term-status')
+  await expect(status).toContainText('access token changed', { timeout: 15_000 })
+  const opened = sockets.opened
+  await page.waitForTimeout(2500)
+  expect(sockets.opened).toBe(opened) // no more attempts
+  await expect(status).not.toContainText(url.split('token=')[1] ?? 'no-token')
+})
+
+test('output flooding a terminal does not leave it disconnected', async ({ page }) => {
+  test.setTimeout(90_000)
+  await startShell(page)
+  await page.keyboard.type(process.platform === 'win32' ? 'for /L %i in (1,1,6000) do @echo %i' : 'seq 1 6000')
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('6000', { timeout: 60_000 })
+  await expect(page.locator('.pane:not([hidden]) .term-status')).toHaveCount(0)
+})
+
+test('the page says when the app cannot be reached, and clears when it can again', async ({ page }) => {
+  test.setTimeout(60_000)
+  await open(page)
+  const note = page.getByTestId('backend-down')
+  await expect(note).toHaveCount(0)
+  await page.route('**/api/**', (route) => route.abort())
+  await expect(note).toContainText('Cannot reach the app', { timeout: 15_000 })
+  await expect(note).toContainText('out of date')
+  await page.unroute('**/api/**')
+  await expect(note).toHaveCount(0, { timeout: 15_000 })
+})

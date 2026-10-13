@@ -3,7 +3,9 @@ package server
 import (
 	"bytes"
 	"context"
+	"io"
 	"log/slog"
+	"net/http"
 	"strings"
 	"sync"
 	"testing"
@@ -149,5 +151,36 @@ func TestTermCloseCausesAreLogged(t *testing.T) {
 	lb.waitFor(t, "cause=\"session exited\"")
 	if !strings.Contains(lb.String(), "lasted=") || !strings.Contains(lb.String(), "silent=") {
 		t.Errorf("log lacks durations:\n%s", lb.String())
+	}
+}
+
+// The page asks with a plain GET why a reattach failed: each answer must tell
+// the cases apart without the token appearing in it.
+func TestTermProbeAnswers(t *testing.T) {
+	e, _ := connServer(t, time.Hour, time.Hour)
+	sj := e.create(map[string]any{"shell": true})
+	for name, tc := range map[string]struct {
+		path string
+		auth string
+		want int
+	}{
+		"live session": {"/api/sessions/" + sj.ID + "/term", "Bearer " + e.token, http.StatusUpgradeRequired},
+		"unknown":      {"/api/sessions/snope/term", "Bearer " + e.token, http.StatusNotFound},
+		"wrong token":  {"/api/sessions/" + sj.ID + "/term", "Bearer wrong", http.StatusUnauthorized},
+	} {
+		req, _ := http.NewRequest("GET", e.base+tc.path, nil)
+		req.Header.Set("Authorization", tc.auth)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != tc.want {
+			t.Errorf("%s: got %d, want %d", name, resp.StatusCode, tc.want)
+		}
+		if strings.Contains(string(body), e.token) {
+			t.Errorf("%s: body leaks the token", name)
+		}
 	}
 }
