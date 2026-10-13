@@ -1,0 +1,6 @@
+/* xterm 6 themes the new scrollable element, but its stylesheet still paints
+   the legacy viewport underneath it black. Let the frame show through that
+   layer; the scrollable element supplies the opaque background in Neutral. */
+.term .xterm .xterm-viewport {
+  background-color: transparent;
+}

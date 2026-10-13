@@ -3,6 +3,7 @@
   import { Terminal } from '@xterm/xterm'
   import { FitAddon } from '@xterm/addon-fit'
   import '@xterm/xterm/css/xterm.css'
+  import './terminal.css'
   import { termUrl } from './api'
   import { TermSocket } from './termsocket'
   import { TERM_THEMES } from './termTheme'
@@ -23,7 +24,7 @@
   ].join(', ')
 
   let host: HTMLDivElement
-  let terminal: Terminal | undefined
+  let terminal = $state.raw<Terminal>()
   let status = $state<'connecting' | 'live' | 'exited' | 'disconnected'>('connecting')
   let detail = $state('')
 

@@ -210,6 +210,7 @@ test('the parchment shows behind output in Dungeon, a flat page in Neutral', asy
   const page_ = pane.locator('.term')
   const image = (loc: typeof page_) => loc.evaluate((el) => getComputedStyle(el).backgroundImage)
   const screenBg = () => pane.locator('.xterm-screen canvas, .xterm-rows').first().evaluate((el) => getComputedStyle(el).backgroundColor)
+  const viewport = pane.locator('.xterm-viewport')
 
   expect(await image(page_)).toContain('parchment')
   // The image must actually load (CSP, path), not just be declared.
@@ -224,6 +225,10 @@ test('the parchment shows behind output in Dungeon, a flat page in Neutral', asy
   }, await image(page_))
   expect(loaded).toBe(true)
   expect(['rgba(0, 0, 0, 0)', 'transparent']).toContain(await screenBg())
+  // xterm 6 retains a legacy viewport underneath its new scrollable element.
+  // A transparent text layer alone does not prove the parchment is visible.
+  await expect(viewport).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(pane.locator('.xterm-scrollable-element')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
 
   await page.getByRole('button', { name: '⚙ Settings', exact: true }).click()
   const settings = page.getByRole('dialog', { name: 'Settings' })
@@ -231,6 +236,7 @@ test('the parchment shows behind output in Dungeon, a flat page in Neutral', asy
   await settings.getByRole('button', { name: 'Close settings' }).click()
   expect(await image(page_)).toBe('none')
   expect(await page_.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(20, 20, 26)')
+  await expect(pane.locator('.xterm-scrollable-element')).toHaveCSS('background-color', 'rgb(20, 20, 26)')
   await expect(term).toContainText('FAKE-CLAUDE')
 
   // Output still arrives and scrolls after the switch.
@@ -254,6 +260,8 @@ test('the parchment shows behind output in Dungeon, a flat page in Neutral', asy
   await settings.getByLabel(/^Theme/).selectOption('dungeon')
   await settings.getByRole('button', { name: 'Close settings' }).click()
   expect(await image(page_)).toContain('parchment')
+  await expect(viewport).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(pane.locator('.xterm-scrollable-element')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   await expect(term).toContainText('echo:line-59')
 })
 
