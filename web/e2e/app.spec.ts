@@ -583,6 +583,36 @@ test('appearance settings can be exported, changed, and imported back after a pr
   await expect(settings.getByRole('alert').filter({ hasText: 'not a Dungeon Master appearance file' })).toBeVisible()
 })
 
+test('a copy of a session whose scrollback overflowed starts with the cut-off notice, and a short one does not', async ({ page, context }) => {
+  test.setTimeout(90_000)
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  await open(page)
+  await hero(page, 'Shell').click()
+  const prompt = process.platform === 'win32' ? '>' : '$'
+  await expect(screenText(page)).toContainText(prompt, { timeout: 25_000 })
+  await page.locator('.pane:not([hidden]) .xterm').click()
+  const pane = page.locator('.pane:not([hidden])')
+  const copy = async () => {
+    await pane.getByRole('button', { name: 'Copy output as text' }).click()
+    await expect(pane.locator('.term-note')).toHaveText('Output copied.')
+    return (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n')
+  }
+  const notice = 'Earlier output is not included'
+  expect(await copy()).not.toContain(notice)
+
+  // A shell loop prints 6,000 lines, more than the 5,000 the terminal keeps. The copy button took the focus.
+  await page.locator('.pane:not([hidden]) .xterm').click()
+  await page.keyboard.type(process.platform === 'win32' ? 'for /L %i in (1,1,6000) do @echo flood-%i' : 'seq -f "flood-%g" 1 6000')
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('flood-6000', { timeout: 60_000 })
+
+  const text = await copy()
+  expect(text.startsWith('[' + notice)).toBe(true)
+  expect(text).toContain('flood-6000')
+  // The oldest output is what was dropped.
+  expect(text).not.toMatch(/flood-1\n/)
+})
+
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()
