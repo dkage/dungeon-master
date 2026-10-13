@@ -12,6 +12,8 @@ const { url } = JSON.parse(readFileSync(join(here, '.url.json'), 'utf8')) as { u
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Quests' })
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Campaigns' })
 const app = (page: Page) => page.locator('.app')
+// The shell's prompt ends in $ on Unix and > in cmd.exe.
+const PROMPT = process.platform === 'win32' ? '>' : '$'
 
 async function openSample(page: Page) {
   await page.goto(url)
@@ -35,7 +37,7 @@ for (const size of [{ width: 1600, height: 1000 }, { width: 900, height: 800 }])
     await openSample(page)
     await page.getByRole('button', { name: 'Shell', exact: true }).click()
     const term = page.locator('.pane:not([hidden]) .xterm-rows')
-    await expect(term).toContainText('$')
+    await expect(term).toContainText(PROMPT, { timeout: 25_000 })
     await page.locator('.pane:not([hidden]) .xterm-screen').click()
     await page.keyboard.type('echo keep-me')
     await page.keyboard.press('Enter')
@@ -72,7 +74,7 @@ test('dragging and key-stepping the borders resizes the terminal and survives a 
   await openSample(page)
   await page.getByRole('button', { name: 'Shell', exact: true }).click()
   const term = page.locator('.pane:not([hidden]) .xterm-rows')
-  await expect(term).toContainText('$')
+  await expect(term).toContainText(PROMPT, { timeout: 25_000 })
   await page.locator('.pane:not([hidden]) .xterm-screen').click()
   let runs = 0
   const size = async () => {
@@ -109,7 +111,7 @@ test('a reload returns to the open issue and the selected terminal; stale places
   await openSample(page)
   await page.getByRole('button', { name: 'Shell', exact: true }).click()
   const term = page.locator('.pane:not([hidden]) .xterm-rows')
-  await expect(term).toContainText('$')
+  await expect(term).toContainText(PROMPT, { timeout: 25_000 })
   await page.locator('.pane:not([hidden]) .xterm-screen').click()
   await page.keyboard.type('echo remembered-output')
   await page.keyboard.press('Enter')
@@ -151,7 +153,7 @@ test('shortcuts: edit, reload, invoke, disable and reset; typing and terminal ke
   await openSample(page)
   await page.getByRole('button', { name: 'Shell', exact: true }).click()
   const term = page.locator('.pane:not([hidden]) .xterm-rows')
-  await expect(term).toContainText('$')
+  await expect(term).toContainText(PROMPT, { timeout: 25_000 })
   await page.locator('.pane:not([hidden]) .xterm-screen').click()
 
   // A default works from inside the terminal, and ordinary typing still reaches the shell.

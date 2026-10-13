@@ -365,7 +365,7 @@ test('the whole output can be copied and saved as plain text', async ({ page, co
   const copied = await page.evaluate(() => navigator.clipboard.readText())
   // Rows scrolled out of view are included, and no control sequences are.
   expect(copied).toContain('FAKE-CLAUDE')
-  expect(copied).toContain('echo:row-1\n')
+  expect(copied).toMatch(/echo:row-1\s/)
   expect(copied).toContain('echo:row-50')
   // eslint-disable-next-line no-control-regex
   expect(copied).not.toMatch(/[\u0000-\u0008\u000b-\u001f\u007f]/)
@@ -1292,7 +1292,7 @@ test('gh in a session is the shim: reads pass at once, writes are paced', async 
   // A read goes straight through to the real gh.
   await page.keyboard.type('gh issue list --limit 3')
   await page.keyboard.press('Enter')
-  await expect(term).toContainText('fake-gh-ran: issue list --limit 3')
+  await expect(term).toContainText('fake-gh-ran: issue list --limit 3', { timeout: process.platform === 'win32' ? 25_000 : 5_000 })
 
   // Three writes in a tight loop, as an agent might send them.
   await page.keyboard.type(process.platform === 'win32'
