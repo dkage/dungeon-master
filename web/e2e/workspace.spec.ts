@@ -70,6 +70,7 @@ test('Escape in the terminal stays terminal input; outside it restores the split
 })
 
 test('dragging and key-stepping the borders resizes the terminal and survives a reload', async ({ page }) => {
+  test.skip(process.platform === 'win32', 'stty and tr are POSIX')
   await page.setViewportSize({ width: 1600, height: 1000 })
   await openSample(page)
   await page.getByRole('button', { name: 'Shell', exact: true }).click()

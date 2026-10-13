@@ -362,7 +362,8 @@ test('the whole output can be copied and saved as plain text', async ({ page, co
   const pane = page.locator('.pane:not([hidden])')
   await pane.getByRole('button', { name: 'Copy output as text' }).click()
   await expect(pane.locator('.term-note')).toHaveText('Output copied.')
-  const copied = await page.evaluate(() => navigator.clipboard.readText())
+  // Windows clipboards turn newlines into CR LF.
+  const copied = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n')
   // Rows scrolled out of view are included, and no control sequences are.
   expect(copied).toContain('FAKE-CLAUDE')
   expect(copied).toMatch(/echo:row-1\s/)
