@@ -107,6 +107,69 @@ export function labelText(hex: string | undefined): string {
   return lum > 0.6 ? '#1d1d1b' : '#ffffff'
 }
 
+/** A themed label tone: a dark background and light text drawn from the Dungeon palette. */
+export interface LabelTone {
+  name: string
+  bg: string
+  fg: string
+}
+
+const TONES: Record<string, LabelTone> = {
+  stone: { name: 'stone', bg: '#3a2f2a', fg: '#e6d9c3' },
+  red: { name: 'red', bg: '#5a1a1c', fg: '#ffd9d2' },
+  amber: { name: 'amber', bg: '#5a3a12', fg: '#ffe6b3' },
+  green: { name: 'green', bg: '#1f4a2c', fg: '#d3f2d9' },
+  teal: { name: 'teal', bg: '#12474a', fg: '#c9f0ee' },
+  blue: { name: 'blue', bg: '#1d3b5e', fg: '#d6e6ff' },
+  violet: { name: 'violet', bg: '#43276a', fg: '#e8d9ff' },
+  rose: { name: 'rose', bg: '#5a2147', fg: '#ffd9f0' },
+}
+
+/** WCAG contrast ratio between two #rrggbb colours. */
+export function contrastRatio(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const n = parseInt(hex.replace('#', ''), 16)
+    const c = [n >> 16, (n >> 8) & 255, n & 255].map((v) => {
+      const x = v / 255
+      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+  }
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+/**
+ * The palette tone closest to a GitHub label colour, so labels follow the theme
+ * but stay distinguishable. Unknown or greyish colours get the neutral stone tone.
+ */
+export function labelTone(hex: string | undefined): LabelTone {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex ?? '')
+  if (!m) return TONES.stone
+  const n = parseInt(m[1], 16)
+  const [r, g, b] = [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const d = max - min
+  if (d < 0.12) return TONES.stone
+  let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  h = (h * 60 + 360) % 360
+  if (h < 15 || h >= 345) return TONES.red
+  if (h < 70) return TONES.amber
+  if (h < 160) return TONES.green
+  if (h < 200) return TONES.teal
+  if (h < 255) return TONES.blue
+  if (h < 305) return TONES.violet
+  return TONES.rose
+}
+
+/** Inline custom properties for a label: its themed tone and its GitHub swatch. */
+export function labelStyle(hex: string | undefined): string {
+  const t = labelTone(hex)
+  const raw = /^#?([0-9a-f]{6})$/i.exec(hex ?? '')?.[1] ?? '999999'
+  return `--gh:#${raw};--gh-text:${labelText(hex)};--tone-bg:${t.bg};--tone-fg:${t.fg}`
+}
+
 export interface TypeChip {
   name: string
   color?: string

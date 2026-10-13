@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { AppStore } from './store.svelte'
-  import { labelText, scopeText, timeAgo, typeChips, visibleRows } from './quests'
+  import { labelStyle, scopeText, timeAgo, typeChips, visibleRows } from './quests'
   import QuestDetail from './QuestDetail.svelte'
   import QuestMap from './QuestMap.svelte'
   import { CREATURES, effortWord } from './map/art'
@@ -228,9 +228,9 @@
             <li class="qitem {q.state} {v?.state ?? ''}" style={`--depth:${depth}`}>
               <button type="button" class="qbtn" class:selected={store.questNumber === q.number} aria-current={store.questNumber === q.number ? 'true' : undefined} onclick={() => store.selectQuest(q.number)}>
                 {#if art}
-                  <span class="thumb" style={`background-image:url(${art.strip})`} title={`${art.name} (${effortWord(q.effort)} effort)`}></span>
+                  <span class="thumb framed" style={`background-image:url(${art.strip})`} title={`${art.name} (${effortWord(q.effort)} effort)`}></span>
                 {:else}
-                  <span class="thumb unknown" title={`${effortWord(q.effort)} effort`} aria-hidden="true">◇</span>
+                  <span class="thumb framed unknown" title={`${effortWord(q.effort)} effort`} aria-hidden="true">◇</span>
                 {/if}
                 <span class="qmain">
                   <span class="qline">
@@ -241,7 +241,7 @@
                     <span class="effort">{effortWord(q.effort)}</span>
                     {#each relations(q.number) as rel (rel)}<span class="chip rel-chip">{rel}</span>{/each}
                     {#each q.labels as l (l.name)}
-                      <span class="label" style={`background:#${l.color ?? '999999'};color:${labelText(l.color)}`}>{l.name}</span>
+                      <span class="label" style={labelStyle(l.color)}><i class="swatch"></i>{l.name}</span>
                     {/each}
                     {#if q.subTotal > 0}<span class="chip" title="Sub-issues done">{q.subDone}/{q.subTotal}</span>{/if}
                     {#each q.assignees as a (a)}<span class="chip">@{a}</span>{/each}

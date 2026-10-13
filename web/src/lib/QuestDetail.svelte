@@ -4,7 +4,7 @@
   import type { QuestRef } from './api'
   import type { LaunchPreview } from './api'
   import type { EffortTier } from './api'
-  import { STATE_LABEL, labelText, timeAgo } from './quests'
+  import { STATE_LABEL, labelStyle, timeAgo } from './quests'
   import { TIERS, effortWord } from './map/art'
   import { renderMarkdown } from './markdown'
   import { wordLabel } from './words'
@@ -127,9 +127,13 @@
     <p class="hint pad" role="status">Loading #{store.questNumber}…</p>
   {:else}
     <article>
-      <h2 class="dtitle"><span class="num">#{d.number}</span> {d.title}</h2>
+      <div class="titlecard">
+        <h2 class="dtitle"><span class="num">#{d.number}</span> {d.title}</h2>
+      </div>
       <p class="dmeta">
         <span class="pill {d.state}">{STATE_LABEL[d.state]}{d.reason ? ` · ${d.reason}` : ''}</span>
+        {#if d.effort}<span class="pill effort-chip" title="Effort">{effortWord(d.effort)}</span>{/if}
+        {#if d.effort && d.effortSource}<span class="pill source-chip" title="Where the effort comes from">{EFFORT_SOURCE[d.effortSource]}</span>{/if}
         {#if d.author}<span>opened by @{d.author}</span>{/if}
         <span>updated {timeAgo(d.updated)}</span>
         {#if safeUrl}<a href={safeUrl} target="_blank" rel="noopener noreferrer">Open on GitHub</a>{/if}
@@ -138,7 +142,7 @@
       {#if d.labels.length > 0 || d.assignees.length > 0 || d.milestone}
         <p class="meta">
           {#each d.labels as l (l.name)}
-            <span class="label" style={`background:#${l.color ?? '999999'};color:${labelText(l.color)}`}>{l.name}</span>
+            <span class="label" style={labelStyle(l.color)}><i class="swatch"></i>{l.name}</span>
           {/each}
           {#each d.assignees as a (a)}<span class="chip">@{a}</span>{/each}
           {#if d.milestone}<span class="chip">milestone: {d.milestone}</span>{/if}

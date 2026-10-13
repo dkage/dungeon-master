@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import type { Scope } from './api'
   import type { AppStore } from './store.svelte'
-  import { labelText } from './quests'
+  import { labelStyle } from './quests'
 
   let { store }: { store: AppStore } = $props()
 
@@ -130,7 +130,7 @@
                   disabled={!picked.includes(l.name) && picked.length >= MAX_LABELS}
                   onchange={() => toggle(l.name)}
                 />
-                <span class="label" style={`background:#${l.color ?? '999999'};color:${labelText(l.color)}`}>{l.name}</span>
+                <span class="label" style={labelStyle(l.color)}><i class="swatch"></i>{l.name}</span>
                 <span class="count">({l.open})</span>
               </label>
             </li>

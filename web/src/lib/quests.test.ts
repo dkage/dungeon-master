@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Quest } from './api'
-import { counts, labelText, matches, questRows, scopeText, timeAgo, typeChips, visibleRows } from './quests'
+import { contrastRatio, counts, labelStyle, labelText, labelTone, matches, questRows, scopeText, timeAgo, typeChips, visibleRows } from './quests'
 
 const q = (number: number, over: Partial<Quest> = {}): Quest => ({
   number, title: `Quest ${number}`, state: 'open', closed: false, url: '', labels: [], assignees: [],
@@ -83,6 +83,40 @@ describe('helpers', () => {
     expect(labelText('fbca04')).toBe('#1d1d1b')
     expect(labelText(undefined)).toBe('inherit')
     expect(labelText('nothex')).toBe('inherit')
+  })
+})
+
+describe('label tones', () => {
+  it('maps GitHub colours to palette tones by hue', () => {
+    expect(labelTone('d73a4a').name).toBe('red')
+    expect(labelTone('fbca04').name).toBe('amber')
+    expect(labelTone('0e8a16').name).toBe('green')
+    expect(labelTone('0075ca').name).toBe('blue')
+    expect(labelTone('5319e7').name).toBe('violet')
+    expect(labelTone('#e99695').name).toBe('red')
+  })
+
+  it('falls back to stone for greys and unknown colours', () => {
+    for (const c of [undefined, '', 'nothex', 'ffffff', '000000', 'cccccc', '12345']) expect(labelTone(c).name).toBe('stone')
+  })
+
+  it('keeps every tone readable at 4.5:1', () => {
+    const seen = new Set<string>()
+    for (let i = 0; i < 360; i += 5) {
+      const c = Math.round(255 * (1 - Math.abs(((i / 60) % 2) - 1)))
+      const rgb = [[255, c, 0], [c, 255, 0], [0, 255, c], [0, c, 255], [c, 0, 255], [255, 0, c]][Math.floor(i / 60) % 6]
+      const t = labelTone(rgb.map((v) => v.toString(16).padStart(2, '0')).join(''))
+      seen.add(t.name)
+      expect(contrastRatio(t.bg, t.fg)).toBeGreaterThanOrEqual(4.5)
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(6)
+  })
+
+  it('exposes the tone and the GitHub swatch as custom properties', () => {
+    const style = labelStyle('d73a4a')
+    expect(style).toContain('--gh:#d73a4a')
+    expect(style).toContain('--tone-bg:')
+    expect(labelStyle(undefined)).toContain('--gh:#999999')
   })
 })
 

@@ -196,6 +196,36 @@ test('draws the plain graph under the Neutral theme, with no art', async ({ page
   await expect(map(page).getByRole('button', { name: /^#3 Build the signup form/ })).toHaveAttribute('aria-pressed', 'true')
 })
 
+async function listWith(page: Page, theme: 'dungeon' | 'neutral') {
+  await page.addInitScript((t) => localStorage.setItem('dungeon.appearance', JSON.stringify({ theme: t })), theme)
+  await openSample(page)
+  await panel(page).getByRole('group', { name: 'Show as' }).getByRole('button', { name: 'List' }).click()
+  await panel(page).locator('.qlist .qbtn').first().click()
+}
+
+test('frames the list rows and the detail in the Dungeon theme', async ({ page }) => {
+  await listWith(page, 'dungeon')
+  const row = panel(page).locator('.qlist .qbtn').first()
+  expect(await row.evaluate((e) => parseFloat(getComputedStyle(e).borderTopWidth))).toBeGreaterThan(0)
+  expect(await row.locator('.thumb').evaluate((e) => parseFloat(getComputedStyle(e).borderTopWidth))).toBeGreaterThan(0)
+  await expect(row.locator('.statetag')).toHaveCount(1)
+  const card = detail(page).locator('.titlecard')
+  await expect(card).toBeVisible()
+  expect(await card.evaluate((e) => parseFloat(getComputedStyle(e).borderTopWidth))).toBeGreaterThan(0)
+  await expect(detail(page).locator('.dmeta .pill').first()).toBeVisible()
+  const label = panel(page).locator('.qlist .label').first()
+  if (await label.count()) await expect(label.locator('.swatch')).toBeVisible()
+})
+
+test('keeps the plain list rows and detail in the Neutral theme', async ({ page }) => {
+  await listWith(page, 'neutral')
+  const row = panel(page).locator('.qlist .qbtn').first()
+  expect(await row.evaluate((e) => parseFloat(getComputedStyle(e).borderTopWidth))).toBe(0)
+  expect(await detail(page).locator('.titlecard').evaluate((e) => parseFloat(getComputedStyle(e).borderTopWidth))).toBe(0)
+  const label = panel(page).locator('.qlist .label').first()
+  if (await label.count()) await expect(label.locator('.swatch')).toBeHidden()
+})
+
 test('keeps creatures still when the system asks for reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await openSample(page)

@@ -560,3 +560,20 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .app[data-theme='neutral'] .statetag.assigned { color: #6b5b40; }
 .app[data-theme='neutral'] .statetag.locked { color: #5f5f5a; }
 .app[data-theme='neutral'] .statetag.cleared { color: #2e7d45; }
+
+/* Labels: GitHub colour in Neutral; a palette tone plus a small GitHub swatch in Dungeon. */
+.label { background: var(--gh, #999999); color: var(--gh-text, inherit); }
+.label .swatch { display: none; }
+.app[data-theme='dungeon'] .label { display: inline-flex; align-items: center; gap: 5px; background: var(--tone-bg, #3a2f2a); color: var(--tone-fg, #e6d9c3); border: 1px solid var(--metal); }
+.app[data-theme='dungeon'] .label .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--gh, #999999); box-shadow: 0 0 0 1px #0007; }
+
+/* Dungeon: framed title card, chips and list rows (issue #75). */
+.app[data-theme='dungeon'] .titlecard { margin: 0 0 8px; padding: 10px 12px; border: 1px solid var(--metal); border-radius: 4px; background: linear-gradient(180deg, var(--panel-raised), var(--card)); box-shadow: inset 0 0 0 2px #0006, inset 0 0 0 3px var(--brass); }
+.app[data-theme='dungeon'] .titlecard .dtitle { margin: 0; }
+.app[data-theme='dungeon'] .titlecard .num { color: var(--brass-bright); }
+.app[data-theme='dungeon'] .pill.effort-chip, .app[data-theme='dungeon'] .pill.source-chip { border-color: var(--brass); color: var(--brass-bright); font-weight: 500; }
+.app[data-theme='dungeon'] .qitem { margin: 6px 8px; padding-left: calc(var(--depth, 0) * 16px); }
+.app[data-theme='dungeon'] .qbtn { border: 1px solid var(--metal); border-radius: 4px; background: linear-gradient(180deg, var(--panel-raised), var(--card)); box-shadow: inset 0 0 0 1px #0006; }
+.app[data-theme='dungeon'] .qbtn:hover, .app[data-theme='dungeon'] .qbtn.selected { border-color: var(--brass-bright); }
+.app[data-theme='dungeon'] .qbtn .thumb.framed { box-sizing: content-box; padding: 2px; border: 1px solid var(--brass); border-radius: 3px; background-color: #0a0405; background-origin: content-box; background-clip: content-box; box-shadow: inset 0 0 0 1px #0009; }
+.app[data-theme='dungeon'] .qbtn .thumb.unknown { color: var(--brass); }
