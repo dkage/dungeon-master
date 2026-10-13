@@ -3,7 +3,10 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"sync/atomic"
+	"time"
 
 	"github.com/coder/websocket"
 )
@@ -35,20 +38,57 @@ func (s *Server) handleTerm(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
+	started := time.Now()
+	var lastHeard atomic.Int64 // unix nanoseconds of the last sign of life from the peer
+	lastHeard.Store(started.UnixNano())
+	cause := make(chan string, 1) // the first cause wins
+	note := func(why string) {
+		select {
+		case cause <- why:
+		default:
+		}
+	}
+	end := func(why string) {
+		note(why)
+		cancel()
+	}
+	// One line per connection: ids and durations only, never keystrokes,
+	// output, tokens or issue text.
+	defer func() {
+		why := "unknown"
+		select {
+		case why = <-cause:
+		default:
+		}
+		s.cfg.Log.Info("terminal connection closed",
+			"session", id, "cause", why,
+			"lasted", time.Since(started).Round(time.Millisecond),
+			"silent", time.Since(time.Unix(0, lastHeard.Load())).Round(time.Millisecond))
+	}()
+
 	replay, sub := sess.Attach()
 	defer sess.Detach(sub)
 
 	// Reader: keystrokes and control messages.
 	go func() {
-		defer cancel()
 		for {
 			typ, data, err := c.Read(ctx)
 			if err != nil {
+				switch {
+				case ctx.Err() != nil:
+					end("server shut down or connection ended")
+				case websocket.CloseStatus(err) != -1:
+					end("client closed")
+				default:
+					end("read error")
+				}
 				return
 			}
+			lastHeard.Store(time.Now().UnixNano())
 			switch typ {
 			case websocket.MessageBinary:
 				if _, err := sess.Write(data); err != nil {
+					end("session exited")
 					return
 				}
 			case websocket.MessageText:
@@ -63,8 +103,33 @@ func (s *Server) handleTerm(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	// Keepalive: a ping keeps intermediaries from dropping an idle
+	// connection, and a peer that stops answering is closed here.
+	go func() {
+		t := time.NewTicker(s.cfg.TermPing)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+			}
+			pctx, pcancel := context.WithTimeout(ctx, s.cfg.TermPingTimeout)
+			err := c.Ping(pctx)
+			pcancel()
+			if err != nil {
+				if ctx.Err() == nil {
+					end("peer stopped answering pings")
+				}
+				return
+			}
+			lastHeard.Store(time.Now().UnixNano())
+		}
+	}()
+
 	if len(replay) > 0 {
 		if err := c.Write(ctx, websocket.MessageBinary, replay); err != nil {
+			end("write error")
 			return
 		}
 	}
@@ -73,15 +138,20 @@ func (s *Server) handleTerm(w http.ResponseWriter, r *http.Request) {
 		case b, ok := <-sub.C:
 			if !ok {
 				if exited, code := sess.Exited(); exited {
+					note("session exited") // before closing, so our own close frame is not read as the client's
 					msg, _ := json.Marshal(map[string]any{"type": "exit", "code": code})
 					_ = c.Write(ctx, websocket.MessageText, msg)
 					_ = c.Close(websocket.StatusNormalClosure, "exited")
 				} else {
+					note("too slow")
 					_ = c.Close(websocket.StatusTryAgainLater, "too slow, reattach")
 				}
 				return
 			}
 			if err := c.Write(ctx, websocket.MessageBinary, b); err != nil {
+				if !errors.Is(err, context.Canceled) {
+					end("write error")
+				}
 				return
 			}
 		case <-ctx.Done():

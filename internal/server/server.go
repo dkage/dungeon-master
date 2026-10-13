@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -84,6 +85,11 @@ type Config struct {
 	// Gatekeeper puts the gh shim in front of the sessions it starts. Nil
 	// means sessions run with the plain gh.
 	Gatekeeper *Gatekeeper
+	// Log receives one line per closed terminal connection. Defaults to slog's default.
+	Log *slog.Logger
+	// TermPing is how often a terminal connection is pinged, and TermPingTimeout
+	// how long a ping may go unanswered before the connection is closed.
+	TermPing, TermPingTimeout time.Duration
 }
 
 // Gatekeeper configures the gh shim for sessions.
@@ -190,6 +196,15 @@ func withDefaults(cfg Config) Config {
 	}
 	if cfg.Sessions == nil {
 		cfg.Sessions = session.NewManager()
+	}
+	if cfg.Log == nil {
+		cfg.Log = slog.Default()
+	}
+	if cfg.TermPing <= 0 {
+		cfg.TermPing = 20 * time.Second
+	}
+	if cfg.TermPingTimeout <= 0 {
+		cfg.TermPingTimeout = 10 * time.Second
 	}
 	if cfg.BaseEnv == nil {
 		cfg.BaseEnv = os.Environ
