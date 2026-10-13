@@ -165,7 +165,6 @@ test('shortcuts: edit, reload, invoke, disable and reset; typing and terminal ke
   await page.keyboard.press('Control+Shift+m')
   await expect(row).toContainText(/(Ctrl|Control)\+Shift\+m/)
   await dialog.getByRole('button', { name: 'Done' }).click()
-  await expect(page.locator('dialog.settings')).toHaveCount(0)
 
   await page.reload()
   await expect(page.getByRole('button', { name: 'Expand terminal' })).toBeVisible()
@@ -177,14 +176,12 @@ test('shortcuts: edit, reload, invoke, disable and reset; typing and terminal ke
   await page.getByRole('button', { name: '⚙ Settings' }).click()
   await dialog.getByRole('button', { name: 'Disable shortcut for Expand map and list' }).click()
   await dialog.getByRole('button', { name: 'Done' }).click()
-  await expect(page.locator('dialog.settings')).toHaveCount(0)
   await page.keyboard.press('Control+Shift+m')
   await expect(app(page)).not.toHaveAttribute('data-expanded')
 
   await page.getByRole('button', { name: '⚙ Settings' }).click()
   await dialog.getByRole('button', { name: 'Reset shortcut for Expand map and list' }).click()
   await dialog.getByRole('button', { name: 'Done' }).click()
-  await expect(page.locator('dialog.settings')).toHaveCount(0)
   await page.keyboard.press('Control+Shift+3')
   await expect(app(page)).toHaveAttribute('data-expanded', 'map')
 })

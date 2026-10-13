@@ -251,6 +251,39 @@ describe('App', () => {
     expect(localStorage.getItem('dungeon.shortcuts')).toBe('{}')
   })
 
+  it('runs shortcuts the moment a dialog is closed, before its close event arrives', async () => {
+    fakeServer()
+    // A dialog whose close event is slow: only the app's own state can know it is closed.
+    const close = HTMLDialogElement.prototype.close
+    HTMLDialogElement.prototype.close = function (this: HTMLDialogElement) { this.removeAttribute('open') }
+    try {
+      const { container } = render(App)
+      await screen.findByRole('button', { name: 'Opus' })
+      const app = container.querySelector('.app')!
+      const press = (init: KeyboardEventInit) => fireEvent.keyDown(document.body, init)
+
+      await press({ key: ',', code: 'Comma', ctrlKey: true })
+      await fireEvent.click(await screen.findByRole('button', { name: 'Done' }))
+      await press({ key: '@', code: 'Digit2', ctrlKey: true, shiftKey: true })
+      expect(app).toHaveAttribute('data-expanded', 'terminal')
+      await press({ key: ')', code: 'Digit0', ctrlKey: true, shiftKey: true })
+
+      await fireEvent.click(screen.getByRole('button', { name: 'Word guide' }))
+      await fireEvent.click(await screen.findByRole('button', { name: 'Close word guide' }))
+      await press({ key: '@', code: 'Digit2', ctrlKey: true, shiftKey: true })
+      expect(app).toHaveAttribute('data-expanded', 'terminal')
+      await press({ key: ')', code: 'Digit0', ctrlKey: true, shiftKey: true })
+
+      // Escape closes a dialog natively through its cancel event.
+      await press({ key: ',', code: 'Comma', ctrlKey: true })
+      await fireEvent(await screen.findByRole('dialog', { name: 'Settings' }), new Event('cancel'))
+      await press({ key: '@', code: 'Digit2', ctrlKey: true, shiftKey: true })
+      expect(app).toHaveAttribute('data-expanded', 'terminal')
+    } finally {
+      HTMLDialogElement.prototype.close = close
+    }
+  })
+
   it('reopens the getting-started guide over a running session, and hides it again', async () => {
     fakeServer()
     render(App)

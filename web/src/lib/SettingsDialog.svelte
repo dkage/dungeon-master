@@ -33,11 +33,11 @@
   })
 
   function close() {
+    // Report the close now: the dialog's own close event arrives a moment later, and keys pressed in between
+    // must not be treated as typed into an open dialog.
     if (typeof dialog.close === 'function') dialog.close()
-    else {
-      dialog.removeAttribute('open')
-      onclose()
-    }
+    else dialog.removeAttribute('open')
+    onclose()
   }
 
   function setFont(event: Event) {
@@ -171,7 +171,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} class="settings" aria-labelledby="settings-title" onclose={onclose}>
+<dialog bind:this={dialog} class="settings" aria-labelledby="settings-title" oncancel={onclose} onclose={onclose}>
   <header>
     <div><p class="eyebrow">Dungeon Master</p><h1 id="settings-title">Settings</h1></div>
     <button type="button" class="close" aria-label="Close settings" onclick={close}>×</button>

@@ -13,11 +13,12 @@
 
   function close() {
     if (typeof dialog.close === 'function') dialog.close()
-    else { dialog.removeAttribute('open'); onclose() }
+    else dialog.removeAttribute('open')
+    onclose() // now, not when the dialog's close event arrives
   }
 </script>
 
-<dialog bind:this={dialog} class="words-dialog" aria-labelledby="words-title" onclose={onclose}>
+<dialog bind:this={dialog} class="words-dialog" aria-labelledby="words-title" oncancel={onclose} onclose={onclose}>
   <header><div><p>Dungeon Master</p><h1 id="words-title">Word guide</h1></div><button type="button" aria-label="Close word guide" onclick={close}>×</button></header>
   <p class="intro">These labels have a plain meaning in the app. Choose a style in Settings; the popovers remain available in every mode.</p>
   <div class="table-wrap">
