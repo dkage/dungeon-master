@@ -147,7 +147,14 @@ export class AppStore {
    * back to the default without an error. Nothing is started, restarted or ended.
    */
   async applyPlace(p: Place) {
-    if (p.campaign && this.campaigns.some((c) => c.id === p.campaign)) this.selectCampaign(p.campaign)
+    if (p.campaign) {
+      // The session, issue and map level belong to that project; without it they mean nothing here.
+      if (!this.campaigns.some((c) => c.id === p.campaign)) {
+        if (p.view) this.setPanelView(p.view)
+        return
+      }
+      this.selectCampaign(p.campaign)
+    }
     const s = p.session ? this.sessions.find((x) => x.id === p.session) : undefined
     if (s && !s.lost && s.campaign === this.campaignId) this.activeId = s.id
     if (p.view) this.setPanelView(p.view)

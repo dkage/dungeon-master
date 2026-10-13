@@ -130,7 +130,16 @@ test('a reload returns to the open issue and the selected terminal; stale places
   await expect(page.locator('.pane:not([hidden]) .xterm-rows')).toContainText('remembered-output')
   await expect(page.getByRole('list', { name: /^Expeditions in Sample/ }).getByRole('button', { name: /^Scratch terminal/ }).first()).toHaveAttribute('aria-current', 'true')
 
+  // A link to a project that is gone leaves the current view alone, without an error.
   await page.evaluate(() => { location.hash = '#c=nope&s=zzz&q=999999&l=d77' })
+  await expect.poll(() => page.evaluate(() => location.hash)).not.toContain('nope')
+  await page.reload()
+  await expect(nav(page)).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+
+  // A removed issue and a gone session in a known project fall back to the default.
+  const campaign = await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('c'))
+  await page.evaluate((c) => { location.hash = `#c=${c}&s=zzz&q=999999&l=d77` }, campaign)
   await page.reload()
   await expect(nav(page)).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
@@ -184,4 +193,24 @@ test('shortcuts: edit, reload, invoke, disable and reset; typing and terminal ke
   await dialog.getByRole('button', { name: 'Done' }).click()
   await page.keyboard.press('Control+Shift+3')
   await expect(app(page)).toHaveAttribute('data-expanded', 'map')
+})
+
+test('removing the current project leaves a clean default place after a reload', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await openSample(page)
+  await panel(page).getByRole('button', { name: 'List', exact: true }).click()
+  await panel(page).getByRole('region', { name: 'Quest browser' }).getByRole('button', { name: /^#\d+ / }).first().click()
+  await expect(panel(page).getByRole('region', { name: 'Selected issue detail' })).toBeVisible()
+  expect(await page.evaluate(() => location.hash)).toMatch(/c=.*q=\d+/)
+
+  await page.getByRole('button', { name: 'Remove sample project' }).click()
+  await page.getByRole('group', { name: /^Confirm removal of/ }).getByRole('button', { name: 'Remove sample' }).click()
+  await expect(nav(page).getByRole('button', { name: /^Sample/ })).toHaveCount(0)
+  await expect.poll(() => page.evaluate(() => location.hash)).not.toMatch(/q=\d+/)
+
+  await page.reload()
+  await expect(nav(page)).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(panel(page).getByRole('region', { name: 'Selected issue detail' })).toHaveCount(0)
+  expect(await page.evaluate(() => location.hash)).not.toMatch(/q=\d+|s=/)
 })

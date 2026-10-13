@@ -200,10 +200,34 @@ describe('App', () => {
 
   it('falls back quietly when the remembered campaign, issue or session is gone', async () => {
     fakeServer()
-    history.replaceState(null, '', '/#c=gone&s=nope&q=999&l=d4')
+    history.replaceState(null, '', '/#c=gone&s=nope&q=11&l=d4')
     render(App)
     await screen.findByRole('button', { name: 'Opus' })
     await waitFor(() => expect(location.hash).not.toContain('gone'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Selected issue detail' })).not.toBeInTheDocument()
+  })
+
+  it('drops a removed project from the remembered place', async () => {
+    fakeServer()
+    history.replaceState(null, '', '/#c=c1&q=11&v=list')
+    render(App)
+    const detail = await screen.findByRole('region', { name: 'Selected issue detail' })
+    await within(detail).findByRole('heading', { name: /#11 Real blocked issue/ })
+    await waitFor(() => expect(localStorage.getItem('dungeon.place')).toContain('c=c1'))
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Campaign actions for demo' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove project' }))
+    await fireEvent.click(within(screen.getByRole('group', { name: 'Confirm removal of demo' })).getByRole('button', { name: 'Remove project' }))
+    await waitFor(() => expect(location.hash).not.toContain('c1'))
+    expect(location.hash).not.toContain('q=11')
+    expect(localStorage.getItem('dungeon.place')).not.toContain('c1')
+    expect(screen.queryByRole('region', { name: 'Selected issue detail' })).not.toBeInTheDocument()
+
+    // Going back onto an entry for the removed project falls back quietly.
+    history.replaceState(null, '', '/#c=c1&q=11&s=old')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    await waitFor(() => expect(location.hash).not.toContain('c1'))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Selected issue detail' })).not.toBeInTheDocument()
   })
