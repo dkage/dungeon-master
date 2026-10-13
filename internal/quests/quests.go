@@ -81,6 +81,14 @@ type Quest struct {
 	Comments  int           `json:"comments"`
 	PRs       []PullRequest `json:"prs"`
 	Updated   time.Time     `json:"updated"`
+
+	// Set by Annotate from the labels and the campaign's local settings.
+	Effort           string   `json:"effort,omitempty"`
+	EffortSource     string   `json:"effortSource,omitempty"`
+	EffortConflict   []string `json:"effortConflict,omitempty"`
+	Priority         string   `json:"priority,omitempty"`
+	PriorityConflict []string `json:"priorityConflict,omitempty"`
+	Creature         string   `json:"creature,omitempty"`
 }
 
 // Comment is one comment on an issue.

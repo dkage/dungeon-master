@@ -52,6 +52,14 @@ type Campaign struct {
 	// is not in a repository or the remote is not on github.com.
 	GitRoot string `json:"gitRoot,omitempty"`
 	Repo    string `json:"repo,omitempty"` // "owner/repo"
+	// EffortLabels maps the team's own labels (for example "size/S") to an
+	// effort tier, for repositories that do not use the default labels.
+	EffortLabels map[string]string `json:"effortLabels"`
+	// EffortOverrides sets an issue's effort tier locally, by issue number.
+	EffortOverrides map[int]string `json:"effortOverrides"`
+	// Creatures remembers which creature each issue was given, so the choice
+	// survives edits to the issue and additions to the roster. Local only.
+	Creatures map[int]string `json:"-"`
 }
 
 // Scope modes.
@@ -102,6 +110,10 @@ type record struct {
 	Demo   bool      `json:"demo,omitempty"`
 	Sample bool      `json:"sample,omitempty"`
 	Added  time.Time `json:"added"`
+
+	EffortLabels    map[string]string `json:"effortLabels,omitempty"`
+	EffortOverrides map[int]string    `json:"effortOverrides,omitempty"`
+	Creatures       map[int]string    `json:"creatures,omitempty"`
 }
 
 type file struct {
@@ -318,6 +330,9 @@ func (r *Registry) view(rec record) Campaign {
 	return Campaign{
 		ID: rec.ID, Name: rec.Name, Dir: rec.Dir, Remote: rec.Remote, Scope: scope, Demo: rec.Demo, Sample: rec.Sample,
 		GitRoot: d.gitRoot, Repo: d.repo,
+		EffortLabels:    copyMap(rec.EffortLabels),
+		EffortOverrides: copyMap(rec.EffortOverrides),
+		Creatures:       copyMap(rec.Creatures),
 	}
 }
 

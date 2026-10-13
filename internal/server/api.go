@@ -49,6 +49,8 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/campaigns/{id}/scope/options", s.handleScopeOptions)
 	mux.HandleFunc("GET /api/campaigns/{id}/quests", s.handleQuests)
 	mux.HandleFunc("GET /api/campaigns/{id}/quests/{number}", s.handleQuest)
+	mux.HandleFunc("PUT /api/campaigns/{id}/effort-labels", s.handleEffortLabels)
+	mux.HandleFunc("PUT /api/campaigns/{id}/quests/{number}/effort", s.handleEffortOverride)
 	mux.HandleFunc("POST /api/campaigns/{id}/quests/{number}/launch-preview", s.handleQuestLaunchPreview)
 
 	mux.HandleFunc("POST /api/sessions", s.handleCreate)

@@ -28,10 +28,67 @@ func (s *Server) handleQuests(w http.ResponseWriter, r *http.Request) {
 		questsErr(w, err, c.Repo)
 		return
 	}
-	if res.Quests == nil {
-		res.Quests = []quests.Quest{}
-	}
+	var picks map[int]string
+	res.Quests, picks = quests.Annotate(res.Quests, c)
+	s.rememberCreatures(c.ID, picks)
 	writeJSON(w, http.StatusOK, res)
+}
+
+// rememberCreatures stores first-time creature choices. Failing to save is
+// harmless: the choice is deterministic and is simply made again next time.
+func (s *Server) rememberCreatures(id string, picks map[int]string) {
+	if len(picks) == 0 {
+		return
+	}
+	_ = s.cfg.Campaigns.RememberCreatures(id, picks)
+}
+
+// handleEffortLabels replaces the campaign's mapping from its own labels to
+// effort tiers. It is local state and never reaches GitHub.
+func (s *Server) handleEffortLabels(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Labels map[string]string `json:"labels"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	for label, tier := range body.Labels {
+		if !quests.ValidTier(tier) {
+			httpErr(w, http.StatusBadRequest, "unknown effort tier for "+strconv.Quote(label))
+			return
+		}
+	}
+	c, err := s.cfg.Campaigns.SetEffortLabels(r.PathValue("id"), body.Labels)
+	if err != nil {
+		campaignErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
+}
+
+// handleEffortOverride sets or clears one issue's effort tier locally.
+func (s *Server) handleEffortOverride(w http.ResponseWriter, r *http.Request) {
+	n, err := strconv.Atoi(r.PathValue("number"))
+	if err != nil || n <= 0 {
+		httpErr(w, http.StatusBadRequest, "quest number must be a positive integer")
+		return
+	}
+	var body struct {
+		Tier string `json:"tier"`
+	}
+	if !decode(w, r, &body) {
+		return
+	}
+	if body.Tier != "" && !quests.ValidTier(body.Tier) {
+		httpErr(w, http.StatusBadRequest, "unknown effort tier")
+		return
+	}
+	c, err := s.cfg.Campaigns.SetEffortOverride(r.PathValue("id"), n, body.Tier)
+	if err != nil {
+		campaignErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, c)
 }
 
 // handleScopeSet stores which issues a campaign shows.
@@ -87,6 +144,8 @@ func (s *Server) handleQuest(w http.ResponseWriter, r *http.Request) {
 		questsErr(w, err, c.Repo)
 		return
 	}
+	d, picks := quests.AnnotateDetail(d, c)
+	s.rememberCreatures(c.ID, picks)
 	writeJSON(w, http.StatusOK, struct {
 		quests.Detail
 		Briefing briefing.Result `json:"briefing"`
