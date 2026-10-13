@@ -140,6 +140,8 @@ export class AppStore {
   suggestions = $state<ProjectSuggestion[]>([])
   suggestionsLoading = $state(false)
   firstRunDismissed = $state(load('dungeon.first-run.dismissed') === '1')
+  /** The user asked for the guide on purpose; it covers an open session until they pick something else. */
+  guideOpen = $state(false)
   appearance = $state<UISettings>(loadSettings())
 
   // Responses that arrive after a newer request, or after the selection moved
@@ -295,12 +297,19 @@ export class AppStore {
     }
   }
 
+  /** Whether the stage shows the getting-started guide instead of a terminal. */
+  get guideShown() {
+    return this.guideOpen || (!this.active && !this.firstRunDismissed)
+  }
+
   dismissFirstRun() {
+    this.guideOpen = false
     this.firstRunDismissed = true
     save('dungeon.first-run.dismissed', '1')
   }
 
   openFirstRun() {
+    this.guideOpen = true
     this.firstRunDismissed = false
     save('dungeon.first-run.dismissed', '0')
   }
@@ -540,6 +549,7 @@ export class AppStore {
   selectCampaign(id: string) {
     if (!this.campaigns.some((c) => c.id === id)) return
     const changed = id !== this.campaignId
+    this.guideOpen = false
     this.pickCampaign(id)
     if (this.active?.campaign !== id) this.activeId = this.sessionsOf(id).at(-1)?.id ?? null
     if (changed) void this.loadQuests()
@@ -549,6 +559,7 @@ export class AppStore {
     const s = this.sessions.find((x) => x.id === id)
     if (!s) return
     const changed = s.campaign !== this.campaignId
+    this.guideOpen = false
     this.pickCampaign(s.campaign)
     this.activeId = id
     if (changed) void this.loadQuests()
@@ -619,6 +630,7 @@ export class AppStore {
       const sess = await this.client.createSession({ ...target, campaign: campaign.id })
       this.sessions = [...this.sessions, sess]
       this.selectCampaign(campaign.id)
+      this.guideOpen = false
       this.activeId = sess.id
       this.error = null
     } catch (e) {
@@ -649,6 +661,7 @@ export class AppStore {
     try {
       const sess = await this.client.createSession({ campaign: campaign.id, hero, quest: number, briefingId })
       this.sessions = [...this.sessions, sess]
+      this.guideOpen = false
       this.activeId = sess.id
       this.questNumber = number
       this.questsOpen = true

@@ -208,6 +208,31 @@ test('launch a hero, see its output, type to it', async ({ page }) => {
   await expect(term).toContainText('echo:hello dungeon')
 })
 
+test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  const guide = page.getByRole('heading', { name: 'Start here' })
+  const start = page.locator('.sidebar').getByRole('button', { name: 'Getting started' })
+
+  await start.click()
+  await expect(guide).toBeVisible()
+  await page.getByRole('button', { name: 'Hide getting started' }).click()
+  await expect(guide).toHaveCount(0)
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+
+  // Dismissed earlier, and again after a reload.
+  await start.click()
+  await expect(guide).toBeVisible()
+  await page.getByRole('button', { name: 'Hide getting started' }).click()
+  await page.reload()
+  await expect(start).toBeVisible()
+  await start.click()
+  await expect(guide).toBeVisible()
+  await page.getByRole('button', { name: 'Hide getting started' }).click()
+  await expect(guide).toHaveCount(0)
+})
+
 test('the terminal text stays inside its frame once the fonts have loaded', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()

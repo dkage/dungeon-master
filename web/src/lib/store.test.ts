@@ -195,6 +195,25 @@ describe('onboarding and appearance preferences', () => {
     s.openFirstRun()
     expect(new AppStore(fakeClient()).firstRunDismissed).toBe(false)
   })
+
+  it('shows the guide over an open session on request, until something else is picked', () => {
+    const s = new AppStore(fakeClient())
+    s.campaigns = [{ id: 'c1', name: 'demo', dir: '/d' } as never]
+    s.sessions = [{ id: 'a', kind: 'hero', title: 'Opus', campaign: 'c1', dir: '/d', created: '', exited: false, exitCode: 0 }]
+    s.campaignId = 'c1'
+    s.activeId = 'a'
+    s.dismissFirstRun()
+    expect(s.guideShown).toBe(false)
+
+    s.openFirstRun()
+    expect(s.guideShown).toBe(true)
+    s.dismissFirstRun()
+    expect(s.guideShown).toBe(false)
+
+    s.openFirstRun()
+    void s.selectSession('a')
+    expect(s.guideShown).toBe(false)
+  })
 })
 
 describe('campaigns', () => {

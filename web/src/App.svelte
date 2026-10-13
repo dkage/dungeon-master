@@ -136,14 +136,14 @@
     <Toolbar {store} />
     <main class="stage">
       {#each live as s (s.id)}
-        <div class="pane" hidden={s.id !== store.activeId}>
+        <div class="pane" hidden={s.id !== store.activeId || store.guideOpen}>
           <Terminal sessionId={s.id} fontSize={store.appearance.terminalSize} theme={store.appearance.theme} onexit={(code) => store.markExited(s.id, code)} />
         </div>
       {/each}
-      {#if store.active?.lost}
-        <p class="empty">This expedition was running when Dungeon Master last stopped, so its terminal is gone. Close it to dismiss.</p>
-      {:else if !store.active && !store.firstRunDismissed}
+      {#if store.guideShown}
         <StartHere {store} openSettings={() => (settingsOpen = true)} />
+      {:else if store.active?.lost}
+        <p class="empty">This expedition was running when Dungeon Master last stopped, so its terminal is gone. Close it to dismiss.</p>
       {:else if !store.active}
         <p class="empty">
           {store.campaign ? 'Pick a hero above to start an expedition.' : 'Add a project on the left to begin.'}

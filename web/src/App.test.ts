@@ -143,6 +143,27 @@ describe('App', () => {
     expect(screen.queryByRole('heading', { name: 'Start here' })).not.toBeInTheDocument()
   })
 
+  it('reopens the getting-started guide over a running session, and hides it again', async () => {
+    fakeServer()
+    render(App)
+    await fireEvent.click(await screen.findByRole('button', { name: 'Opus' }))
+    await screen.findByTestId('term-stub')
+    expect(screen.queryByRole('heading', { name: 'Start here' })).not.toBeInTheDocument()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Getting started' }))
+    expect(screen.getByRole('heading', { name: 'Start here' })).toBeInTheDocument()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Hide getting started' }))
+    expect(screen.queryByRole('heading', { name: 'Start here' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('term-stub')).toBeInTheDocument()
+
+    // Once dismissed, the button still brings it back; picking the session returns to the terminal.
+    await fireEvent.click(screen.getByRole('button', { name: 'Getting started' }))
+    expect(screen.getByRole('heading', { name: 'Start here' })).toBeInTheDocument()
+    await fireEvent.click(within(screen.getByRole('list', { name: 'Expeditions in demo' })).getByRole('button', { name: /^Opus/ }))
+    expect(screen.queryByRole('heading', { name: 'Start here' })).not.toBeInTheDocument()
+  })
+
   it('walks a new user through adding a campaign, then launching', async () => {
     const calls = fakeServer({ campaigns: false })
     render(App)
