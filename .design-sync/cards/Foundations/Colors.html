@@ -1,0 +1,22 @@
+<div class="ds-swatches">
+  <div><i style="background:var(--bg)"></i><code>--bg</code></div>
+  <div><i style="background:var(--panel)"></i><code>--panel</code></div>
+  <div><i style="background:var(--panel-raised)"></i><code>--panel-raised</code></div>
+  <div><i style="background:var(--card)"></i><code>--card</code></div>
+  <div><i style="background:var(--line)"></i><code>--line</code></div>
+  <div><i style="background:var(--metal)"></i><code>--metal</code></div>
+  <div><i style="background:var(--text)"></i><code>--text</code></div>
+  <div><i style="background:var(--muted)"></i><code>--muted</code></div>
+  <div><i style="background:var(--accent)"></i><code>--accent</code></div>
+  <div><i style="background:var(--brass)"></i><code>--brass</code></div>
+  <div><i style="background:var(--brass-bright)"></i><code>--brass-bright</code></div>
+  <div><i style="background:var(--warn-bg);outline:1px solid var(--warn)"></i><code>--warn / --warn-bg</code></div>
+  <div><i style="background:var(--error-bg);outline:1px solid var(--error)"></i><code>--error / --error-bg</code></div>
+  <div><i style="background:var(--term-bg)"></i><code>--term-bg</code></div>
+</div>
+<style>
+  .ds-swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:16px}
+  .ds-swatches div{display:flex;align-items:center;gap:8px;color:var(--text)}
+  .ds-swatches i{width:36px;height:36px;border-radius:6px;border:1px solid #0008;flex:none}
+  .ds-swatches code{font-family:'Fira Code',monospace;font-size:12px}
+</style>
