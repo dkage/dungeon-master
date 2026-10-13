@@ -42,6 +42,10 @@ export interface Campaign {
   gitRoot?: string
   /** "owner/repo" on github.com, when the remote could be resolved. */
   repo?: string
+  /** The team's own labels mapped to effort tiers (local state). */
+  effortLabels?: Record<string, EffortTier>
+  /** Per-issue effort set locally, by issue number. */
+  effortOverrides?: Record<string, EffortTier>
 }
 
 export interface ProjectSuggestion {
@@ -118,6 +122,9 @@ export interface LaunchPreview {
 
 export type QuestState = 'open' | 'locked' | 'claimed' | 'cleared'
 
+export type EffortTier = 'trivial' | 'low' | 'moderate' | 'high' | 'extreme'
+export type Priority = 'low' | 'normal' | 'high' | 'urgent'
+
 export interface QuestLabel {
   name: string
   color?: string
@@ -152,6 +159,14 @@ export interface Quest {
   comments: number
   prs: QuestPR[]
   updated: string
+  /** Absent when the effort is unknown (no label, or labels that disagree). */
+  effort?: EffortTier
+  effortSource?: 'override' | 'label' | 'mapping'
+  effortConflict?: string[]
+  priority?: Priority
+  priorityConflict?: string[]
+  /** Creature id from the roster, chosen once per issue; absent without a tier. */
+  creature?: string
 }
 
 export interface QuestResult {
@@ -284,6 +299,10 @@ export const getQuest = (campaignId: string, number: number) =>
   call<QuestDetail>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}`) as Promise<QuestDetail>
 export const previewQuestLaunch = (campaignId: string, number: number, hero: string) =>
   call<LaunchPreview>('POST', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}/launch-preview`, { hero }) as Promise<LaunchPreview>
+export const setEffortLabels = (campaignId: string, labels: Record<string, EffortTier>) =>
+  call<Campaign>('PUT', `/api/campaigns/${encodeURIComponent(campaignId)}/effort-labels`, { labels }) as Promise<Campaign>
+export const setEffortOverride = (campaignId: string, number: number, tier: EffortTier | '') =>
+  call<Campaign>('PUT', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}/effort`, { tier }) as Promise<Campaign>
 export const createSession = (req: CreateRequest) =>
   call<SessionInfo>('POST', '/api/sessions', req) as Promise<SessionInfo>
 export const deleteSession = (id: string) =>
