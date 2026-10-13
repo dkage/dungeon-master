@@ -9,6 +9,7 @@
   import SettingsDialog from './lib/SettingsDialog.svelte'
   import WordsDialog from './lib/WordsDialog.svelte'
   import { attentionTitle, faviconHref } from './lib/attention'
+  import { keyWidth, DEFAULTS, limits, type Edge } from './lib/columns'
   import { escapeRestores } from './lib/workspace'
   import { notificationText, permission } from './lib/notify'
 
@@ -39,6 +40,8 @@
       void tick().then(() => document.querySelector<HTMLElement>(`.expand-button[data-region="${region}"]`)?.focus())
     }
     window.addEventListener('keydown', onEscape)
+    const onWindow = () => (store.windowWidth = window.innerWidth)
+    window.addEventListener('resize', onWindow)
     const onShortcut = (event: KeyboardEvent) => {
       if (event.ctrlKey && !event.metaKey && event.key === ',') {
         event.preventDefault()
@@ -75,8 +78,24 @@
       document.removeEventListener('visibilitychange', onFocus)
       window.removeEventListener('keydown', onShortcut)
       window.removeEventListener('keydown', onEscape)
+      window.removeEventListener('resize', onWindow)
     }
   })
+
+  // Dragging a column border: the pointer position is the new width.
+  let dragging = $state<Edge | null>(null)
+  function dragMove(edge: Edge, event: PointerEvent) {
+    if (dragging !== edge) return
+    store.resizeColumn(edge, edge === 'sidebar' ? event.clientX : window.innerWidth - event.clientX)
+  }
+  function borderKey(edge: Edge, event: KeyboardEvent) {
+    const next = keyWidth(store.columnWidths, edge, event.key, store.windowWidth)
+    if (!next) return
+    event.preventDefault()
+    store.setColumns(next)
+  }
+  const bounds = (edge: Edge) =>
+    limits(edge, edge === 'sidebar' ? store.columnWidths.quests : store.columnWidths.sidebar, store.windowWidth)
 
   // Sessions of every campaign stay mounted (hidden) so switching is instant
   // and their terminals keep their state; lost sessions have no terminal.
@@ -141,7 +160,7 @@
   data-expanded={store.workspace.expanded ?? undefined}
   data-theme={store.appearance.theme}
   data-font={store.appearance.font}
-  style={`--sidebar-size:${store.appearance.sidebarSize}px;--sidebar-font-scale:${store.appearance.sidebarSize / 14};--terminal-size:${store.appearance.terminalSize}px;--quests-size:${store.appearance.questsSize}px;--quests-font-scale:${store.appearance.questsSize / 14}`}
+  style={`--col-sidebar:${store.columnWidths.sidebar}px;--col-quests:${store.columnWidths.quests}px;--sidebar-size:${store.appearance.sidebarSize}px;--sidebar-font-scale:${store.appearance.sidebarSize / 14};--terminal-size:${store.appearance.terminalSize}px;--quests-size:${store.appearance.questsSize}px;--quests-font-scale:${store.appearance.questsSize / 14}`}
 >
   <Sidebar {store} onsettings={() => (settingsOpen = true)} onwords={() => (wordsOpen = true)} />
   <div class="main">
@@ -164,6 +183,28 @@
     </main>
   </div>
   <QuestsPanel {store} />
+  {#each ['sidebar', 'quests'] as const as edge (edge)}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+    <div
+      class="col-border"
+      class:dragging={dragging === edge}
+      data-edge={edge}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={edge === 'sidebar' ? 'Resize projects panel' : 'Resize issues panel'}
+      aria-valuenow={store.columnWidths[edge]}
+      aria-valuemin={bounds(edge).min}
+      aria-valuemax={bounds(edge).max}
+      tabindex="0"
+      style={edge === 'sidebar' ? `left:${store.columnWidths.sidebar - 3}px` : `right:${store.columnWidths.quests - 3}px`}
+      onpointerdown={(e) => { dragging = edge; e.currentTarget.setPointerCapture(e.pointerId) }}
+      onpointermove={(e) => dragMove(edge, e)}
+      onpointerup={() => (dragging = null)}
+      onpointercancel={() => (dragging = null)}
+      ondblclick={() => store.resizeColumn(edge, DEFAULTS[edge])}
+      onkeydown={(e) => borderKey(edge, e)}
+    ></div>
+  {/each}
   {#if settingsOpen}<SettingsDialog {store} onclose={() => (settingsOpen = false)} />{/if}
   {#if wordsOpen}<WordsDialog onclose={() => (wordsOpen = false)} />{/if}
 </div>

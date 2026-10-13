@@ -166,6 +166,26 @@ describe('App', () => {
     expect(screen.getByTestId('term-stub')).toBe(stub)
   })
 
+  it('resizes the side columns with the keyboard, remembers them, and resets on double-click', async () => {
+    fakeServer()
+    vi.stubGlobal('innerWidth', 1600)
+    const { container } = render(App)
+    await screen.findByRole('button', { name: 'Opus' })
+    const app = container.querySelector<HTMLElement>('.app')!
+    const border = screen.getByRole('separator', { name: 'Resize projects panel' })
+    expect(app.style.getPropertyValue('--col-sidebar')).toBe('246px')
+    await fireEvent.keyDown(border, { key: 'ArrowRight' })
+    expect(app.style.getPropertyValue('--col-sidebar')).toBe('262px')
+    expect(JSON.parse(localStorage.getItem('dungeon.columns')!).sidebar).toBe(262)
+    await fireEvent.keyDown(border, { key: 'Home' })
+    expect(border).toHaveAttribute('aria-valuenow', '200')
+    await fireEvent.dblClick(border)
+    expect(app.style.getPropertyValue('--col-sidebar')).toBe('246px')
+    const right = screen.getByRole('separator', { name: 'Resize issues panel' })
+    await fireEvent.keyDown(right, { key: 'ArrowLeft' })
+    expect(app.style.getPropertyValue('--col-quests')).toBe('476px')
+  })
+
   it('reopens the getting-started guide over a running session, and hides it again', async () => {
     fakeServer()
     render(App)

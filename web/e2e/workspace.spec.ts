@@ -66,3 +66,40 @@ test('Escape in the terminal stays terminal input; outside it restores the split
   await page.keyboard.press('Escape')
   await expect(app(page)).not.toHaveAttribute('data-expanded')
 })
+
+test('dragging and key-stepping the borders resizes the terminal and survives a reload', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await openSample(page)
+  await page.getByRole('button', { name: 'Shell', exact: true }).click()
+  const term = page.locator('.pane:not([hidden]) .xterm-rows')
+  await expect(term).toContainText('$')
+  await page.locator('.pane:not([hidden]) .xterm-screen').click()
+  let runs = 0
+  const size = async () => {
+    runs++
+    await page.keyboard.type("echo A$(stty size | tr ' ' x)B")
+    await page.keyboard.press('Enter')
+    await expect.poll(async () => ((await term.textContent()) ?? '').match(/A\d+x\d+B/g)?.length ?? 0).toBe(runs)
+    return (await term.textContent())!.match(/A\d+x\d+B/g)!.at(-1)!
+  }
+  const before = await size()
+  const border = page.getByRole('separator', { name: 'Resize issues panel' })
+  const box = (await border.boundingBox())!
+  await page.mouse.move(box.x + 3, box.y + 300)
+  await page.mouse.down()
+  await page.mouse.move(box.x - 150, box.y + 300, { steps: 6 })
+  await page.mouse.up()
+  await expect(border).toHaveAttribute('aria-valuenow', /^(59\d|6\d\d)$/)
+  await page.locator('.pane:not([hidden]) .xterm-screen').click()
+  expect(await size()).not.toBe(before)
+  await expect(term).toContainText('echo A') // scrollback survived
+  const sidebar = page.getByRole('separator', { name: 'Resize projects panel' })
+  await sidebar.focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(sidebar).toHaveAttribute('aria-valuenow', '262')
+  await page.reload()
+  await expect(page.getByRole('separator', { name: 'Resize projects panel' })).toHaveAttribute('aria-valuenow', '262')
+  await expect(page.getByRole('separator', { name: 'Resize issues panel' })).toHaveAttribute('aria-valuenow', /^(59\d|6\d\d)$/)
+  await page.setViewportSize({ width: 1000, height: 800 })
+  await expect(page.getByRole('separator', { name: 'Resize issues panel' })).toBeHidden()
+})

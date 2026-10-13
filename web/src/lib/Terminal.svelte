@@ -106,17 +106,24 @@
 
     const data = term.onData((d) => sock.sendInput(d))
     const resized = term.onResize(({ cols, rows }) => sock.resize(cols, rows))
+    // One fit per frame, so dragging a column border does not flood the session with resizes.
+    let frame = 0
     const ro = new ResizeObserver(() => {
-      try {
-        fit.fit()
-      } catch {
-        /* hidden or zero-sized: fit on the next resize */
-      }
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        try {
+          fit.fit()
+        } catch {
+          /* hidden or zero-sized: fit on the next resize */
+        }
+      })
     })
     ro.observe(host)
 
     return () => {
       ro.disconnect()
+      if (frame) cancelAnimationFrame(frame)
       data.dispose()
       resized.dispose()
       sock.close()

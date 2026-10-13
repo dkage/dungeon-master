@@ -1,4 +1,5 @@
 import * as realApi from './api'
+import { DEFAULTS, KEY as COLUMNS_KEY, fit, parse as parseColumns, setWidth, type Columns, type Edge } from './columns'
 import { SPLIT, restore, toggle, type Region, type Workspace } from './workspace'
 import type {
   AppState, Campaign, CampaignInput, CampaignPatch, EffortTier, GithubStatus, Hero, HeroesConfig, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
@@ -127,6 +128,18 @@ export class AppStore {
   github = $state<GithubStatus | null>(null)
   /** Whether the quest panel is open on narrow screens. */
   questsOpen = $state(false)
+  /** Saved widths of the side columns, and the window they are shown in. */
+  columns = $state<Columns>(parseColumns(load(COLUMNS_KEY)) ?? DEFAULTS)
+  windowWidth = $state(typeof window === 'undefined' ? 1600 : window.innerWidth)
+  /** The widths in use: saved ones that no longer fit the window fall back to the defaults. */
+  columnWidths = $derived(fit(this.columns, this.windowWidth))
+  setColumns(next: Columns) {
+    this.columns = next
+    save(COLUMNS_KEY, JSON.stringify(next))
+  }
+  resizeColumn(edge: Edge, width: number) {
+    this.setColumns(setWidth(this.columnWidths, edge, width, this.windowWidth))
+  }
   /** The workspace region that fills the application, or null for the split layout. */
   workspace = $state<Workspace>(SPLIT)
   /** Expand a region, or restore the split when it is already expanded. */

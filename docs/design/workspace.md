@@ -3,7 +3,7 @@ status: planned
 milestone: workspace usability
 github_issues: [63, 64, 65, 78]
 tracking: in-gh-issues
-next: column resizing (#78), then the reload decision (#87) and restore (#84), then configurable shortcuts (#65)
+next: reload decision record (#87) and restore (#84), then configurable shortcuts (#65)
 verified: 2026-10-13
 ---
 
@@ -11,7 +11,7 @@ verified: 2026-10-13
 
 The default remains the existing three-panel cockpit and its visual design. All presentations share campaigns,
 sessions, selected issue, map level, filters and geometry. Planning, running and reviewing are activities in this
-workspace, not separate copies of it. Panel expansion (#64) is implemented; the rest of this document specifies future behavior.
+workspace, not separate copies of it. Panel expansion (#64) and column resizing (#78) are implemented; the rest of this document specifies future behavior.
 
 ## Panel expansion
 

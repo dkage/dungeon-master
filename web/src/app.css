@@ -625,3 +625,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .expand-button { padding: 2px 8px; }
 .expand-button[aria-pressed='true'] { border-color: var(--accent); }
 .brand-header .expand-button { margin-left: auto; }
+
+/* Draggable borders between the three columns (wide layout only). */
+.app { position: relative; }
+.col-border { display: none; position: absolute; top: 0; bottom: 0; width: 7px; z-index: 5; cursor: col-resize; touch-action: none; background: transparent; }
+.col-border:hover, .col-border:focus-visible, .col-border.dragging { background: var(--accent); opacity: .6; outline: none; }
+@media (min-width: 1181px) {
+  .app:not([data-expanded]) { grid-template-columns: var(--col-sidebar, 246px) minmax(0, 1fr) var(--col-quests, 460px); }
+  .app:not([data-expanded]) .col-border { display: block; }
+}
+.quests, .sidebar { min-width: 0; }
+.quests :is(.qtitle, .source, .stitle, .cname, .repo) { overflow-wrap: anywhere; }
+.qtools { flex-wrap: wrap; }
