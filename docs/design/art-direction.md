@@ -1,10 +1,10 @@
 ---
 status: current
 milestone: M5a, M6
-github_issues: [28, 44]
+github_issues: [28, 44, 72, 73, 74, 75, 76]
 tracking: in-gh-issues
-next: use for current theme work; review as later art is added
-verified: 2026-10-11
+next: finish the reference's textures and frames in #72; review as later art is added
+verified: 2026-10-13
 ---
 
 # Dungeon theme: art direction
@@ -20,12 +20,13 @@ carry into product work; it is not an asset sheet.
 ## Current theme
 
 The current direction is the Stitch v4 **Gothic Codex**: a warm parchment
-surface framed by dark carved wood and aged brass, with a near-black slate
-terminal and cool blue-gray stone for the map. Muted burgundy and ember accents
-mark selected or active elements. This replaces the first study's black-iron,
-oxblood-glass material emphasis. Follow v4 for composition, contrast, density,
-and material balance; use the original creature art as a compatible map layer,
-not as authority for the whole cockpit.
+terminal page framed by dark carved wood and aged brass, near-black slate
+behind the side panels and cool blue-gray stone for the map. Muted burgundy
+and ember accents mark selected or active elements. This replaces the first
+study's black-iron, oxblood-glass material emphasis. Follow v4 for
+composition, contrast, density, and material balance; use the original
+creature art as a compatible map layer, not as authority for the whole
+cockpit.
 
 The theme selector is a later feature. Build this one coherent Dungeon look
 first, with reusable color and material tokens so another theme can be added

@@ -8,9 +8,9 @@ Status: M0-M4.5 delivered (#7, #19 and #23 are closed). M5a map (#28) is committ
 (a1676ae through 808573b), with its automated checks passed; the milestone remains open. On 2026-10-13, after fetching
 origin, the five implementation commits were not yet published. The revised roadmap/design/skill plans record
 the approved follow-up work separately from that implementation.
-Next: review and publish the M5a increment, then expandable panels/shortcuts (#63) and registered skill sources mapped
-to projects (#43). Priority and verification evidence live in `docs/roadmap.md`; the GitHub open list owns remaining
-scope. Themed words: `GLOSSARY.md`.
+Next: review and publish the M5a increment, then the Dungeon visual baseline (#72), expandable panels/shortcuts (#63)
+and registered skill sources mapped to projects (#43). Priority and verification evidence live in `docs/roadmap.md`;
+the GitHub open list owns remaining scope. Themed words: `GLOSSARY.md`.
 
 Design for work not yet built lives in `docs/` (`architecture.md`, `ideas.md`, `design/`), not in the repo root. Each of
 those files starts with front-matter properties (`status`, `milestone`, `github_issues`, `tracking`, `next`,

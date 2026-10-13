@@ -1,7 +1,7 @@
 ---
 status: current
 milestone: cockpit and workspace focus
-github_issues: [28, 43, 63, 64, 65, 67, 68, 71]
+github_issues: [28, 43, 63, 64, 65, 67, 68, 71, 72, 77]
 tracking: in-gh-issues
 next: finish prototype parity, then expansion/shortcuts; see the roadmap for priority
 verified: 2026-10-13
@@ -367,7 +367,10 @@ is mostly data, not a rewrite:
 Milestones: M3.6 applies the Stitch v4 visual foundation to the Svelte cockpit shell, records the Dungeon/Neutral theme
 choice, ships the glossary and font controls, and establishes the right-panel split. Full theme-pack data seams,
 multiple palettes, pack completeness and contrast tests are deferred until a second pack is approved; do not build a
-generic pack framework ahead of that need. M5a fills the reserved map area with the sprite-backed interactive graph. New packs, such
+generic pack framework ahead of that need. The reference's remaining textures and frames (parchment terminal page,
+slate side panels, framed detail, list rows and headers) are Dungeon baseline work in #72, done with theme tokens and
+plain CSS rather than per-pack component variants; whether the terminal header gets the reference's Clear and Reload
+buttons is decision #77. M5a fills the reserved map area with the sprite-backed interactive graph. New packs, such
 as a starship pack, are a later initiative in `docs/ideas.md`.
 
 ## 7. Keyboard and platform conventions

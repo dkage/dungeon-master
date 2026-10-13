@@ -1,10 +1,10 @@
 ---
 status: current
 milestone: M5a, M6
-github_issues: [23, 28, 44]
+github_issues: [23, 28, 44, 73, 74]
 tracking: in-gh-issues
 next: review assets in the map as it ships; delete when M6 art work closes
-verified: 2026-10-11
+verified: 2026-10-13
 ---
 
 # Art checklist
@@ -42,7 +42,8 @@ Each is one sheet of four idle frames, transparent, 2172 × 724 px (cells 543 ×
 - [x] `design/stitch-prototype/assets/images/slate.png`: dark slate, 1254 × 1254, opaque, generated for this project. Panel
   backgrounds in the prototype.
 - [x] `design/stitch-prototype/assets/images/6a8650faf410.png` and `97785ef87771.png`: one parchment texture, byte-identical,
-  288 × 512, opaque. The terminal's page background. AI-generated (confirmed by the author).
+  288 × 512, opaque. The terminal's page background. AI-generated (confirmed by the author). Not yet bundled in the
+  app; #73 brings it in.
 
 ### Prototype-only copies
 
@@ -107,7 +108,7 @@ generated in one session; all six were checked together at 512 × 512. A flicker
 
 - [x] `design/stitch-prototype/assets/images/slate.png`, done: the slate that replaces the removed texture, behind the side
   panels. It arrived as a 1254 × 1254 PNG of 3.5 MB instead of the planned 512 × 512 JPG; downscale it when the app
-  starts using it. Not yet checked for seamless tiling.
+  starts using it. Not yet checked for seamless tiling. #74 does both and applies it.
   > Seamless tileable texture, 512 × 512: dark slate rock, near black with a hint of warm brown, fine grain and a few
   > shallow cracks, low contrast, even light with no focal point, no text. Match the tone and lighting of the attached
   > stone floor (our own `stone-floor.png`, the only reference to attach). Original, not derived from any photograph

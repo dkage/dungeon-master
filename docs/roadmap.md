@@ -1,7 +1,7 @@
 ---
 status: current
 milestone: all
-github_issues: [28, 63, 43, 45, 67, 68, 61, 69, 70, 71, 44, 58, 35, 36, 37, 38, 39]
+github_issues: [28, 72, 63, 78, 43, 45, 67, 68, 61, 69, 70, 71, 44, 58, 35, 36, 37, 38, 39]
 tracking: in-gh-issues
 next: review and publish the committed map increment, then workspace focus and source-backed skill launch
 verified: 2026-10-13
@@ -45,18 +45,21 @@ checks, committed/published code and a closed milestone. Keep existing issue num
 | Order | Increment | Status | Issues | Design |
 |---|---|---|---|---|
 | 1 | M5a: review and publish the map/list implementation | five local commits; checks passed; milestone open | #28 (#24–#27, #59, #60, #62) | `docs/design/map.md` |
-| 2 | Workspace focus: expand/restore panels and configurable shortcuts | planned | #63 (#64, #65) | `docs/design/workspace.md` |
-| 3 | M5b: registered skill sources mapped to projects, verified method delivery and picker | planned | #43 (#51, #49, #66, #50) | `docs/design/skills.md` |
-| 4 | M7: trustworthy session attention | probe before implementation | #48 → #45; #52 provides real-CLI fixtures | `docs/design/experience.md` |
-| 5 | Ready work and planning before issues | planned | #67, #68; #61 publishes shaped issues | `docs/design/campaign-loop.md` |
-| 6 | Session ownership and continuity | investigation, then implementation | #69 → #70 | `docs/design/sessions.md` |
-| 7 | Outcome review and continuation | planned | #71; #47 verifies killed outcomes on Windows | `docs/design/campaign-loop.md` |
-| 8 | M8: verified portable release and desktop packaging | planned; lifecycle decision precedes shell wiring | #35–#38, #36/#57 | `release/PLAN_RELEASE.md` |
+| 2 | Dungeon visual baseline: parchment terminal, slate panels, framed detail/list/headers | planned | #72 (#73–#77) | `docs/design/art-direction.md` |
+| 3 | Workspace focus: resizable columns, expand/restore panels and configurable shortcuts | planned | #63 (#78, #64, #65) | `docs/design/workspace.md` |
+| 4 | M5b: registered skill sources mapped to projects, verified method delivery and picker | planned | #43 (#51, #49, #66, #50) | `docs/design/skills.md` |
+| 5 | M7: trustworthy session attention | probe before implementation | #48 → #45; #52 provides real-CLI fixtures | `docs/design/experience.md` |
+| 6 | Ready work and planning before issues | planned | #67, #68; #61 publishes shaped issues | `docs/design/campaign-loop.md` |
+| 7 | Session ownership and continuity | investigation, then implementation | #69 → #70 | `docs/design/sessions.md` |
+| 8 | Outcome review and continuation | planned | #71; #47 verifies killed outcomes on Windows | `docs/design/campaign-loop.md` |
+| 9 | M8: verified portable release and desktop packaging | planned; lifecycle decision precedes shell wiring | #35–#38, #36/#57 | `release/PLAN_RELEASE.md` |
 | Later | M6: additional map presentation | deferred until the full workflow is usable | #44 | `docs/design/map.md` |
 
 #69 can run alongside the source/attention work: decide ownership before implementing desktop-window shutdown.
-Finish the existing visual baseline; new prototypes test expanded planning, terminal and reading at ordinary window
-sizes. Keep one workspace model, existing art and the RPG/Neutral presentations. No generic pane manager, plugin
+#72's children have no prerequisites; #76 restyles the panel headers that #64 later extends, so keep room for its
+controls. #77 settles the reference's Clear/Reload buttons before anyone builds them.
+Finish the existing visual baseline (#72); new prototypes test expanded planning, terminal and reading at ordinary
+window sizes. Keep one workspace model, existing art and the RPG/Neutral presentations. No generic pane manager, plugin
 platform, alternate tracker, native-framework rewrite or provider registry is required by this reset.
 
 ## Conditional and platform work
@@ -88,12 +91,19 @@ Snapshot verified 2026-10-13. These are planned issues, not delivered functional
 | [#63](https://github.com/dkage/dungeon-master/issues/63) | Make workspace panels expandable and shortcuts configurable | high | task | — | — |
 | [#64](https://github.com/dkage/dungeon-master/issues/64) | Expand and restore individual workspace panels | moderate | task | #63 | — |
 | [#65](https://github.com/dkage/dungeon-master/issues/65) | Configure workspace shortcuts in Settings | moderate | task | #63 | #64 |
+| [#78](https://github.com/dkage/dungeon-master/issues/78) | Resize the three workspace panels by dragging their borders | moderate | task | #63 | — |
 | [#66](https://github.com/dkage/dungeon-master/issues/66) | Verify and preserve the selected skill invocation contract | high | task | #43 | #49 |
 | [#67](https://github.com/dkage/dungeon-master/issues/67) | Show ready work and waiting sessions with trustworthy dependency reasons | high | task | — | — |
 | [#68](https://github.com/dkage/dungeon-master/issues/68) | Start a planning session before publishing issues | moderate | task | — | #61, #50 |
 | [#69](https://github.com/dkage/dungeon-master/issues/69) | Investigate session ownership, detach and recovery | moderate | research | — | — |
 | [#70](https://github.com/dkage/dungeon-master/issues/70) | Preserve sessions across window closure and support bounded recovery | high | task | — | #69 |
 | [#71](https://github.com/dkage/dungeon-master/issues/71) | Review session outcomes and continue issue work | moderate | task | — | #50 |
+| [#72](https://github.com/dkage/dungeon-master/issues/72) | Finish the Dungeon visual baseline from the reference | high | task | — | — |
+| [#73](https://github.com/dkage/dungeon-master/issues/73) | Show the parchment texture behind the terminal | moderate | task | #72 | — |
+| [#74](https://github.com/dkage/dungeon-master/issues/74) | Use the slate texture behind the side panels | low | task | #72 | — |
+| [#75](https://github.com/dkage/dungeon-master/issues/75) | Frame the issue detail and list rows like the reference | moderate | task | #72 | — |
+| [#76](https://github.com/dkage/dungeon-master/issues/76) | Frame the panel headers and project panel actions | low | task | #72 | — |
+| [#77](https://github.com/dkage/dungeon-master/issues/77) | Decide on Clear and Reload actions for the terminal | low | decision | #72 | — |
 
 The reset revised 16 existing issues, added nine bounded issues, and verified 26 native relationship repairs/additions.
 Affected issues have effort/method labels and concrete scope/evidence. Unchanged legacy items still need label/body

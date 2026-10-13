@@ -1,7 +1,7 @@
 ---
 status: planned
 milestone: workspace usability
-github_issues: [63, 64, 65]
+github_issues: [63, 64, 65, 78]
 tracking: in-gh-issues
 next: review/publish the committed map increment, then implement expansion and configurable shortcuts
 verified: 2026-10-13
@@ -37,6 +37,23 @@ click returns to the previous layout. This is application layout, not operating-
 Implement a small typed workspace state (`expandedRegion`, saved split state), not a general split-pane tree. Buttons,
 shortcuts and future native menus call the same allowlisted semantic actions. Keep issue selection and terminal
 ownership independent of layout.
+
+## Column resizing
+
+The three columns (projects/sessions, terminal, right panel) are resized by dragging the two borders between them
+(#78), the same way the map/list and detail split already works inside the right panel.
+
+- Each border is a focusable separator: arrow keys step its width, Home/End go to the limits, and a double-click or a
+  key returns to the default split. Hover and focus are visible in both appearances.
+- Minimum widths keep every panel usable; the terminal keeps the largest share by default and never drops below a
+  working size.
+- The terminal refits its columns and rows while a border moves and resizes the running session, with updates
+  coalesced during a drag. Scrollback and the session survive every resize.
+- The other panels reflow: text wraps or truncates with a tooltip, controls wrap instead of overflowing, and the map
+  refits to its area.
+- Column widths are remembered per browser next to the map/detail split. Saved widths that no longer fit the window
+  fall back to defaults; below the drawer breakpoint the narrow layout applies and saved widths never hide a panel.
+- The saved column widths are the split geometry that Restore split (§Panel expansion) returns to.
 
 ## Shortcuts settings
 
