@@ -1,7 +1,7 @@
 ---
 status: current
 milestone: all
-github_issues: [28, 72, 63, 78, 79, 43, 45, 67, 68, 61, 69, 70, 71, 44, 58, 35, 36, 37, 38, 39]
+github_issues: [28, 72, 63, 78, 79, 43, 45, 67, 68, 61, 69, 70, 71, 151, 44, 58, 35, 36, 37, 38, 39]
 tracking: in-gh-issues
 next: workspace focus and source-backed skill launch
 verified: 2026-10-13
@@ -54,7 +54,7 @@ checks, committed/published code and a closed milestone. Keep existing issue num
 | 8 | Session ownership and continuity | investigation, then implementation | #69 → #70 | `docs/design/sessions.md` |
 | 9 | Outcome review and continuation | planned | #71; #47 verifies killed outcomes on Windows | `docs/design/campaign-loop.md` |
 | 10 | M8: verified portable release and desktop packaging | planned; lifecycle decision precedes shell wiring | #35–#38, #36/#57 | `release/PLAN_RELEASE.md` |
-| Later | M6: additional map presentation | deferred until the full workflow is usable | #44 | `docs/design/map.md` |
+| Later | M6 / v2: rework the map view as a whole | deferred until the full workflow is usable | #151 (#44) | `docs/design/map.md` |
 
 #69 can run alongside the source/attention work: decide ownership before implementing desktop-window shutdown.
 #72 is done: #76 restyled the panel headers that #64 later extends, so keep room for its controls. #77 decided to omit
