@@ -229,6 +229,43 @@ test('Shift+Enter sends the new-line sequence while plain Enter still sends a ca
   expect(sent.filter((x) => x === '\r')).toHaveLength(1)
 })
 
+// Fires a paste or drop carrying one file (or text) at the terminal, the way the browser would.
+async function sendTransfer(page: Page, kind: 'paste' | 'drop', file: { name: string; type: string; bytes: number[] } | { text: string }) {
+  await page.locator('.pane:not([hidden]) .term-host').evaluate((host, args) => {
+    const dt = new DataTransfer()
+    if ('text' in args.file) dt.setData('text/plain', args.file.text)
+    else dt.items.add(new File([new Uint8Array(args.file.bytes)], args.file.name, { type: args.file.type }))
+    const ev = args.kind === 'paste'
+      ? new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })
+      : new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true })
+    host.querySelector('textarea')!.dispatchEvent(ev)
+  }, { kind, file })
+}
+const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0]
+
+test('a pasted image or dropped file arrives as its stored path, text paste is unchanged, refusals are explained', async ({ page }) => {
+  await open(page)
+  await hero(page, 'Opus').click()
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await page.locator('.pane:not([hidden]) .xterm').click()
+
+  await sendTransfer(page, 'paste', { text: 'plain words' })
+  await expect(screenText(page)).toContainText('plain words')
+
+  await sendTransfer(page, 'paste', { name: 'shot.png', type: 'image/png', bytes: PNG })
+  await expect(screenText(page)).toContainText('-shot.png')
+  await sendTransfer(page, 'drop', { name: 'notes.txt', type: 'text/plain', bytes: Array.from(Buffer.from('some notes\n')) })
+  await expect(screenText(page)).toContainText('-notes.txt')
+  // Nothing was submitted by either insertion.
+  await expect(screenText(page)).not.toContainText('echo:plain')
+
+  const note = page.locator('.pane:not([hidden]) .term-note')
+  await sendTransfer(page, 'drop', { name: 'tool.bin', type: 'application/octet-stream', bytes: [0x7f, 0x45, 0x4c, 0x46, 2, 1, 1, 0] })
+  await expect(note).toContainText('only images, PDF and plain text')
+  await sendTransfer(page, 'paste', { name: 'empty.png', type: 'image/png', bytes: [] })
+  await expect(note).toContainText('empty.png is empty')
+})
+
 test('Getting started opens the guide over a session, after dismissal and after a reload', async ({ page }) => {
   await open(page)
   await hero(page, 'Opus').click()

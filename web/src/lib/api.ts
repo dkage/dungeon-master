@@ -314,3 +314,11 @@ export function termUrl(id: string, loc: Pick<Location, 'protocol' | 'host'> = l
   const scheme = loc.protocol === 'https:' ? 'wss' : 'ws'
   return `${scheme}://${loc.host}/api/sessions/${encodeURIComponent(id)}/term`
 }
+
+export interface UploadedFile {
+  path: string
+  kind: 'image' | 'pdf' | 'text'
+}
+/** Stores a pasted or dropped file for a live session and returns where it now lives. */
+export const uploadToSession = (id: string, name: string, data: string) =>
+  call<UploadedFile>('POST', `/api/sessions/${encodeURIComponent(id)}/uploads`, { name, data }) as Promise<UploadedFile>

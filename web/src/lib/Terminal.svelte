@@ -4,11 +4,12 @@
   import { FitAddon } from '@xterm/addon-fit'
   import '@xterm/xterm/css/xterm.css'
   import './terminal.css'
-  import { termUrl } from './api'
+  import { termUrl, uploadToSession } from './api'
   import { TermSocket } from './termsocket'
   import { TERM_THEMES, dimStyles } from './termTheme'
   import { terminalTypography } from './termOptions'
   import { keyInput } from './termKeys'
+  import { fileToBase64, filesOf, pathsText, refusal } from './termUpload'
 
   let {
     sessionId,
@@ -21,6 +22,10 @@
   let terminal = $state.raw<Terminal>()
   let status = $state<'connecting' | 'live' | 'exited' | 'disconnected'>('connecting')
   let detail = $state('')
+  // A short message about a refused paste or drop, and whether a drag is over the terminal.
+  let note = $state('')
+  let dropping = $state(false)
+  let noteTimer: ReturnType<typeof setTimeout> | undefined
 
   $effect(() => {
     if (terminal) terminal.options.fontSize = fontSize
@@ -112,6 +117,61 @@
       },
     })
 
+    // Files pasted or dropped become a path in the prompt, inserted at the
+    // cursor through xterm's paste so the agent sees one paste and nothing
+    // is submitted. Plain text pastes are left to xterm.
+    function tell(msg: string) {
+      note = msg
+      clearTimeout(noteTimer)
+      noteTimer = setTimeout(() => (note = ''), 6000)
+    }
+    async function sendFiles(files: File[]) {
+      if (status !== 'live') return tell('The session is not running, so the file was not added.')
+      const paths: string[] = []
+      for (const file of files) {
+        const why = refusal(file)
+        if (why) {
+          tell(why)
+          continue
+        }
+        try {
+          paths.push((await uploadToSession(sessionId, file.name, await fileToBase64(file))).path)
+        } catch (e) {
+          tell(`${file.name || 'The file'} was not added: ${e instanceof Error ? e.message : 'upload failed'}`)
+        }
+      }
+      if (paths.length) {
+        note = ''
+        term.paste(pathsText(paths))
+        term.focus()
+      }
+    }
+    const onPaste = (ev: ClipboardEvent) => {
+      const files = filesOf(ev.clipboardData)
+      if (!files.length) return
+      ev.preventDefault()
+      ev.stopPropagation()
+      void sendFiles(files)
+    }
+    const hasFiles = (ev: DragEvent) => Array.from(ev.dataTransfer?.types ?? []).includes('Files')
+    const onDragOver = (ev: DragEvent) => {
+      if (!hasFiles(ev)) return
+      ev.preventDefault()
+      dropping = true
+    }
+    const onDragLeave = () => (dropping = false)
+    const onDrop = (ev: DragEvent) => {
+      dropping = false
+      const files = filesOf(ev.dataTransfer)
+      if (!files.length) return
+      ev.preventDefault()
+      void sendFiles(files)
+    }
+    host.addEventListener('paste', onPaste, true)
+    host.addEventListener('dragover', onDragOver)
+    host.addEventListener('dragleave', onDragLeave)
+    host.addEventListener('drop', onDrop)
+
     const data = term.onData((d) => sock.sendInput(d))
     const resized = term.onResize(({ cols, rows }) => sock.resize(cols, rows))
     // One fit per frame, so dragging a column border does not flood the session with resizes.
@@ -131,6 +191,11 @@
 
     return () => {
       ro.disconnect()
+      clearTimeout(noteTimer)
+      host.removeEventListener('paste', onPaste, true)
+      host.removeEventListener('dragover', onDragOver)
+      host.removeEventListener('dragleave', onDragLeave)
+      host.removeEventListener('drop', onDrop)
       if (frame) cancelAnimationFrame(frame)
       data.dispose()
       resized.dispose()
@@ -143,9 +208,12 @@
 <div class="term-wrap">
   <!-- The addon measures its parent's width and ignores that parent's padding, so xterm
        lives in an unpadded host inside the padded frame. -->
-  <div class="term" data-testid="terminal" data-term-theme={theme}>
+  <div class="term" data-testid="terminal" data-term-theme={theme} data-dropping={dropping}>
     <div class="term-host" bind:this={host}></div>
   </div>
+  {#if note}
+    <div class="term-note" role="status">{note}</div>
+  {/if}
   {#if status !== 'live'}
     <div class="term-status" data-status={status} role="status">
       {status === 'connecting' ? 'Connecting…' : status === 'exited' ? `Session ${detail}` : `Disconnected: ${detail}`}
