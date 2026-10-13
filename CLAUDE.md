@@ -5,10 +5,10 @@ an agent CLI in a PTY with its model, flags and context already set. Go server w
 webview shell.
 
 Status: M0-M4.5 delivered (#7, #19 and #23 are closed). M5a map (#28) is published (commits a1676ae through 808573b,
-plus the review fixes #123-#127, are in `origin/master`) and every child issue is closed; #28 itself awaits closure.
+plus the review fixes #123-#127, are in `origin/master`) and #28 and every child issue are closed.
 The map is to be reworked as a whole in v2 (#44); the revised roadmap/design/skill plans record the approved follow-up
 work separately.
-Next: close M5a, then the Dungeon visual baseline (#72), expandable panels/shortcuts (#63)
+Next: expandable panels/shortcuts (#63)
 and registered skill sources mapped to projects (#43). Priority and verification evidence live in `docs/roadmap.md`;
 the GitHub open list owns remaining scope. Themed words: `GLOSSARY.md`.
 

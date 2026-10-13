@@ -3,7 +3,7 @@ status: current
 milestone: all
 github_issues: [28, 72, 63, 78, 79, 43, 45, 67, 68, 61, 69, 70, 71, 44, 58, 35, 36, 37, 38, 39]
 tracking: in-gh-issues
-next: close #28, then workspace focus and source-backed skill launch
+next: workspace focus and source-backed skill launch
 verified: 2026-10-13
 ---
 
@@ -17,7 +17,7 @@ checks, committed/published code and a closed milestone. Keep existing issue num
 
 - M0 through M4.5 are delivered; #7, #19 and #23 and their implementation children are closed. M4.5's old
   "closes when pushed" status was stale.
-- M5a (#28) is open. Its implementation, assets, shared model/layout, effort APIs and tests are published: the five
+- M5a (#28) is closed (2026-10-13). Its implementation, assets, shared model/layout, effort APIs and tests are published: the five
   commits a1676ae, 4f5b6f9, 7a25fbd, 01a461a and 808573b are in `origin/master`, and CI passed on 0daab09.
 - A code review of those commits (recorded as a comment on #28) found ten issues. Their fixes are published and
   #123 to #127 are closed: chain-end marker, parent cycles, list epic filter, colliding label keys, creatures computed
@@ -44,7 +44,7 @@ checks, committed/published code and a closed milestone. Keep existing issue num
 
 | Order | Increment | Status | Issues | Design |
 |---|---|---|---|---|
-| 1 | M5a: close the map/list milestone | published with its review fixes; all children closed; #28 awaits closure | #28 (#24–#27, #59, #60, #62) | `docs/design/map.md` |
+| 1 | M5a: map and list for a project's issues and dependencies | done; published with its review fixes, #28 and all children closed | #28 (#24–#27, #59, #60, #62) | `docs/design/map.md` |
 | 2 | Dungeon visual baseline: parchment terminal, slate panels, framed detail/list/headers | done; differences recorded in `docs/design/art-direction.md` | #72 (#73–#77, #93, #96–#99) | `docs/design/art-direction.md` |
 | 3 | Workspace focus: resizable columns, expand/restore panels and configurable shortcuts | planned | #63 (#78, #64, #65) | `docs/design/workspace.md` |
 | 4 | Parallel work: several issue sessions of one project, each in its own working copy, with session tabs | research, then implementation | #79 (#80 → #81, #82) | `docs/design/sessions.md` |
