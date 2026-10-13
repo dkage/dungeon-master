@@ -139,7 +139,7 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 		History:   hist,
 
 		Appearance: appearance.Open(filepath.Join(dir, "appearance.json")),
-		Quests:    qsvc,
+		Quests:     qsvc,
 
 		Quartermaster: qm,
 		Gatekeeper:    gate,
