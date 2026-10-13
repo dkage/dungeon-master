@@ -248,3 +248,33 @@ test('remembers the split between the map and the detail', async ({ page }) => {
   await nav(page).getByRole('button', { name: /^Sample/ }).first().click()
   await expect(panel(page).getByRole('separator', { name: 'Resize the map and the detail' })).toHaveAttribute('aria-valuenow', '57')
 })
+
+for (const theme of ['dungeon', 'neutral'] as const) {
+  test(`finds the panel header and footer controls by role in the ${theme} appearance`, async ({ page }) => {
+    await page.addInitScript((t) => localStorage.setItem('dungeon.appearance', JSON.stringify({ theme: t })), theme)
+    await openSample(page)
+    const toggle = panel(page).getByRole('group', { name: 'Show as' })
+    await toggle.getByRole('button', { name: 'List' }).click()
+    await expect(toggle.getByRole('button', { name: 'List', pressed: true })).toBeVisible()
+    await toggle.getByRole('button', { name: 'Map' }).click()
+    await expect(toggle.getByRole('button', { name: 'Map', pressed: true })).toBeVisible()
+
+    const side = page.locator('.sidebar')
+    const framed = (name: string) => side.getByRole('button', { name, exact: true }).evaluate((e) => parseFloat(getComputedStyle(e).borderTopWidth))
+    const border = await framed('⚙ Settings')
+    if (theme === 'dungeon') expect(border).toBeGreaterThan(0)
+    else expect(border).toBe(0)
+    expect(await panel(page).locator('.qtitle .gem').isVisible()).toBe(theme === 'dungeon')
+
+    await side.getByRole('button', { name: '＋ Add project' }).click()
+    await expect(side.getByRole('button', { name: '× Cancel' })).toBeVisible()
+    await side.getByRole('button', { name: '× Cancel' }).click()
+    await side.getByRole('button', { name: '⚙ Settings' }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await side.getByRole('button', { name: 'Word guide' }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(side.getByRole('button', { name: 'Getting started' })).toBeVisible()
+  })
+}

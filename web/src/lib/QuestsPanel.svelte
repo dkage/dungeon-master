@@ -100,6 +100,7 @@
   <section class="quest-browser" class:mapmode={view === 'map' && !!result && !asking} aria-label="Quest browser">
     <header class="qhead">
       <div class="qtitle">
+        <span class="gem" aria-hidden="true"></span>
         <h2><Term word="quest" mode={store.appearance.wordMode} /></h2>
         {#if result}
           <span class="source" class:demo={result.source === 'demo'}>
