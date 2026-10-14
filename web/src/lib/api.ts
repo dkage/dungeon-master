@@ -375,6 +375,61 @@ export const getAppearance = () => call<AppearanceState>('GET', '/api/appearance
 export const saveAppearance = (settings: Partial<UISettings>) =>
   call<AppearanceState>('PUT', '/api/appearance', settings) as Promise<AppearanceState>
 
+// Skill sources: registered folders and pinned repositories, and how each project uses them.
+export interface SkillSource {
+  id: string
+  name: string
+  kind: 'folder' | 'git'
+  location: string
+  /** The ref the user asked for; blank follows the remote's default branch. */
+  pin?: string
+  enabled: boolean
+  license?: string
+  notice?: string
+  /** The last checkout that worked (Git only); a failed refresh leaves it in place. */
+  verified?: { revision: string; at: string }
+  error?: { message: string; at: string }
+}
+export interface SkillSourceReport { sourceId: string; count: number; warnings: string[]; unavailable?: string }
+export interface SkillSuggestion { key: string; name: string; location: string; license: string; notice: string }
+export interface SkillSourcesState { sources: SkillSource[]; suggestions: SkillSuggestion[]; reports: SkillSourceReport[] }
+/** A source as one project sees it: `enabled` is for that project, `override` says the project lists it itself. */
+export interface ProjectSkillSource extends SkillSource { override: boolean }
+export interface SkillSourceInput { name?: string; kind?: 'folder' | 'git'; location?: string; pin?: string; suggestion?: string }
+export interface SkillSourcePatch { name?: string; enabled?: boolean; pin?: string; location?: string }
+
+export interface SkillEntry {
+  /** Source-qualified identity, "<source id>/<name>". */
+  id: string
+  sourceId: string
+  sourceName: string
+  revision?: string
+  name: string
+  description: string
+  path: string
+  dir: string
+  file: string
+  userInvocable: boolean
+  shadowed: boolean
+  shadowedBy?: string
+}
+export interface SkillCatalog { entries: SkillEntry[]; reports: SkillSourceReport[] }
+
+const skillSource = (id: string) => `/api/skill-sources/${encodeURIComponent(id)}`
+export const getSkillSources = () => call<SkillSourcesState>('GET', '/api/skill-sources') as Promise<SkillSourcesState>
+export const addSkillSource = (input: SkillSourceInput) => call<SkillSource>('POST', '/api/skill-sources', input) as Promise<SkillSource>
+export const updateSkillSource = (id: string, patch: SkillSourcePatch) => call<SkillSource>('PATCH', skillSource(id), patch) as Promise<SkillSource>
+export const refreshSkillSource = (id: string) => call<SkillSource>('POST', `${skillSource(id)}/refresh`, {}) as Promise<SkillSource>
+export const removeSkillSource = (id: string) => call<void>('DELETE', skillSource(id)) as Promise<void>
+export const reorderSkillSources = (ids: string[]) => call<SkillSourcesState>('PUT', '/api/skill-sources/order', { ids }) as Promise<SkillSourcesState>
+export const getProjectSkillSources = (campaignId: string) =>
+  call<{ sources: ProjectSkillSource[] }>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/skill-sources`) as Promise<{ sources: ProjectSkillSource[] }>
+/** An empty list returns the project to the inherited defaults. */
+export const setProjectSkillSources = (campaignId: string, sources: { sourceId: string; enabled: boolean }[]) =>
+  call<{ sources: ProjectSkillSource[] }>('PUT', `/api/campaigns/${encodeURIComponent(campaignId)}/skill-sources`, { sources }) as Promise<{ sources: ProjectSkillSource[] }>
+export const getProjectSkills = (campaignId: string) =>
+  call<SkillCatalog>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/skills`) as Promise<SkillCatalog>
+
 /** A cheap request that only asks whether the backend answers; the result goes to the connection state. */
 export async function pingBackend(): Promise<boolean> {
   try {

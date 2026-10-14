@@ -196,3 +196,39 @@ describe('api', () => {
     expect(termUrl('s1', { protocol: 'https:', host: 'x.test' })).toBe('wss://x.test/api/sessions/s1/term')
   })
 })
+
+describe('skill sources', () => {
+  it('uses guarded, escaped endpoints for every source and project call', async () => {
+    const f = mockFetch(200, {})
+    const api = await import('./api')
+    await api.getSkillSources()
+    await api.addSkillSource({ name: 'x', kind: 'folder', location: '/s' })
+    await api.updateSkillSource('a/b', { enabled: false })
+    await api.refreshSkillSource('a/b')
+    await api.reorderSkillSources(['b', 'a'])
+    await api.getProjectSkillSources('c/1')
+    await api.setProjectSkillSources('c/1', [{ sourceId: 'a', enabled: true }])
+    await api.getProjectSkills('c/1')
+    const calls = f.mock.calls as unknown as [string, RequestInit][]
+    expect(calls.map(([u, i]) => `${i.method} ${u}`)).toEqual([
+      'GET /api/skill-sources',
+      'POST /api/skill-sources',
+      'PATCH /api/skill-sources/a%2Fb',
+      'POST /api/skill-sources/a%2Fb/refresh',
+      'PUT /api/skill-sources/order',
+      'GET /api/campaigns/c%2F1/skill-sources',
+      'PUT /api/campaigns/c%2F1/skill-sources',
+      'GET /api/campaigns/c%2F1/skills',
+    ])
+    expect(JSON.parse(calls[1][1].body as string)).toEqual({ name: 'x', kind: 'folder', location: '/s' })
+    expect(JSON.parse(calls[4][1].body as string)).toEqual({ ids: ['b', 'a'] })
+    expect(calls[1][1].headers).toEqual({ 'Content-Type': 'application/json' })
+  })
+
+  it('removing a source expects an empty answer', async () => {
+    const f = mockFetch(204)
+    const api = await import('./api')
+    await expect(api.removeSkillSource('a')).resolves.toBeUndefined()
+    expect((f.mock.calls[0] as unknown as [string, RequestInit])[1].method).toBe('DELETE')
+  })
+})
