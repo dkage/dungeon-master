@@ -17,7 +17,9 @@ const root = mkdtempSync(join(tmpdir(), 'dungeon-e2e-'))
 const home = join(root, 'home')
 const workdir = join(root, 'work')
 const fakeBin = join(root, 'bin')
-for (const d of [home, workdir, fakeBin]) mkdirSync(d)
+// The user's own home, so skill discovery never reads the real one.
+const userhome = join(root, 'userhome')
+for (const d of [home, workdir, fakeBin, userhome]) mkdirSync(d)
 // Build portable stub executables for the real PTY and shim.
 const fixture = join(fakeBin, 'fixture' + suffix)
 execFileSync('go', ['build', '-o', fixture, './internal/testutil/cmd/fixture'], { cwd: resolve(here, '../..') })
@@ -140,6 +142,8 @@ const child = spawn(bin, ['serve', '--addr', `127.0.0.1:${port}`], {
   env: {
     ...process.env,
     DUNGEON_HOME: home,
+    HOME: userhome,
+    USERPROFILE: userhome,
     GH_TOKEN: 'e2e-token',
     DUNGEON_GITHUB_ENDPOINT: githubUrl,
     PATH: `${fakeBin}${delimiter}${process.env.PATH}`,
@@ -153,7 +157,7 @@ child.stdout.on('data', (d) => {
   buf += d
   const m = buf.match(/http:\/\/127\.0\.0\.1:\d+\/\?token=[0-9a-f]+/)
   if (m) {
-    writeFileSync(join(here, '.url.json'), JSON.stringify({ url: m[0], workdir, subdir, plaindir, ghLog }))
+    writeFileSync(join(here, '.url.json'), JSON.stringify({ url: m[0], workdir, subdir, plaindir, ghLog, userhome }))
     buf = ''
   }
   process.stdout.write(d)

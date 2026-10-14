@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,7 +10,7 @@ import { test } from './fixtures'
 // and show that the project's own files are left alone. Repositories are local fixtures: no network.
 
 const here = dirname(fileURLToPath(import.meta.url))
-const { url, workdir } = JSON.parse(readFileSync(join(here, '.url.json'), 'utf8')) as { url: string; workdir: string }
+const { url, workdir, userhome } = JSON.parse(readFileSync(join(here, '.url.json'), 'utf8')) as { url: string; workdir: string; userhome: string }
 
 const skill = (name: string, description: string) => `---\nname: ${name}\ndescription: ${description}\n---\n# ${name}\n`
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Campaigns' })
@@ -191,4 +191,60 @@ test('a source can be registered, reordered and removed with the keyboard alone'
   await page.keyboard.press('Enter')
   await expect(section.getByRole('listitem').filter({ hasText: 'Keys' })).toHaveCount(0)
   await clearSources(page)
+})
+
+test('skills Claude already finds are opt-in, show where they were found, and carry compatibility notes', async ({ page }) => {
+  const fx = fixtures()
+  // A flagged skill in a registered source; one in the user's folder; one in an installed plugin.
+  mkdirSync(join(fx.folder, 'publish'), { recursive: true })
+  writeFileSync(join(fx.folder, 'publish', 'SKILL.md'), skill('publish', 'open an issue') + 'Then run gh issue create.\n')
+  const userSkills = join(userhome, '.claude', 'skills')
+  mkdirSync(join(userSkills, 'shout'), { recursive: true })
+  writeFileSync(join(userSkills, 'shout', 'SKILL.md'), skill('shout', 'say it loudly'))
+  const plugin = join(userhome, '.claude', 'plugins', 'cache', 'market', 'helper', '1.0')
+  mkdirSync(join(plugin, 'skills', 'helper-skill'), { recursive: true })
+  writeFileSync(join(plugin, 'skills', 'helper-skill', 'SKILL.md'), skill('helper-skill', 'from a plugin'))
+  writeFileSync(join(userhome, '.claude', 'plugins', 'installed_plugins.json'), JSON.stringify({ version: 2, plugins: { 'helper@market': [{ installPath: plugin }] } }))
+  const discovery = (d: Record<string, boolean>) => page.request.put('/api/skill-sources/discovery', { headers: { 'Content-Type': 'application/json' }, data: d })
+
+  try {
+    await page.goto(url)
+    await clearSources(page)
+    await discovery({ project: false, user: false, plugins: false })
+    const section = await openSettings(page)
+
+    // Registered source: its flagged skill is a hint, listed under compatibility notes.
+    await section.getByRole('button', { name: 'New source' }).click()
+    await section.getByLabel('Name').fill('Mine')
+    await section.getByLabel('Path').fill(fx.folder)
+    await section.getByRole('button', { name: 'Register' }).click()
+    await section.getByText('Compatibility notes (1)').click()
+    await expect(section.getByText('publish', { exact: true })).toBeVisible()
+    await expect(section.getByText(/Mentions creating or changing GitHub issues/)).toBeVisible()
+
+    // Off until chosen: nothing is found.
+    await expect(section.getByLabel(/Your skill folders/)).not.toBeChecked()
+    await expect(section.getByRole('list', { name: /Found automatically/ })).toHaveCount(0)
+
+    await section.getByLabel(/Your skill folders/).check()
+    const found = section.getByRole('list', { name: /Found automatically/ })
+    await expect(found.getByText('Your skills (~/.claude/skills)')).toBeVisible()
+    await expect(found.getByText('user', { exact: true })).toBeVisible()
+    await section.getByLabel(/Installed Claude plugins/).check()
+    await expect(found.getByText('Plugin: helper')).toBeVisible()
+
+    // The catalog names where each was found, and registered sources come first.
+    const state = await (await page.request.get('/api/state')).json()
+    const camp = state.campaigns.find((c: { name: string }) => c.name === 'demo')
+    const entries = (await (await page.request.get(`/api/campaigns/${camp.id}/skills`)).json()).entries as { name: string; origin: string }[]
+    expect(entries.map((e) => `${e.origin}:${e.name}`)).toEqual(['registered:publish', 'registered:review', 'registered:tdd', 'user:shout', 'plugin:helper-skill'])
+
+    // Turning a place off removes its skills from the catalog again.
+    await section.getByLabel(/Your skill folders/).uncheck()
+    await expect.poll(async () => ((await (await page.request.get(`/api/campaigns/${camp.id}/skills`)).json()).entries as { origin: string }[]).some((e) => e.origin === 'user')).toBe(false)
+  } finally {
+    await discovery({ project: false, user: false, plugins: false })
+    rmSync(join(userhome, '.claude'), { recursive: true, force: true })
+    await clearSources(page)
+  }
 })
