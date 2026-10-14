@@ -163,3 +163,32 @@ test('the section is usable at a narrow width', async ({ page }) => {
   const box = await section.getByRole('group', { name: 'Register a source' }).boundingBox()
   expect(box!.x + box!.width).toBeLessThanOrEqual(420)
 })
+
+test('a source can be registered, reordered and removed with the keyboard alone', async ({ page }) => {
+  const fx = fixtures()
+  await page.goto(url)
+  await clearSources(page)
+  const section = await openSettings(page)
+  await section.getByRole('button', { name: 'New source' }).focus()
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('Keys')
+  await page.keyboard.press('Tab') // Kind
+  await page.keyboard.press('Tab') // Path
+  await page.keyboard.type(fx.folder)
+  await section.getByRole('button', { name: 'Register' }).focus()
+  await page.keyboard.press('Enter')
+  const row = section.getByRole('listitem').filter({ hasText: 'Keys' }).first()
+  await expect(row.getByLabel('2 skills')).toBeVisible()
+  // Toggle with the space bar, then remove with Enter on the buttons.
+  await row.getByLabel('Use Keys').focus()
+  await page.keyboard.press('Space')
+  await expect(row.getByLabel('Use Keys')).not.toBeChecked()
+  const remove = row.getByRole('button', { name: 'Remove' })
+  await expect(remove).toBeEnabled() // the list reloads after a change; its buttons are off meanwhile
+  await remove.focus()
+  await page.keyboard.press('Enter')
+  await section.getByRole('button', { name: 'Remove source' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(section.getByRole('listitem').filter({ hasText: 'Keys' })).toHaveCount(0)
+  await clearSources(page)
+})
