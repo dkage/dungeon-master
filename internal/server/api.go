@@ -21,6 +21,7 @@ import (
 	"github.com/dkage/dungeon-master/internal/platform"
 	"github.com/dkage/dungeon-master/internal/quests"
 	"github.com/dkage/dungeon-master/internal/session"
+	"github.com/dkage/dungeon-master/internal/worktree"
 )
 
 const (
@@ -82,6 +83,10 @@ type sessionJSON struct {
 	// Lost is a session that was running when Dungeon Master last stopped; its
 	// terminal is gone and only the record remains.
 	Lost bool `json:"lost,omitempty"`
+	// Copy and Branch name the working copy an issue session runs in; empty
+	// for a session in the project's main working tree.
+	Copy   string `json:"copy,omitempty"`
+	Branch string `json:"branch,omitempty"`
 }
 
 type stateJSON struct {
@@ -129,7 +134,7 @@ func (s *Server) sessionViews() []sessionJSON {
 		}
 		v := sessionJSON{
 			ID: r.ID, Kind: r.Kind, Hero: r.Hero, Quest: r.Quest, Title: r.Title, Campaign: r.Campaign,
-			Dir: r.Dir, Created: r.Created, Lost: r.Lost,
+			Dir: r.Dir, Created: r.Created, Lost: r.Lost, Copy: r.Copy, Branch: r.Branch,
 			Exited: r.Ended != nil, ExitCode: r.ExitCode,
 		}
 		if live, ok := s.cfg.Sessions.Get(r.ID); ok {
@@ -451,8 +456,13 @@ type createReq struct {
 	// BriefingID refers only to a preview created by this server for the same
 	// campaign, quest, and hero; it is never interpreted as a filesystem path.
 	BriefingID string `json:"briefingId,omitempty"`
-	Cols       int    `json:"cols"`
-	Rows       int    `json:"rows"`
+	// WorkingCopy is "copy" (the issue gets its own git worktree) or "main"
+	// (the project's main working tree, the default). Carry lists top-level
+	// entries of the main tree to bring into a copy: name -> "copy" or "link".
+	WorkingCopy string            `json:"workingCopy,omitempty"`
+	Carry       map[string]string `json:"carry,omitempty"`
+	Cols        int               `json:"cols"`
+	Rows        int               `json:"rows"`
 }
 
 func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -475,6 +485,18 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Quest < 0 || (req.Quest == 0 && req.BriefingID != "") {
 		httpErr(w, http.StatusBadRequest, "invalid quest briefing reference")
+		return
+	}
+	if req.WorkingCopy != "" && req.WorkingCopy != "main" && req.WorkingCopy != "copy" {
+		httpErr(w, http.StatusBadRequest, "workingCopy must be main or copy")
+		return
+	}
+	if (req.WorkingCopy == "copy" || len(req.Carry) > 0) && req.Quest == 0 {
+		httpErr(w, http.StatusBadRequest, "a working copy is only for an issue session")
+		return
+	}
+	if len(req.Carry) > 0 && req.WorkingCopy != "copy" {
+		httpErr(w, http.StatusBadRequest, "carry needs a working copy")
 		return
 	}
 	if req.Quest > 0 && (req.Hero == "" || req.Shell) {
@@ -531,8 +553,18 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 				httpErrCode(w, http.StatusConflict, "quest_not_startable", reason)
 				return
 			}
-			if existing := s.activeQuestSessionFor(camp); existing != nil && !camp.ParallelQuests {
-				httpErrCode(w, http.StatusConflict, "quest_session_active", fmt.Sprintf("%s is already working in this Git working tree.", existing.Title))
+			// One active session per issue, and one per working copy.
+			if existing := s.activeIssueSession(camp, d.Number); existing != nil {
+				httpErrCode(w, http.StatusConflict, "quest_session_active", fmt.Sprintf("%s already has a session.", existing.Title))
+				return
+			}
+			if req.WorkingCopy == "copy" {
+				if camp.GitRoot == "" || s.cfg.Worktrees == nil {
+					httpErrCode(w, http.StatusConflict, "working_copy_unavailable", "A working copy needs the project to be in a Git repository.")
+					return
+				}
+			} else if existing := s.activeQuestSessionFor(camp); existing != nil && !camp.ParallelQuests {
+				httpErrCode(w, http.StatusConflict, "quest_session_active", fmt.Sprintf("%s is already working in this Git working tree. Start this one in its own working copy.", existing.Title))
 				return
 			}
 			plan, err := s.questLaunchPlan(camp, d, h, req.BriefingID)
@@ -560,17 +592,47 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	spec.Dir, spec.Cols, spec.Rows = camp.Dir, cols, rows
 
+	var wc *worktree.Copy
+	if req.WorkingCopy == "copy" {
+		c, err := s.makeWorkingCopy(r.Context(), camp, questNumber, req.Carry)
+		if err != nil {
+			code := http.StatusInternalServerError
+			if errors.Is(err, worktree.ErrCarry) {
+				httpErr(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			if errors.Is(err, worktree.ErrBranchInUse) {
+				httpErrCode(w, http.StatusConflict, "quest_session_active", "This issue already has a working copy in use.")
+				return
+			}
+			httpErr(w, code, "could not prepare the working copy: "+err.Error())
+			return
+		}
+		wc = &c
+		spec.Dir = s.copyDir(camp, c)
+	}
+	dropCopy := func() {
+		if wc != nil {
+			_, _ = s.cfg.Worktrees.Remove(context.Background(), camp.GitRoot, *wc)
+		}
+	}
+
 	sess, err := s.cfg.Sessions.Spawn(spec)
 	if err != nil {
+		dropCopy()
 		httpErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	rec := history.Record{
 		ID: sess.ID, Campaign: camp.ID, Kind: spec.Meta["kind"], Hero: spec.Meta["hero"],
-		Quest: questNumber, Title: spec.Meta["title"], Dir: camp.Dir, Created: sess.Created.UTC(),
+		Quest: questNumber, Title: spec.Meta["title"], Dir: spec.Dir, Created: sess.Created.UTC(),
+	}
+	if wc != nil {
+		rec.Copy, rec.Branch, rec.CopyStart = wc.Path, wc.Branch, wc.Start
 	}
 	if err := s.cfg.History.Add(rec); err != nil {
 		s.cfg.Sessions.Remove(sess.ID)
+		dropCopy()
 		httpErr(w, http.StatusInternalServerError, "could not record the session: "+err.Error())
 		return
 	}
@@ -595,13 +657,14 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	// Closing a running session stops the agent and everything it started.
-	// The record is kept, marked as stopped by the user; a finished session's
-	// record is simply dropped.
-	if known, ok := s.cfg.History.Get(id); ok && known.Hidden {
+	known, hadRecord := s.cfg.History.Get(id)
+	if hadRecord && known.Hidden {
 		httpErr(w, http.StatusNotFound, "no such session") // already closed; its record keeps the outcome
 		return
 	}
+	// Closing a running session stops the agent and everything it started.
+	// The record is kept, marked as stopped by the user; a finished session's
+	// record is simply dropped.
 	var rec bool
 	var err error
 	if sess, running := s.cfg.Sessions.Get(id); running {
@@ -622,6 +685,14 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	if !live && !rec {
 		httpErr(w, http.StatusNotFound, "no such session")
 		return
+	}
+	// A working copy goes with its session when it is clean; unfinished work
+	// keeps it, and the answer says where.
+	if hadRecord && known.Copy != "" {
+		if res := s.removeWorkingCopy(r.Context(), known); res.Kept {
+			writeJSON(w, http.StatusOK, map[string]any{"copyKept": known.Copy, "branch": known.Branch, "changes": len(res.Changes)})
+			return
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

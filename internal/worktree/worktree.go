@@ -281,6 +281,24 @@ const (
 	CarryLink = "link"
 )
 
+// ErrCarry means a requested entry is not one that can be carried over.
+var ErrCarry = errors.New("worktree: that entry cannot be carried over")
+
+// CheckCarry validates a carry request before anything is created: every name
+// must be a listed top-level entry and every way "copy" or "link".
+func CheckCarry(names map[string]string, allowed []Entry) error {
+	ok := map[string]bool{}
+	for _, e := range allowed {
+		ok[e.Name] = true
+	}
+	for name, how := range names {
+		if !ok[name] || !SafeEntryName(name) || (how != CarryCopy && how != CarryLink) {
+			return fmt.Errorf("%w: %q", ErrCarry, name)
+		}
+	}
+	return nil
+}
+
 // Carry puts chosen entries of the main tree into a copy: a small file is
 // copied, anything else (or a requested link) is symlinked. Only names from
 // Entries are accepted.

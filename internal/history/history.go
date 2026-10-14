@@ -36,7 +36,12 @@ type Record struct {
 	// outcome is "stopped by the user", not a completed run. Hidden records
 	// stay in the history but are no longer listed as sessions.
 	Stopped bool `json:"stopped,omitempty"`
-	Hidden  bool `json:"hidden,omitempty"`
+	// Copy, Branch and CopyStart describe the git worktree an issue session
+	// ran in; empty for a session that worked in the main tree.
+	Copy      string `json:"copy,omitempty"`
+	Branch    string `json:"branch,omitempty"`
+	CopyStart string `json:"copyStart,omitempty"`
+	Hidden    bool   `json:"hidden,omitempty"`
 }
 
 type file struct {

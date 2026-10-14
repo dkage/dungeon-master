@@ -497,14 +497,17 @@ func TestParallelQuestsSettingAllowsASecondQuestInOneTree(t *testing.T) {
 	e.gh.detail = quests.Detail{Quest: quests.Quest{Number: 42, Title: "First", State: quests.StateOpen}}
 	e.gh.mu.Unlock()
 	first := e.create(map[string]any{"hero": "opus", "quest": 42})
-	body := map[string]any{"campaign": e.campaign, "hero": "opus", "quest": 42}
+	body := map[string]any{"campaign": e.campaign, "hero": "opus", "quest": 43}
 	if resp, out := e.req(http.MethodPost, "/api/sessions", body, nil); resp.StatusCode != http.StatusConflict {
-		t.Fatalf("default must block: %d %s", resp.StatusCode, out)
+		t.Fatalf("default must block a second issue in the main tree: %d %s", resp.StatusCode, out)
+	}
+	if resp, out := e.req(http.MethodPost, "/api/sessions", map[string]any{"campaign": e.campaign, "hero": "opus", "quest": 42}, nil); resp.StatusCode != http.StatusConflict {
+		t.Fatalf("the same issue twice must be refused: %d %s", resp.StatusCode, out)
 	}
 	if resp, out := e.req(http.MethodPatch, "/api/campaigns/"+e.campaign, map[string]any{"parallelQuests": true}, nil); resp.StatusCode != http.StatusOK || !strings.Contains(string(out), `"parallelQuests":true`) {
 		t.Fatalf("patch: %d %s", resp.StatusCode, out)
 	}
-	resp, out := e.req(http.MethodPost, "/api/campaigns/"+e.campaign+"/quests/42/launch-preview", map[string]any{"hero": "opus"}, nil)
+	resp, out := e.req(http.MethodPost, "/api/campaigns/"+e.campaign+"/quests/43/launch-preview", map[string]any{"hero": "opus"}, nil)
 	if resp.StatusCode != http.StatusOK || !strings.Contains(string(out), `"canStart":true`) {
 		t.Fatalf("preview should allow it: %d %s", resp.StatusCode, out)
 	}

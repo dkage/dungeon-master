@@ -13,7 +13,6 @@ import (
 	"github.com/dkage/dungeon-master/internal/campaign"
 	"github.com/dkage/dungeon-master/internal/launcher"
 	"github.com/dkage/dungeon-master/internal/party"
-	"github.com/dkage/dungeon-master/internal/platform"
 	"github.com/dkage/dungeon-master/internal/quests"
 )
 
@@ -34,6 +33,8 @@ type launchPreviewJSON struct {
 	SystemPrompt    string       `json:"systemPrompt,omitempty"`
 	Command         []string     `json:"command,omitempty"`
 	ExistingSession *sessionJSON `json:"existingSession,omitempty"`
+	// WorkingCopy says where the session would run and what a copy lacks.
+	WorkingCopy *workingCopyJSON `json:"workingCopy,omitempty"`
 }
 
 // handleQuestLaunchPreview assembles and saves the exact context that Start
@@ -69,9 +70,17 @@ func (s *Server) handleQuestLaunchPreview(w http.ResponseWriter, r *http.Request
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
-	if existing := s.activeQuestSessionFor(c); existing != nil && !c.ParallelQuests {
+	if existing := s.activeIssueSession(c, n); existing != nil {
 		out.ExistingSession = existing
-		out.Reason = existing.Title + " is already working in this Git working tree."
+		out.Reason = existing.Title + " already has a session."
+		writeJSON(w, http.StatusOK, out)
+		return
+	}
+	wc := s.workingCopyPlan(r.Context(), c, n)
+	out.WorkingCopy = &wc
+	if !wc.Available && wc.MainBusy != nil && !c.ParallelQuests {
+		out.ExistingSession = wc.MainBusy
+		out.Reason = wc.MainBusy.Title + " is already working in this Git working tree."
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
@@ -97,44 +106,6 @@ func (s *Server) handleQuestLaunchPreview(w http.ResponseWriter, r *http.Request
 	out.Directory, out.BriefingID, out.BriefingFile = c.Dir, plan.id, plan.path
 	out.Opener, out.SystemPrompt, out.Command = plan.opener, plan.systemPrompt, plan.command
 	writeJSON(w, http.StatusOK, out)
-}
-
-// activeQuestSessionFor finds the running quest session for the campaign's
-// Git working tree. Campaigns added from subdirectories share GitRoot.
-func (s *Server) activeQuestSessionFor(c campaign.Campaign) *sessionJSON {
-	tree := c.GitRoot
-	if tree == "" {
-		tree = c.Dir
-	}
-	for _, rec := range s.cfg.History.List() {
-		if rec.Quest <= 0 || rec.Kind != "hero" || rec.Ended != nil || rec.Lost {
-			continue
-		}
-		live, ok := s.cfg.Sessions.Get(rec.ID)
-		if !ok {
-			continue
-		}
-		if exited, _ := live.Exited(); exited {
-			continue
-		}
-		other, ok := s.cfg.Campaigns.Get(rec.Campaign)
-		if !ok {
-			continue
-		}
-		otherTree := other.GitRoot
-		if otherTree == "" {
-			otherTree = other.Dir
-		}
-		if !platform.SamePath(otherTree, tree) {
-			continue
-		}
-		found := sessionJSON{
-			ID: rec.ID, Kind: rec.Kind, Hero: rec.Hero, Quest: rec.Quest, Title: rec.Title,
-			Campaign: rec.Campaign, Dir: rec.Dir, Created: rec.Created,
-		}
-		return &found
-	}
-	return nil
 }
 
 type questLaunchPlan struct {

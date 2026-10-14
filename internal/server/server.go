@@ -32,6 +32,7 @@ import (
 	"github.com/dkage/dungeon-master/internal/quests/demo"
 	"github.com/dkage/dungeon-master/internal/session"
 	"github.com/dkage/dungeon-master/internal/uploads"
+	"github.com/dkage/dungeon-master/internal/worktree"
 )
 
 // Config is everything New needs.
@@ -85,6 +86,9 @@ type Config struct {
 	// Gatekeeper puts the gh shim in front of the sessions it starts. Nil
 	// means sessions run with the plain gh.
 	Gatekeeper *Gatekeeper
+	// Worktrees makes the per-session working copies of issue sessions. Built
+	// under StateDir when nil.
+	Worktrees *worktree.Manager
 	// Log receives one line per closed terminal connection. Defaults to slog's default.
 	Log *slog.Logger
 	// TermPing is how often a terminal connection is pinged, and TermPingTimeout
@@ -196,6 +200,9 @@ func withDefaults(cfg Config) Config {
 	}
 	if cfg.Sessions == nil {
 		cfg.Sessions = session.NewManager()
+	}
+	if cfg.Worktrees == nil && cfg.StateDir != "" {
+		cfg.Worktrees = &worktree.Manager{Root: filepath.Join(cfg.StateDir, "worktrees")}
 	}
 	if cfg.Log == nil {
 		cfg.Log = slog.Default()
