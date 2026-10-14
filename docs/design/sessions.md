@@ -80,7 +80,7 @@ replayed and the page clears first.
 
 ## Working copies for parallel issue sessions (#80)
 
-Status: researched on macOS on 2026-10-14; Linux and Windows checks are open (listed at the end).
+Status: researched on macOS on 2026-10-14; implemented in #81 (`internal/worktree`, `internal/server/working_copy.go`, the launch review in `QuestDetail.svelte`). Linux and Windows checks are open (listed at the end); CI runs the feature tests on all three.
 
 ### Answer
 

@@ -73,6 +73,9 @@ export interface SessionInfo {
   activity?: 'working' | 'idle' | 'needs-you' | 'ended'
   /** Was running when Dungeon Master last stopped; only the record remains. */
   lost?: boolean
+  /** The git worktree an issue session runs in, and its branch; absent for the main working tree. */
+  copy?: string
+  branch?: string
 }
 
 export interface AppState {
@@ -101,8 +104,38 @@ export interface CreateRequest {
   opener?: string
   quest?: number
   briefingId?: string
+  /** "copy" starts an issue session in its own git worktree; "main" (the default) in the project's tree. */
+  workingCopy?: 'copy' | 'main'
+  /** Top-level entries of the main tree to bring into the copy. */
+  carry?: Record<string, 'copy' | 'link'>
   cols?: number
   rows?: number
+}
+
+export interface CopyEntry {
+  name: string
+  dir: boolean
+  ignored: boolean
+}
+
+/** Where an issue session would run, from the launch review. */
+export interface WorkingCopyPlan {
+  available: boolean
+  reason?: string
+  location?: string
+  branch?: string
+  start?: string
+  startName?: string
+  mainChanges: number
+  entries: CopyEntry[]
+  mainBusy?: SessionInfo
+}
+
+/** Answer to closing a session whose working copy was kept because it holds unfinished work. */
+export interface CopyKept {
+  copyKept: string
+  branch: string
+  changes: number
 }
 
 export interface LaunchPreview {
@@ -121,6 +154,7 @@ export interface LaunchPreview {
   systemPrompt?: string
   command?: string[]
   existingSession?: SessionInfo
+  workingCopy?: WorkingCopyPlan
 }
 
 export type QuestState = 'open' | 'locked' | 'claimed' | 'cleared'
@@ -316,7 +350,7 @@ export const setEffortOverride = (campaignId: string, number: number, tier: Effo
 export const createSession = (req: CreateRequest) =>
   call<SessionInfo>('POST', '/api/sessions', req) as Promise<SessionInfo>
 export const deleteSession = (id: string) =>
-  call<void>('DELETE', `/api/sessions/${encodeURIComponent(id)}`) as Promise<void>
+  call<CopyKept | undefined>('DELETE', `/api/sessions/${encodeURIComponent(id)}`)
 
 export function termUrl(id: string, loc: Pick<Location, 'protocol' | 'host'> = location): string {
   const scheme = loc.protocol === 'https:' ? 'wss' : 'ws'

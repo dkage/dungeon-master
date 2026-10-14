@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -1664,4 +1665,55 @@ test('a hidden page does not poll the backend and checks at once when shown', as
   expect(beats).toBe(before)
   await page.evaluate(() => (window as unknown as { __show(v: string): void }).__show('visible'))
   await expect.poll(() => beats, { timeout: 2000 }).toBeGreaterThan(before)
+})
+
+// --- Parallel issue sessions in their own working copies ---
+
+test('two issues of one project run at once, each in its own working copy', async ({ page }) => {
+  test.skip(process.platform === 'win32', 'working copy paths and the git listing are checked on POSIX; see the plan for Windows')
+  test.setTimeout(90_000)
+  await open(page)
+  const panel = questPanel(page)
+  const browser = panel.getByRole('region', { name: 'Quest browser' })
+  const detail = panel.getByRole('region', { name: 'Selected issue detail' })
+  const plan = page.getByRole('dialog', { name: 'Review launch plan' })
+
+  const startInCopy = async (title: RegExp, branch: string) => {
+    await browser.getByRole('button', { name: title }).click()
+    await detail.getByRole('button', { name: 'Review launch' }).click()
+    const where = plan.getByRole('group', { name: 'Where the session runs' })
+    await expect(where.getByRole('radio', { name: /Its own working copy/ })).toBeChecked()
+    await expect(where).toContainText(branch)
+    await expect(where).toContainText('Starts from')
+    await plan.getByRole('button', { name: 'Start expedition' }).click()
+    await expect(screenText(page)).toContainText('worktrees')
+    await expect(page.locator('.toolbar .branch-chip')).toHaveText(`⎇ ${branch}`)
+    await detail.getByRole('button', { name: /← Quests/ }).click()
+  }
+  await startInCopy(/Hostile body/, 'dungeon/issue-9')
+  await startInCopy(/Bug: terminal loses colours/, 'dungeon/issue-5')
+
+  // Both are live in the project's list, each with its branch.
+  const rows = expeditions(page)
+  await expect(rows.getByRole('listitem')).toHaveCount(2)
+  await expect(rows).toContainText('issue-9')
+  await expect(rows).toContainText('issue-5')
+  // Git knows both copies; the project folder itself has none of their files.
+  const listed = () => execFileSync('git', ['worktree', 'list'], { cwd: workdir }).toString()
+  expect(listed()).toContain('dungeon/issue-9')
+  expect(listed()).toContain('dungeon/issue-5')
+
+  // Switching sessions switches the working copy shown.
+  await rows.getByRole('button', { name: /^#9/ }).click()
+  await expect(page.locator('.toolbar .branch-chip')).toHaveText('⎇ dungeon/issue-9')
+  await rows.getByRole('button', { name: /^#5/ }).click()
+  await expect(page.locator('.toolbar .branch-chip')).toHaveText('⎇ dungeon/issue-5')
+
+  // Closing removes the clean copies.
+  const closers = page.getByRole('button', { name: closeSession })
+  await closeExpedition(page)
+  await expect(closers).toHaveCount(1)
+  await closeExpedition(page)
+  await expect(page.getByRole('list', { name: /^Expeditions in/ })).toHaveCount(0)
+  await expect.poll(listed).not.toContain('dungeon/issue-')
 })

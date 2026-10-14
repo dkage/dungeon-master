@@ -4,7 +4,7 @@ import { PLACE_KEY, format as formatPlace, type Place } from './place'
 import { DEFAULTS, KEY as COLUMNS_KEY, fit, parse as parseColumns, setWidth, type Columns, type Edge } from './columns'
 import { SPLIT, restore, toggle, type Region, type Workspace } from './workspace'
 import type {
-  AppState, Campaign, CampaignInput, CampaignPatch, EffortTier, GithubStatus, Hero, HeroesConfig, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
+  AppState, Campaign, CampaignInput, CreateRequest, CampaignPatch, EffortTier, GithubStatus, Hero, HeroesConfig, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
   SessionInfo,
 } from './api'
 import { stillWaiting, unattended } from './attention'
@@ -85,6 +85,8 @@ export class AppStore {
   /** Sessions whose current wait the user has already looked at. */
   seen = $state<Set<string>>(new Set())
   error = $state<string | null>(null)
+  /** Something the user should know that is not an error, for example a working copy that was kept. */
+  notice = $state<string | null>(null)
   busy = $state(false)
 
   // Quests of the selected campaign.
@@ -285,6 +287,19 @@ export class AppStore {
 
   sessionsOf(campaignId: string): SessionInfo[] {
     return this.sessions.filter((s) => s.campaign === campaignId)
+  }
+
+  /** The running session for one issue of a project, in any working copy. */
+  sessionForQuest(campaignId: string, number: number): SessionInfo | undefined {
+    const main = this.questSessionForCampaign(campaignId)
+    if (main?.quest === number) return main
+    const campaign = this.campaigns.find((c) => c.id === campaignId)
+    const tree = campaign?.gitRoot || campaign?.dir
+    return this.sessions.find((s) => {
+      if (s.quest !== number || s.exited || s.lost) return false
+      const other = this.campaigns.find((c) => c.id === s.campaign)
+      return (other?.gitRoot || other?.dir) === tree
+    })
   }
 
   questSessionForCampaign(campaignId: string): SessionInfo | undefined {
@@ -824,7 +839,7 @@ export class AppStore {
     }
   }
 
-  async launchQuest(number: number, hero: string, briefingId?: string): Promise<boolean> {
+  async launchQuest(number: number, hero: string, briefingId?: string, where?: Pick<CreateRequest, 'workingCopy' | 'carry'>): Promise<boolean> {
     const campaign = this.campaign
     if (!campaign) {
       this.error = 'Add or select a campaign first.'
@@ -832,7 +847,7 @@ export class AppStore {
     }
     this.busy = true
     try {
-      const sess = await this.client.createSession({ campaign: campaign.id, hero, quest: number, briefingId })
+      const sess = await this.client.createSession({ campaign: campaign.id, hero, quest: number, briefingId, ...where })
       this.sessions = [...this.sessions, sess]
       this.guideOpen = false
       this.activeId = sess.id
@@ -850,7 +865,10 @@ export class AppStore {
 
   async close(id: string) {
     try {
-      await this.client.deleteSession(id)
+      const kept = await this.client.deleteSession(id)
+      if (kept?.copyKept) {
+        this.notice = `Working copy kept because it has unfinished work (${kept.changes} changed ${kept.changes === 1 ? 'path' : 'paths'}): ${kept.copyKept} on branch ${kept.branch}. Commit or discard it there; the issue cannot start again until it is removed.`
+      }
     } catch (e) {
       // Already gone on the server is fine; anything else is worth showing.
       const status = (e as { status?: number }).status

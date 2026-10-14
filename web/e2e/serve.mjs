@@ -41,6 +41,8 @@ const git = (...args) =>
   })
 git('init', '-q')
 git('remote', 'add', 'origin', 'git@github.com:acme/demo.git')
+// One commit, so an issue session can start from it in its own working copy.
+git('-c', 'user.email=e2e@example.test', '-c', 'user.name=e2e', 'commit', '-q', '--allow-empty', '-m', 'initial commit')
 // copyFileSync keeps the mode of the source (executable).
 
 // A plain directory (no git repository) for the "no GitHub repo" case.
@@ -88,6 +90,16 @@ const hostile = JSON.stringify({
     comments: { totalCount: 1, nodes: [{ author: { login: 'mallory' }, body: '<svg onload="window.__pwned=1">', createdAt: new Date().toISOString(), url: '' }] },
   } } },
 })
+// A plain open issue with no blockers, for tests that need a second one to start.
+const plainIssue = (number, title) => JSON.stringify({
+  data: { repository: { issue: {
+    number, title, state: 'OPEN', url: `https://github.com/acme/demo/issues/${number}`,
+    updatedAt: new Date().toISOString(), createdAt: new Date().toISOString(),
+    body: 'A plain issue.', author: { login: 'octocat' }, labels: { nodes: [] }, assignees: { nodes: [] },
+    blockedBy: { nodes: [] }, blocking: { nodes: [] }, subIssues: { nodes: [] },
+    comments: { totalCount: 0, nodes: [] },
+  } } },
+})
 const github = createServer((req, res) => {
   let body = ''
   req.on('data', (d) => (body += d))
@@ -107,7 +119,7 @@ const github = createServer((req, res) => {
     if (query.includes('viewer{login}')) return res.end(viewer)
     if (query.includes('assigned: issues')) return res.end(JSON.stringify(counts))
     if (variables.number !== undefined) {
-      return res.end(variables.number === 3 ? recordedDetail : variables.number === 9 ? hostile : '{"data":{"repository":{"issue":null}}}')
+      return res.end(variables.number === 3 ? recordedDetail : variables.number === 9 ? hostile : variables.number === 5 ? plainIssue(5, '[demo] Bug: terminal loses colours') : '{"data":{"repository":{"issue":null}}}')
     }
     if (variables.states?.[0] === 'CLOSED') return res.end(emptyPage)
     const kind = variables.labels ? 'labels' : variables.filter ? 'assigned' : 'all'

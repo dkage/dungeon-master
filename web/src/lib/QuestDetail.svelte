@@ -15,8 +15,8 @@
   const d = $derived(store.detail)
   const body = $derived(d ? renderMarkdown(d.body) : '')
   const safeUrl = $derived(d && /^https:\/\//i.test(d.url) && !store.campaign?.demo ? d.url : '')
-  const existingQuestSession = $derived(store.campaignId ? store.questSessionForCampaign(store.campaignId) : undefined)
-  const blockedBySession = $derived(existingQuestSession && !store.campaign?.parallelQuests ? existingQuestSession : undefined)
+  // One active session per issue: only a session for this very issue blocks starting it.
+  const blockedBySession = $derived(store.campaignId && d ? store.sessionForQuest(store.campaignId, d.number) : undefined)
   const inList = $derived(d ? store.mapModel.quests.get(d.number) : undefined)
   const openBlockers = $derived(d ? d.blockedBy.filter((b) => !b.closed) : [])
   const parentInScope = $derived(d?.parent ? store.mapModel.quests.has(d.parent) : true)
@@ -52,6 +52,11 @@
   let launchPreview = $state<LaunchPreview | null>(null)
   let selectedHero = $state('')
   let previewBusy = $state(false)
+  // Where the session will run, chosen in the launch review (see docs/design/sessions.md).
+  let where = $state<'copy' | 'main'>('copy')
+  let carry = $state<Record<string, string>>({})
+  const wc = $derived(launchPreview?.workingCopy)
+  const mainTaken = $derived(!!wc?.mainBusy && !store.campaign?.parallelQuests)
 
   $effect(() => {
     const campaign = store.campaignId ?? ''
@@ -68,6 +73,8 @@
     launchPreview = null
     const result = await store.previewQuestLaunch(d.number, selectedHero)
     launchPreview = result
+    carry = {}
+    where = result?.workingCopy?.available ? 'copy' : 'main'
     previewBusy = false
     if (!result) return
     await tick()
@@ -83,7 +90,9 @@
 
   async function startQuest() {
     if (!d || !launchPreview?.canStart || !selectedHero || store.busy) return
-    if (await store.launchQuest(d.number, selectedHero, launchPreview.briefingId)) closeBrief()
+    const chosen = Object.fromEntries(Object.entries(carry).filter(([, how]) => how === 'copy' || how === 'link')) as Record<string, 'copy' | 'link'>
+    const placement = where === 'copy' ? { workingCopy: 'copy' as const, carry: chosen } : { workingCopy: 'main' as const }
+    if (await store.launchQuest(d.number, selectedHero, launchPreview.briefingId, placement)) closeBrief()
   }
 
   function closeBrief() {
@@ -268,7 +277,7 @@
         {previewBusy ? 'Preparing…' : 'Review launch'}
       </button>
       {#if blockedBySession}
-        <p class="launch-note">{blockedBySession.title} is already running in this working tree.</p>
+        <p class="launch-note">{blockedBySession.title} already has a session.</p>
         <button type="button" class="go-session" onclick={() => store.goToSession(blockedBySession.id)}>Go to session</button>
       {:else if d.state === 'locked'}
         <p class="launch-note">
@@ -290,10 +299,54 @@
         {#if launchPreview.reason}<p class="launch-note" role="status">{launchPreview.reason}</p>{/if}
         {#if launchPreview.existingSession}<button type="button" class="go-session" onclick={() => store.goToSession(launchPreview!.existingSession!.id)}>Go to {launchPreview.existingSession.title}</button>{/if}
         <dl class="plan-meta">
-          {#if launchPreview.directory}<dt>Working directory</dt><dd>{launchPreview.directory}</dd>{/if}
+          {#if launchPreview.directory}<dt>Working directory</dt><dd>{where === 'copy' && wc?.location ? `a new working copy in ${wc.location}` : launchPreview.directory}</dd>{/if}
           {#if launchPreview.briefingFile}<dt>Private briefing</dt><dd>{launchPreview.briefingFile}</dd>{/if}
           {#if launchPreview.opener}<dt>Opening instruction</dt><dd>{launchPreview.opener}</dd>{/if}
         </dl>
+        {#if wc && !launchPreview.existingSession}
+          <fieldset class="where" aria-label="Where the session runs">
+            <legend>Where the session runs</legend>
+            <label>
+              <input type="radio" name="where" value="copy" bind:group={where} disabled={!wc.available} />
+              <span>Its own working copy{wc.available ? '' : ' (not available)'}</span>
+            </label>
+            <label>
+              <input type="radio" name="where" value="main" bind:group={where} disabled={mainTaken} />
+              <span>The project's main working tree{mainTaken ? ` (in use by ${wc.mainBusy?.title})` : ''}</span>
+            </label>
+            {#if !wc.available && wc.reason}<p class="where-note">{wc.reason}</p>{/if}
+            {#if where === 'copy' && wc.available}
+              <dl class="plan-meta">
+                <dt>Branch</dt><dd><code>{wc.branch}</code></dd>
+                <dt>Starts from</dt><dd>{wc.startName} at <code>{wc.start}</code></dd>
+                <dt>Copies live in</dt><dd>{wc.location} (outside the repository)</dd>
+              </dl>
+              {#if wc.mainChanges > 0}
+                <p class="where-note" role="status">The main working tree has {wc.mainChanges} uncommitted or untracked {wc.mainChanges === 1 ? 'path' : 'paths'}. A copy starts from the last commit and does not include them.</p>
+              {/if}
+              {#if wc.entries.length > 0}
+                <h3 class="brief-label">Bring from the main working tree</h3>
+                <ul class="carry">
+                  {#each wc.entries as e (e.name)}
+                    <li>
+                      <code>{e.name}{e.dir ? '/' : ''}</code>
+                      <span class="hint">{e.ignored ? 'ignored by Git' : 'not tracked'}</span>
+                      <select aria-label={`How to bring ${e.name}`} bind:value={carry[e.name]}>
+                        <option value="">Leave out</option>
+                        {#if !e.dir}<option value="copy">Copy it</option>{/if}
+                        <option value="link">Link to the original</option>
+                      </select>
+                    </li>
+                  {/each}
+                </ul>
+                <p class="where-note">A linked folder is shared with the main working tree: changes the agent makes there change the original. Nothing is brought unless you choose it.</p>
+              {/if}
+            {/if}
+            {#if where === 'main'}
+              <p class="where-note">The agent works directly in your project folder. Only one issue session can use it at a time.</p>
+            {/if}
+          </fieldset>
+        {/if}
         <details class="command"><summary>Command and agent instruction</summary><pre>{JSON.stringify(launchPreview.command ?? [], null, 2)}\n\n{launchPreview.systemPrompt ?? ''}</pre></details>
         <h3 class="brief-label">Task briefing sent to the agent</h3>
         <pre class="brief-content">{launchPreview.content}</pre>
@@ -322,6 +375,13 @@
   .effort-map ul { margin: 4px 0; padding-left: 16px; }
   .map-add { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
   .map-add button { padding: 3px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--text); }
+  .where { margin: 10px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; }
+  .where legend { padding: 0 4px; color: var(--muted); font-size: 12px; }
+  .where label { display: flex; gap: 6px; align-items: center; margin: 3px 0; }
+  .where-note { margin: 6px 0; color: var(--muted); font-size: 12px; }
+  .carry { list-style: none; margin: 4px 0; padding: 0; }
+  .carry li { display: flex; gap: 8px; align-items: center; margin: 3px 0; font-size: 12px; }
+  .carry select { margin-left: auto; padding: 2px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; font-size: 12px; }
   .jump { margin: 8px 0 0; }
   .jump-button { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 6px; background: transparent; color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; }
   .jump-list { margin: 4px 0 0; padding-left: 16px; }

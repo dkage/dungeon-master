@@ -136,6 +136,7 @@
                     {#if st.kind === 'needs'}<span class="badge needs" aria-hidden="true">{st.label}</span>{/if}
                     {#if s.exited && !s.lost}<span class="badge">exit {s.exitCode}</span>{/if}
                     {#if s.lost}<span class="badge">lost</span>{/if}
+                    {#if s.branch}<span class="badge branch" title={`Working copy: ${s.copy}`}>⎇ {s.branch.replace(/^dungeon\//, '')}</span>{/if}
                   </button>
                   <button type="button" class="ghost" aria-label={`Close ${s.title}`} onclick={() => closeSession(s)}>×</button>
                 </li>

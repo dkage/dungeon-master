@@ -19,7 +19,8 @@
       {#if activeSession}<span class="session-title"><span class="session-light" aria-hidden="true"></span>{activeSession.title}</span>{/if}
       {#if activity}<span class="activity-chip {activity.kind}" role="status">{activity.glyph}{activity.glyph ? ' ' : ''}{activity.label}</span>{/if}
       {#if activeSession?.quest}<button type="button" class="quest-session-chip" title={`Select issue #${activeSession.quest}`} onclick={() => { store.questsOpen = true; void store.selectQuest(activeSession.quest!) }}>#{activeSession.quest}</button>{/if}
-      <code class="path" title={campaign.dir}>{campaign.dir}</code>
+      {#if activeSession?.branch}<span class="branch-chip" title={`Working copy: ${activeSession.copy}`}>⎇ {activeSession.branch}</span>{/if}
+      <code class="path" title={activeSession?.copy ?? campaign.dir}>{activeSession?.copy ? activeSession.dir : campaign.dir}</code>
     {:else}
       <span class="hint">No campaign selected</span>
     {/if}
@@ -61,6 +62,9 @@
     </button>
     Settings stay on this computer.
   </p>
+{/if}
+{#if store.notice}
+  <p class="notice warn" role="status">{store.notice} <button type="button" class="link" onclick={() => (store.notice = null)}>Dismiss</button></p>
 {/if}
 {#if store.error}
   <p class="notice error" role="alert">{store.error}</p>

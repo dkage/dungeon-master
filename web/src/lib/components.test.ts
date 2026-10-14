@@ -57,6 +57,20 @@ describe('Toolbar', () => {
     expect(screen.getByRole('button', { name: 'Shell' })).toBeEnabled()
   })
 
+  it('shows the working copy and branch of the active issue session, and keeps a notice until dismissed', async () => {
+    const s = store((st) => {
+      st.sessions = [sess('w1', 'c1', { quest: 5, title: '#5 Copy work', copy: '/state/worktrees/c1/w1', dir: '/state/worktrees/c1/w1', branch: 'dungeon/issue-5' })]
+      st.activeId = 'w1'
+      st.notice = 'Working copy kept because it has unfinished work.'
+    })
+    render(Toolbar, { store: s })
+    expect(screen.getByText('⎇ dungeon/issue-5')).toBeInTheDocument()
+    expect(screen.getByTitle('/state/worktrees/c1/w1')).toHaveTextContent('/state/worktrees/c1/w1')
+    expect(screen.getByText(/Working copy kept/)).toBeInTheDocument()
+    await fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(screen.queryByText(/Working copy kept/)).not.toBeInTheDocument()
+  })
+
   it('says when the campaign has no GitHub repo', () => {
     render(Toolbar, { store: store((s) => (s.campaignId = 'c2')) })
     expect(screen.getByText('no GitHub repo')).toBeInTheDocument()
@@ -206,6 +220,13 @@ describe('Sidebar', () => {
     render(Sidebar, { store: store((s) => { s.campaigns = []; s.campaignId = null }) })
     expect(screen.getByText(/Add one to start/)).toBeInTheDocument()
     expect(screen.queryByPlaceholderText('/absolute/path/to/project')).not.toBeInTheDocument()
+  })
+
+  it('shows the branch of a session that runs in its own working copy', () => {
+    const s = store((st) => { st.sessions = [sess('w1', 'c1', { quest: 5, title: '#5 Copy work', copy: '/x/w1', branch: 'dungeon/issue-5' }), sess('m1', 'c1', { quest: 6, title: '#6 Main work' })] })
+    render(Sidebar, { store: s })
+    expect(screen.getByText('⎇ issue-5')).toBeInTheDocument()
+    expect(screen.queryByText(/⎇ issue-6/)).not.toBeInTheDocument()
   })
 
   it('closes an idle or finished session at once, and asks before stopping one that is mid-work', async () => {
@@ -683,7 +704,7 @@ describe('QuestDetail', () => {
     expect(screen.getByText(/5 of 12 comments · some context was shortened/)).toBeInTheDocument()
     expect(screen.getByText('/state/briefings/c1/3-opus-preview-1.md')).toBeInTheDocument()
     await fireEvent.click(screen.getByRole('button', { name: 'Start expedition' }))
-    expect(start).toHaveBeenCalledWith(3, 'opus', 'preview-1')
+    expect(start).toHaveBeenCalledWith(3, 'opus', 'preview-1', { workingCopy: 'main' }) // no copy plan: the main tree
     expect(screen.queryByRole('dialog', { name: 'Review launch plan' })).not.toBeInTheDocument()
   })
 
@@ -723,15 +744,75 @@ describe('QuestDetail', () => {
     expect(screen.getByText('Closed issues cannot be started.')).toBeInTheDocument()
   })
 
-  it('blocks a second launch in a busy working tree unless the project allows several', () => {
-    const busy = (s: AppStore) => { s.sessions = [sess('s9', 'c1', { quest: 9, title: '#9 Other' })] }
-    const { unmount } = render(QuestDetail, { store: open(detail({ state: 'open', blockedBy: [] }), busy) })
+  it('blocks only a second session for the same issue; another issue can still be reviewed', () => {
+    const same = (s: AppStore) => { s.sessions = [sess('s3', 'c1', { quest: 3, title: '#3 Same' })] }
+    const { unmount } = render(QuestDetail, { store: open(detail({ state: 'open', blockedBy: [] }), same) })
     expect(screen.getByRole('button', { name: 'Review launch' })).toBeDisabled()
-    expect(screen.getByText('#9 Other is already running in this working tree.')).toBeInTheDocument()
+    expect(screen.getByText('#3 Same already has a session.')).toBeInTheDocument()
     unmount()
-    render(QuestDetail, { store: open(detail({ state: 'open', blockedBy: [] }), (s) => { busy(s); s.campaigns[0].parallelQuests = true }) })
+    const other = (s: AppStore) => { s.sessions = [sess('s9', 'c1', { quest: 9, title: '#9 Other' })] }
+    render(QuestDetail, { store: open(detail({ state: 'open', blockedBy: [] }), other) })
     expect(screen.getByRole('button', { name: 'Review launch' })).toBeEnabled()
-    expect(screen.queryByText(/already running in this working tree/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/already has a session/)).not.toBeInTheDocument()
+  })
+
+  const copyPlan = (over: Record<string, unknown> = {}) => ({
+    content: 'brief', truncated: false, commentsShown: 0, commentsTotal: 0, canStart: true, hero: 'opus', heroLabel: 'Opus',
+    directory: '/p/c1', briefingId: 'preview-2', briefingFile: '/state/b.md', opener: 'Read it.', systemPrompt: '', command: [],
+    workingCopy: {
+      available: true, location: '/state/worktrees/c1', branch: 'dungeon/issue-3', start: 'abc123def456', startName: 'main',
+      mainChanges: 2, entries: [{ name: '.env', dir: false, ignored: true }, { name: 'node_modules', dir: true, ignored: true }],
+      ...over,
+    },
+  })
+
+  it('offers its own working copy first, says what it lacks and starts there with the chosen entries', async () => {
+    const s = open(detail({ state: 'open' }))
+    vi.spyOn(s, 'previewQuestLaunch').mockResolvedValue(copyPlan())
+    const start = vi.spyOn(s, 'launchQuest').mockResolvedValue(true)
+    render(QuestDetail, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+    const group = screen.getByRole('group', { name: 'Where the session runs' })
+    expect(within(group).getByRole('radio', { name: /Its own working copy/ })).toBeChecked()
+    expect(within(group).getByText('dungeon/issue-3')).toBeInTheDocument()
+    expect(within(group).getByText(/2 uncommitted or untracked paths/)).toBeInTheDocument()
+    expect(within(group).getByText(/does not include them/)).toBeInTheDocument()
+    // Nothing is brought unless chosen; folders can only be linked.
+    expect(within(group).queryByRole('option', { name: 'Copy it' })).toBeInTheDocument() // the file offers a copy
+    const folder = within(group).getByLabelText('How to bring node_modules')
+    expect(within(folder).queryByRole('option', { name: 'Copy it' })).not.toBeInTheDocument()
+    await fireEvent.change(within(group).getByLabelText('How to bring .env'), { target: { value: 'copy' } })
+    await fireEvent.click(screen.getByRole('button', { name: 'Start expedition' }))
+    expect(start).toHaveBeenCalledWith(3, 'opus', 'preview-2', { workingCopy: 'copy', carry: { '.env': 'copy' } })
+  })
+
+  it('starts in the main tree when chosen, and cannot when another issue holds it', async () => {
+    const s = open(detail({ state: 'open' }))
+    vi.spyOn(s, 'previewQuestLaunch').mockResolvedValue(copyPlan())
+    const start = vi.spyOn(s, 'launchQuest').mockResolvedValue(true)
+    const { unmount } = render(QuestDetail, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+    await fireEvent.click(screen.getByRole('radio', { name: /main working tree/ }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Start expedition' }))
+    expect(start).toHaveBeenCalledWith(3, 'opus', 'preview-2', { workingCopy: 'main' })
+    unmount()
+
+    const busy = open(detail({ state: 'open' }))
+    vi.spyOn(busy, 'previewQuestLaunch').mockResolvedValue(copyPlan({ mainBusy: sess('s9', 'c1', { quest: 9, title: '#9 Other' }) }))
+    render(QuestDetail, { store: busy })
+    await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+    expect(screen.getByRole('radio', { name: /main working tree.*in use by #9 Other/ })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: /Its own working copy/ })).toBeChecked()
+  })
+
+  it('falls back to the main tree and says why when copies are not available', async () => {
+    const s = open(detail({ state: 'open' }))
+    vi.spyOn(s, 'previewQuestLaunch').mockResolvedValue(copyPlan({ available: false, reason: 'This project is not in a Git repository, so it has no working copies.' }))
+    render(QuestDetail, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+    expect(screen.getByRole('radio', { name: /Its own working copy \(not available\)/ })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: /main working tree/ })).toBeChecked()
+    expect(screen.getByText(/not in a Git repository/)).toBeInTheDocument()
   })
 
   it('shows loading and error states, with retry', async () => {
