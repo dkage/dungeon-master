@@ -237,6 +237,13 @@
         onexit(code)
       },
       onReset: () => term.reset(),
+      onInputRefused: (why) =>
+        inform(
+          why === 'full'
+            ? 'Too much was typed while reconnecting, so the rest was not sent.'
+            : 'The session is not running, so what you typed was not sent.',
+          'error',
+        ),
       onReconnecting(attempt, kind) {
         status = 'reconnecting'
         detail = attempt > 1 ? ` (attempt ${attempt})` : ''
@@ -399,7 +406,7 @@
   {/if}
   {#if status !== 'live'}
     <div class="term-status" data-status={status} role="status">
-      {status === 'connecting' ? 'Connecting…' : status === 'reconnecting' ? `Reconnecting…${detail}` : status === 'exited' ? `Session ${detail}` : detail}
+      {status === 'connecting' ? 'Connecting…' : status === 'reconnecting' ? `Reconnecting…${detail} What you type is kept and sent once it is back.` : status === 'exited' ? `Session ${detail}` : detail}
     </div>
   {/if}
 </div>

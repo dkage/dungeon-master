@@ -29,6 +29,8 @@ export interface TermHandlers {
   onReconnecting?(attempt: number, kind?: Refusal): void
   /** A reattach opened: the replay that follows repeats what is on screen, so clear it first. */
   onReset?(): void
+  /** Typed input could not be kept or sent: the session is gone or the wait queue is full. */
+  onInputRefused?(reason: 'closed' | 'full'): void
 }
 
 export interface TermOptions {
@@ -39,6 +41,8 @@ export interface TermOptions {
 }
 
 const OPEN = 1
+/** Typing kept while the connection is down; more than this is refused rather than sent late in a heap. */
+export const MAX_QUEUED_INPUT = 4096
 const TRY_AGAIN_LATER = 1013 // the server dropped a viewer that fell behind a burst
 
 export const defaultBackoff = (attempt: number) => Math.min(15000, 500 * 2 ** (attempt - 1))
@@ -68,6 +72,8 @@ export class TermSocket {
   private reopened = false
   private timer: ReturnType<typeof setTimeout> | undefined
   private enc = new TextEncoder()
+  private queued: Uint8Array[] = []
+  private queuedBytes = 0
   private backoff: (attempt: number) => number
   private probe: (url: string) => Promise<number>
 
@@ -92,6 +98,7 @@ export class TermSocket {
       if (this.reopened) this.h.onReset?.()
       this.reopened = true
       this.h.onOpen?.()
+      this.flush()
     }
     ws.onmessage = (ev) => {
       if (ws === this.ws) this.message(ev.data)
@@ -119,6 +126,8 @@ export class TermSocket {
     if (this.exited || this.stopped) return
     if (kind && kind !== 'unreachable') {
       this.stopped = true
+      this.queued = []
+      this.queuedBytes = 0
       this.h.onDisconnect(REFUSAL_MESSAGE[kind], kind)
       return
     }
@@ -151,7 +160,23 @@ export class TermSocket {
   }
 
   sendInput(text: string) {
-    if (this.ws.readyState === OPEN) this.ws.send(this.enc.encode(text))
+    const bytes = this.enc.encode(text)
+    if (this.ws.readyState === OPEN) {
+      this.ws.send(bytes)
+      return
+    }
+    // Not connected: keep a little for after the reattach, but never for a session that is gone.
+    if (this.exited || this.stopped) return this.h.onInputRefused?.('closed')
+    if (this.queuedBytes + bytes.length > MAX_QUEUED_INPUT) return this.h.onInputRefused?.('full')
+    this.queued.push(bytes)
+    this.queuedBytes += bytes.length
+  }
+
+  private flush() {
+    const q = this.queued
+    this.queued = []
+    this.queuedBytes = 0
+    for (const b of q) this.ws.send(b)
   }
 
   resize(cols: number, rows: number) {
@@ -161,6 +186,8 @@ export class TermSocket {
 
   close() {
     this.exited = true // closing on purpose is not a disconnect
+    this.queued = []
+    this.queuedBytes = 0
     clearTimeout(this.timer)
     this.ws.close(1000, 'bye')
   }

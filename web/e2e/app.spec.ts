@@ -1529,6 +1529,7 @@ async function watchTerminals(page: Page) {
   return {
     cut: () => page.evaluate(() => (window as unknown as { __terms: WebSocket[] }).__terms.at(-1)?.close(4000)),
     refuse: () => page.evaluate(() => ((window as unknown as { __refuse: boolean }).__refuse = true)),
+    allow: () => page.evaluate(() => ((window as unknown as { __refuse: boolean }).__refuse = false)),
     opened: () => page.evaluate(() => (window as unknown as { __terms: WebSocket[] }).__terms.length),
   }
 }
@@ -1558,6 +1559,24 @@ test('a dropped terminal connection reattaches by itself, typing works and nothi
   const text = (await screenText(page).innerText()).replace(/\s+/g, ' ')
   // The typed command and its output: twice, not four times.
   expect(text.split('ONE-MARK-111').length - 1).toBe(2)
+})
+
+test('typing while the connection is down is kept and reaches the session after it returns', async ({ page }) => {
+  test.setTimeout(60_000)
+  const sockets = await watchTerminals(page)
+  await startShell(page)
+  await sockets.refuse() // every reattach fails fast, as a dead network would
+  await sockets.cut()
+  const status = page.locator('.pane:not([hidden]) .term-status')
+  await expect(status).toContainText('Reconnecting', { timeout: 10_000 })
+  await expect(status).toContainText('What you type is kept')
+  await page.keyboard.type('echo KEPT-MARK-333')
+  await page.keyboard.press('Enter')
+  await sockets.allow()
+  await expect(status).toHaveCount(0, { timeout: 20_000 })
+  await expect(screenText(page)).toContainText('KEPT-MARK-333')
+  const text = (await screenText(page).innerText()).replace(/\s+/g, ' ')
+  expect(text.split('KEPT-MARK-333').length - 1).toBe(2) // the command and its output
 })
 
 test('a refused reconnect says the sign-in changed and stops retrying', async ({ page }) => {

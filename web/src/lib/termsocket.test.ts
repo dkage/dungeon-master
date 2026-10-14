@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { TermSocket, classify, defaultBackoff, type SocketLike } from './termsocket'
+import { MAX_QUEUED_INPUT, TermSocket, classify, defaultBackoff, type SocketLike } from './termsocket'
 
 class FakeSocket implements SocketLike {
   binaryType = ''
@@ -12,6 +12,10 @@ class FakeSocket implements SocketLike {
   onerror: SocketLike['onerror'] = null
   send(d: unknown) {
     this.sent.push(d)
+  }
+  drop(code: number) {
+    this.readyState = 3
+    this.onclose?.({ code })
   }
   close(code?: number, reason?: string) {
     this.closed = { code, reason }
@@ -39,6 +43,7 @@ function setup(probe: (url: string) => Promise<number> = () => Promise.resolve(4
     onOpen: vi.fn(),
     onReconnecting: vi.fn(),
     onReset: vi.fn(),
+    onInputRefused: vi.fn(),
   }
   const ts = new TermSocket('ws://x/y', h, factory, { backoff: () => 10, probe })
   return { sock: socks[0], socks, h, ts }
@@ -58,12 +63,11 @@ describe('TermSocket', () => {
     expect(new TextDecoder().decode(h.onOutput.mock.calls[0][0])).toBe('hi')
   })
 
-  it('encodes keystrokes as UTF-8 binary, only once open', () => {
+  it('encodes keystrokes as UTF-8 binary, holding them until open', () => {
     const { sock, ts } = setup()
-    ts.sendInput('lost') // not open yet
+    ts.sendInput('é\r') // not open yet: kept, then sent first
     expect(sock.sent).toHaveLength(0)
     sock.open()
-    ts.sendInput('é\r')
     expect(Array.from(sock.sent[0] as Uint8Array)).toEqual([0xc3, 0xa9, 0x0d])
   })
 
@@ -184,6 +188,48 @@ describe('TermSocket', () => {
     await vi.advanceTimersByTimeAsync(100)
     expect(socks).toHaveLength(1)
     vi.useRealTimers()
+  })
+
+  it('keeps typing made during a reconnect and sends it, in order, after reattaching', async () => {
+    vi.useFakeTimers()
+    const { sock, socks, h, ts } = setup()
+    sock.open()
+    sock.drop(1006)
+    ts.sendInput('ab')
+    ts.sendInput('c')
+    expect(sock.sent).toHaveLength(0)
+    await vi.advanceTimersByTimeAsync(10)
+    socks[1].open()
+    expect(socks[1].sent.map((b) => new TextDecoder().decode(b as Uint8Array))).toEqual(['ab', 'c'])
+    ts.sendInput('d')
+    expect(socks[1].sent).toHaveLength(3)
+    expect(h.onInputRefused).not.toHaveBeenCalled()
+    vi.useRealTimers()
+  })
+
+  it('refuses input beyond the queue bound and tells the page', async () => {
+    const { sock, h, ts } = setup()
+    sock.drop(1006)
+    ts.sendInput('x'.repeat(MAX_QUEUED_INPUT))
+    expect(h.onInputRefused).not.toHaveBeenCalled()
+    ts.sendInput('y')
+    expect(h.onInputRefused).toHaveBeenCalledWith('full')
+  })
+
+  it('refuses input once reconnecting has stopped or the session ended, and sends nothing queued', async () => {
+    const a = setup(() => Promise.resolve(404))
+    a.sock.open()
+    a.sock.drop(1006)
+    a.ts.sendInput('kept?')
+    await new Promise((r) => setTimeout(r, 30))
+    a.ts.sendInput('late')
+    expect(a.h.onInputRefused).toHaveBeenCalledWith('closed')
+    expect(a.socks).toHaveLength(1)
+    expect(a.sock.sent).toHaveLength(0)
+    const b = setup()
+    b.sock.msg(JSON.stringify({ type: 'exit', code: 0 }))
+    b.ts.sendInput('after exit')
+    expect(b.h.onInputRefused).toHaveBeenCalledWith('closed')
   })
 
   it('classifies the probe answers and doubles the backoff up to a cap', () => {
