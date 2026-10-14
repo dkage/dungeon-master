@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import SkillSources from './SkillSources.svelte'
-import type { ProjectSkillSource, SkillSource, SkillSourcesState } from './api'
+import type { ProjectSkillSource, SkillDiscovery, SkillSource, SkillSourceReport, SkillSourcesState } from './api'
 
 const REV = 'a'.repeat(40)
 const folder: SkillSource = { id: 'f1', name: 'Mine', kind: 'folder', location: '/home/me/skills', enabled: true }
@@ -29,6 +29,8 @@ function fake(initial: Partial<SkillSourcesState> = {}, project: ProjectSkillSou
       return { sources: proj }
     }),
     pickFolder: vi.fn(async () => ({ path: '/picked/folder' })),
+    getProjectSkills: vi.fn(async () => ({ entries: [], reports: [] as SkillSourceReport[] })),
+    setSkillDiscovery: vi.fn(async (d: SkillDiscovery) => { book = { ...book, discovery: d }; return book }),
   }
   return api
 }
@@ -229,5 +231,42 @@ describe('SkillSources with empty answers', () => {
     expect(await screen.findByText(/No sources yet/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New source' })).toBeEnabled()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('SkillSources discovery and notes', () => {
+  it('turns supplementary places on one at a time and lists what was found for the project', async () => {
+    const api = fake()
+    api.getProjectSkills.mockResolvedValue({ entries: [], reports: [
+      { sourceId: 'f1', name: 'Mine', origin: 'registered', count: 3, warnings: [] },
+      { sourceId: 'user-claude', name: 'Your skills (~/.claude/skills)', origin: 'user', count: 2, warnings: [],
+        flagged: [{ name: 'publish', notes: ['Mentions creating or changing GitHub issues or pull requests.'] }] },
+    ] })
+    open(api, { campaignId: 'c1', campaignName: 'Camp' })
+    const box = await screen.findByLabelText(/Your skill folders/)
+    expect(box).not.toBeChecked() // off until chosen
+    expect(screen.getByLabelText(/The project's own skill folders/)).not.toBeChecked()
+    await fireEvent.click(box)
+    await waitFor(() => expect(api.setSkillDiscovery).toHaveBeenCalledWith({ project: false, user: true, plugins: false }))
+    await waitFor(() => expect(screen.getByLabelText(/Your skill folders/)).toBeChecked())
+    const found = await screen.findByRole('list', { name: 'Found automatically for Camp' })
+    expect(within(found).getByText('Your skills (~/.claude/skills)')).toBeInTheDocument()
+    expect(within(found).getByText('user')).toBeInTheDocument()
+    expect(within(found).getByText(/publish: Mentions creating or changing GitHub issues/)).toBeInTheDocument()
+    expect(within(found).queryByText('Mine')).not.toBeInTheDocument() // registered sources are listed above, not here
+  })
+
+  it('shows a source\'s compatibility notes as hints that never block', async () => {
+    const api = fake({ reports: [
+      { sourceId: 'f1', count: 3, warnings: [], flagged: [{ name: 'to-tickets', notes: ['Appears to keep issues or tickets in local files.', 'Ships scripts.'] }] },
+      { sourceId: 'g1', count: 1, warnings: [] },
+    ] })
+    open(api)
+    const summary = await screen.findByText('Compatibility notes (1)')
+    await fireEvent.click(summary)
+    expect(screen.getByText('to-tickets')).toBeVisible()
+    expect(screen.getByText('Appears to keep issues or tickets in local files.')).toBeInTheDocument()
+    expect(screen.getByText(/never stop a launch/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Compatibility notes/)).toHaveLength(1) // none for the source without notes
   })
 })

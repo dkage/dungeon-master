@@ -1,10 +1,10 @@
 <script lang="ts">
   import * as realApi from './api'
-  import type { ProjectSkillSource, SkillSource, SkillSourceReport, SkillSourcesState, SkillSuggestion } from './api'
+  import type { ProjectSkillSource, SkillDiscovery, SkillSource, SkillSourceReport, SkillSourcesState, SkillSuggestion } from './api'
   import { wordLabel } from './words'
 
   type Api = Pick<typeof realApi, 'getSkillSources' | 'addSkillSource' | 'updateSkillSource' | 'refreshSkillSource' | 'removeSkillSource'
-    | 'reorderSkillSources' | 'getProjectSkillSources' | 'setProjectSkillSources' | 'pickFolder'>
+    | 'reorderSkillSources' | 'getProjectSkillSources' | 'setProjectSkillSources' | 'pickFolder'> & Partial<Pick<typeof realApi, 'getProjectSkills' | 'setSkillDiscovery'>>
   let { campaignId = '', campaignName = '', wordMode = 'hints', api = realApi, now = () => Date.now(), onchange = () => {} }: {
     campaignId?: string
     campaignName?: string
@@ -17,6 +17,8 @@
 
   let sourcesState = $state<SkillSourcesState | null>(null)
   let project = $state<ProjectSkillSource[]>([])
+  // What was found automatically for this project (its own folders, yours, plugins), when those are turned on.
+  let found = $state<SkillSourceReport[]>([])
   let error = $state('')
   let loadError = $state('')
   let busy = $state(false)
@@ -41,7 +43,9 @@
     try {
       const book = await api.getSkillSources()
       const mine = campaignId ? ((await api.getProjectSkillSources(campaignId)).sources ?? []) : []
+      const finds = campaignId && api.getProjectSkills ? ((await api.getProjectSkills(campaignId)).reports ?? []).filter((r) => r.origin && r.origin !== 'registered') : []
       if (seq !== loadSeq) return
+      found = finds
       sourcesState = { ...book, sources: book.sources ?? [], suggestions: book.suggestions ?? [], reports: book.reports ?? [] }
       project = mine
     } catch (e) {
@@ -92,6 +96,11 @@
       await load()
     }, 'Could not save the source.')
   }
+  const discovery = $derived<SkillDiscovery>(sourcesState?.discovery ?? { project: false, user: false, plugins: false })
+  const setDiscovery = (key: keyof SkillDiscovery, on: boolean) => run(async () => {
+    await api.setSkillDiscovery?.({ ...discovery, [key]: on })
+    await load()
+  }, 'Could not change where to look.')
   const toggle = (s: SkillSource, enabled: boolean) => run(async () => { await api.updateSkillSource(s.id, { enabled }); await load() }, 'Could not change the source.')
   const refresh = (s: SkillSource) => run(async () => { await api.refreshSkillSource(s.id); await load() }, 'Could not refresh the source.')
   const remove = (s: SkillSource) => run(async () => { await api.removeSkillSource(s.id); removeId = null; await load() }, 'Could not remove the source.')
@@ -151,6 +160,11 @@
               {#if s.error}<span class="warn" role="status">Last refresh failed {age(s.error.at)}: {s.error.message}.{s.verified ? ` Showing the version from ${age(s.verified.at)}.` : ''}</span>{/if}
               {#if r?.unavailable}<span class="warn">{r.unavailable}</span>{/if}
               {#each r?.warnings ?? [] as w (w)}<span class="warn">{w}</span>{/each}
+              {#if (r?.flagged ?? []).length > 0}
+                <details class="notes"><summary>Compatibility notes ({r?.flagged?.length})</summary>
+                  <ul>{#each r?.flagged ?? [] as f (f.name)}<li><strong>{f.name}</strong>{#each f.notes as n (n)}<span>{n}</span>{/each}</li>{/each}</ul>
+                  <small class="hint">Hints from reading each skill, not a check. They never stop a launch.</small></details>
+              {/if}
             </div>
             <span class="count" aria-label={`${r?.count ?? 0} skills`}>{r?.count ?? 0}</span>
             <div class="row-actions">
@@ -198,6 +212,24 @@
     </div>
   {/if}
 
+  {#if api.setSkillDiscovery}
+    <fieldset class="discover">
+      <legend>Also look in</legend>
+      <label class="check"><input type="checkbox" checked={discovery.project} onchange={(e) => setDiscovery('project', e.currentTarget.checked)} disabled={busy} /> <span>The project's own skill folders (<code>.claude/skills</code>, <code>.agents/skills</code>)</span></label>
+      <label class="check"><input type="checkbox" checked={discovery.user} onchange={(e) => setDiscovery('user', e.currentTarget.checked)} disabled={busy} /> <span>Your skill folders (<code>~/.claude/skills</code>, <code>~/.agents/skills</code>)</span></label>
+      <label class="check"><input type="checkbox" checked={discovery.plugins} onchange={(e) => setDiscovery('plugins', e.currentTarget.checked)} disabled={busy} /> <span>Installed Claude plugins</span></label>
+      <small class="hint">Off unless you turn it on. Registered sources come first. Where a skill was found does not say Claude can run it as a command; a launch hands it over in the briefing.</small>
+      {#if found.length > 0}
+        <ul class="found" aria-label={`Found automatically for ${campaignName}`}>
+          {#each found as r (r.sourceId)}
+            <li><strong>{r.name ?? r.sourceId}</strong> <span class="pin">{r.origin}</span> <span aria-label={`${r.count} skills`}>{r.count}</span>
+              {#each r.flagged ?? [] as f (f.name)}<span class="warn">{f.name}: {f.notes.join(' ')}</span>{/each}</li>
+          {/each}
+        </ul>
+      {/if}
+    </fieldset>
+  {/if}
+
   {#if campaignId && project.length > 0}
     <div class="project" role="group" aria-label={`Sources for ${campaignName}`}>
       <div class="section-heading"><div><h3>For {campaignName}</h3><p>{project.some((s) => s.override) ? 'This project has its own list.' : 'Using the defaults above. Change anything to give this project its own list.'}</p></div>
@@ -238,6 +270,14 @@
   .confirm { grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; color: var(--muted); }
   .suggest { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); font-size: 12px; }
   .error { color: var(--error); }
+  .discover { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+  .discover legend { padding: 0 6px; color: var(--muted); font-size: 12px; }
+  .check { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; }
+  .found { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+  .found li { display: grid; gap: 2px; }
+  .notes { font-size: 12px; color: var(--muted); }
+  .notes ul { margin: 4px 0; padding-left: 16px; display: grid; gap: 4px; }
+  .notes li { display: grid; gap: 1px; }
   .editor, .project { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
   .field { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
   .path { display: grid; grid-template-columns: 1fr auto; gap: 6px; }

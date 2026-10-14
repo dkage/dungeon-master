@@ -907,6 +907,18 @@ describe('QuestDetail', () => {
       expect(within(dialog).getByText('Only the form. · shortened to fit')).toBeInTheDocument()
     })
 
+    it('shows where a skill was found and its compatibility notes in the review', async () => {
+      const { preview } = setup()
+      preview.mockResolvedValue(plan({
+        method: { id: 'user-claude/publish', name: 'publish', sourceName: 'Your skills', dir: '/h/.claude/skills/publish', file: '/h/.claude/skills/publish/SKILL.md', delivery: 'briefing', origin: 'user',
+          notes: ['Mentions creating or changing GitHub issues or pull requests.'] },
+      }) as never)
+      await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+      const dialog = screen.getByRole('dialog', { name: 'Review launch plan' })
+      expect(within(dialog).getByText('your own skill folder')).toBeInTheDocument()
+      expect(within(dialog).getByText('Mentions creating or changing GitHub issues or pull requests.')).toBeInTheDocument()
+    })
+
     it('keeps a choice that is no longer offered visible, and the server\'s refusal stops the launch', async () => {
       const { s, preview } = setup()
       const method = await screen.findByLabelText('Method')

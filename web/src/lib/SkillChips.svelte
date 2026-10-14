@@ -32,7 +32,7 @@
   <div class="chips" role="group" aria-label={`${wordLabel('spell', store.appearance.wordMode, true)} for the open issue`}>
     {#each entries as e (e.id)}
       <button type="button" class="chip" class:on={chosen === e.id} aria-pressed={chosen === e.id} disabled={number === null}
-        title={number === null ? reason : `${e.sourceName}${e.description ? `: ${e.description}` : ''}`} onclick={() => pick(e.id)}>{label(e)}</button>
+        title={number === null ? reason : `${e.sourceName}${e.description ? `: ${e.description}` : ''}${e.notes?.length ? ` (${e.notes.length} note${e.notes.length === 1 ? '' : 's'})` : ''}`} onclick={() => pick(e.id)}>{label(e)}</button>
     {/each}
     {#if reason}<span class="hint">{reason}</span>{/if}
   </div>

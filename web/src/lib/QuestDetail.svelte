@@ -364,6 +364,8 @@
             <dt>Method</dt><dd>{launchPreview.method.name} · {launchPreview.method.sourceName}{launchPreview.method.revision ? ` @ ${launchPreview.method.revision.slice(0, 12)}` : ''}</dd>
             <dt>Delivery</dt><dd>{launchPreview.method.delivery === 'briefing' ? "Added to the briefing: the skill's instructions and its directory" : launchPreview.method.delivery}{launchPreview.method.truncated ? ' · only the start of a long skill is copied; the whole file is readable in its directory' : ''}</dd>
             <dt>Skill directory</dt><dd>{launchPreview.method.dir}</dd>
+            {#if launchPreview.method.origin && launchPreview.method.origin !== 'registered'}<dt>Found in</dt><dd>{({ project: "this project's own skill folder", user: 'your own skill folder', plugin: 'an installed plugin' } as Record<string, string>)[launchPreview.method.origin] ?? launchPreview.method.origin}</dd>{/if}
+            {#each launchPreview.method.notes ?? [] as note (note)}<dt>Note</dt><dd>{note}</dd>{/each}
           {:else if launchPreview.canStart}<dt>Method</dt><dd>None. {choice.skill === '' ? 'No skill was suggested for this issue.' : 'No skill was chosen.'}</dd>{/if}
           {#if launchPreview.direction}<dt>Additional direction</dt><dd>{launchPreview.direction}{launchPreview.directionTruncated ? ' · shortened to fit' : ''}</dd>{/if}
         </dl>

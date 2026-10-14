@@ -174,6 +174,8 @@ export interface LaunchMethod {
   /** "briefing": the skill's text and directory are in the reviewed briefing. */
   delivery: string
   truncated?: boolean
+  origin?: string
+  notes?: string[]
 }
 
 /** What the operator adds to a launch; both are part of the reviewed plan. */
@@ -416,9 +418,20 @@ export interface SkillSource {
   verified?: { revision: string; at: string }
   error?: { message: string; at: string }
 }
-export interface SkillSourceReport { sourceId: string; count: number; warnings: string[]; unavailable?: string }
+export interface SkillSourceReport {
+  sourceId: string
+  name?: string
+  /** "registered", or where a supplementary source was found: "project", "user" or "plugin". */
+  origin?: string
+  count: number
+  warnings: string[]
+  /** Skills with compatibility notes: hints from inspecting them, never a block. */
+  flagged?: { name: string; notes: string[] }[]
+  unavailable?: string
+}
+export interface SkillDiscovery { project: boolean; user: boolean; plugins: boolean }
 export interface SkillSuggestion { key: string; name: string; location: string; license: string; notice: string }
-export interface SkillSourcesState { sources: SkillSource[]; suggestions: SkillSuggestion[]; reports: SkillSourceReport[] }
+export interface SkillSourcesState { sources: SkillSource[]; suggestions: SkillSuggestion[]; reports: SkillSourceReport[]; discovery?: SkillDiscovery }
 /** A source as one project sees it: `enabled` is for that project, `override` says the project lists it itself. */
 export interface ProjectSkillSource extends SkillSource { override: boolean }
 export interface SkillSourceInput { name?: string; kind?: 'folder' | 'git'; location?: string; pin?: string; suggestion?: string }
@@ -436,6 +449,8 @@ export interface SkillEntry {
   dir: string
   file: string
   userInvocable: boolean
+  origin?: string
+  notes?: string[]
   shadowed: boolean
   shadowedBy?: string
 }
@@ -448,6 +463,7 @@ export const updateSkillSource = (id: string, patch: SkillSourcePatch) => call<S
 export const refreshSkillSource = (id: string) => call<SkillSource>('POST', `${skillSource(id)}/refresh`, {}) as Promise<SkillSource>
 export const removeSkillSource = (id: string) => call<void>('DELETE', skillSource(id)) as Promise<void>
 export const reorderSkillSources = (ids: string[]) => call<SkillSourcesState>('PUT', '/api/skill-sources/order', { ids }) as Promise<SkillSourcesState>
+export const setSkillDiscovery = (d: SkillDiscovery) => call<SkillSourcesState>('PUT', '/api/skill-sources/discovery', d) as Promise<SkillSourcesState>
 export const getProjectSkillSources = (campaignId: string) =>
   call<{ sources: ProjectSkillSource[] }>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/skill-sources`) as Promise<{ sources: ProjectSkillSource[] }>
 /** An empty list returns the project to the inherited defaults. */
