@@ -46,6 +46,8 @@ type Skill struct {
 	// UserInvocable is false when the skill's metadata says only the model
 	// may call it; it stays listed, with that reason.
 	UserInvocable bool `json:"userInvocable"`
+	// Notes are compatibility hints from a read-only look at the skill; see inspect.go.
+	Notes []string `json:"notes"`
 }
 
 // Result is what one scan found.
@@ -168,6 +170,7 @@ func readSkill(dir, realRoot string) (sk Skill, ok bool, warn string) {
 		return Skill{}, false, "skipped " + label + ": its name is not a plain identifier"
 	}
 	return Skill{
+		Notes:         inspect(dir, string(buf[:n])),
 		Name:          name,
 		Description:   clean(meta["description"]),
 		Dir:           dir,

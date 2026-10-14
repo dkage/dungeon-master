@@ -247,3 +247,122 @@ func TestReadRefusesAFileThatLeavesTheSourceOrIsTooLarge(t *testing.T) {
 		t.Fatal("read a missing file")
 	}
 }
+
+func TestNotesFlagGitHubWritesFileTrackersSetupFilesAndScripts(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "publish", "SKILL.md"), "---\nname: publish\n---\nThen run `gh issue create --title x`.\n")
+	write(t, filepath.Join(root, "tracker", "SKILL.md"), "---\nname: tracker\n---\nKeep tickets as local markdown files under .scratch/.\n")
+	write(t, filepath.Join(root, "setup", "SKILL.md"), "---\nname: setup\n---\nFirst, create a CONTEXT.md in the repository root.\n")
+	write(t, filepath.Join(root, "scripted", "SKILL.md"), "---\nname: scripted\n---\nRun it.\n")
+	write(t, filepath.Join(root, "scripted", "scripts", "check.sh"), "#!/bin/sh\n")
+	write(t, filepath.Join(root, "clean", "SKILL.md"), "---\nname: clean\n---\nRead the code. Use `gh issue view 3` to read.\n")
+	got := map[string][]string{}
+	for _, s := range Scan(root).Skills {
+		got[s.Name] = s.Notes
+	}
+	for name, want := range map[string]string{"publish": NoteWritesGitHub, "tracker": NoteFileTracker, "setup": NoteSetupFiles, "scripted": NoteScripts} {
+		if len(got[name]) != 1 || got[name][0] != want {
+			t.Errorf("%s notes = %v, want [%s]", name, got[name], want)
+		}
+	}
+	if got["clean"] == nil || len(got["clean"]) != 0 {
+		t.Errorf("clean notes = %#v, want an empty list (reading with gh is fine)", got["clean"])
+	}
+}
+
+func TestAnExecutableFileOrScriptsFolderFlagsAndASymlinkDoesNot(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "a", "SKILL.md"), "---\nname: a\n---\n")
+	write(t, filepath.Join(root, "a", "tool"), "x")
+	if runtime.GOOS != "windows" {
+		_ = os.Chmod(filepath.Join(root, "a", "tool"), 0o755)
+		outside := t.TempDir()
+		write(t, filepath.Join(outside, "evil.sh"), "x")
+		_ = os.Chmod(filepath.Join(outside, "evil.sh"), 0o755)
+		write(t, filepath.Join(root, "b", "SKILL.md"), "---\nname: b\n---\n")
+		_ = os.Symlink(filepath.Join(outside, "evil.sh"), filepath.Join(root, "b", "link.sh"))
+	}
+	for _, s := range Scan(root).Skills {
+		if s.Name == "a" && runtime.GOOS != "windows" && (len(s.Notes) != 1 || s.Notes[0] != NoteScripts) {
+			t.Errorf("a = %v", s.Notes)
+		}
+		if s.Name == "b" && len(s.Notes) != 0 {
+			t.Errorf("b followed a symlink: %v", s.Notes)
+		}
+	}
+}
+
+func TestBuildReportsFlaggedSkillsAndTheOriginOfEachSource(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "p", "SKILL.md"), "---\nname: p\n---\ngh pr create\n")
+	write(t, filepath.Join(root, "q", "SKILL.md"), "---\nname: q\n---\n")
+	cat := Build([]Source{{ID: "s1", Name: "Mine", Root: root, Enabled: true}, {ID: "project-claude", Name: "Project", Origin: OriginProject, Root: root, Enabled: true}})
+	if cat.Reports[0].Origin != OriginRegistered || len(cat.Reports[0].Flagged) != 1 || cat.Reports[0].Flagged[0].Name != "p" || cat.Reports[0].Name != "Mine" {
+		t.Fatalf("report = %+v", cat.Reports[0])
+	}
+	if cat.Reports[1].Origin != OriginProject {
+		t.Fatalf("report = %+v", cat.Reports[1])
+	}
+	for _, e := range cat.Entries {
+		if e.SourceID == "project-claude" && (e.Origin != OriginProject || !e.Shadowed) {
+			t.Errorf("entry = %+v", e)
+		}
+	}
+}
+
+func TestSupplementaryFindsOnlyWhatIsTurnedOnAndExists(t *testing.T) {
+	home, proj := t.TempDir(), t.TempDir()
+	write(t, filepath.Join(proj, ".claude", "skills", "a", "SKILL.md"), skill("a", ""))
+	write(t, filepath.Join(proj, ".agents", "skills", "b", "SKILL.md"), skill("b", ""))
+	write(t, filepath.Join(home, ".claude", "skills", "c", "SKILL.md"), skill("c", ""))
+	ids := func(d Discovery, dirs []string, h string) string {
+		var out []string
+		for _, s := range Supplementary(d, dirs, h) {
+			out = append(out, s.ID)
+		}
+		return strings.Join(out, ",")
+	}
+	if got := ids(Discovery{}, []string{proj}, home); got != "" {
+		t.Errorf("nothing on = %q", got)
+	}
+	if got := ids(Discovery{Project: true}, []string{proj}, home); got != "project-claude,project-agents" {
+		t.Errorf("project = %q", got)
+	}
+	if got := ids(Discovery{User: true}, []string{proj}, home); got != "user-claude" { // ~/.agents/skills does not exist
+		t.Errorf("user = %q", got)
+	}
+	if got := ids(Discovery{User: true, Plugins: true}, nil, ""); got != "" {
+		t.Errorf("no home must find nothing: %q", got)
+	}
+	// The git root is listed after the project folder, and a repeated folder only once.
+	root := t.TempDir()
+	write(t, filepath.Join(root, ".claude", "skills", "r", "SKILL.md"), skill("r", ""))
+	if got := ids(Discovery{Project: true}, []string{proj, root, root}, ""); got != "project-claude,project-agents,project-claude-root" {
+		t.Errorf("root = %q", got)
+	}
+}
+
+func TestPluginSkillsComeFromInstalledPluginsInsideThePluginsFolder(t *testing.T) {
+	home := t.TempDir()
+	base := filepath.Join(home, ".claude", "plugins")
+	good := filepath.Join(base, "cache", "market", "helper", "1.0")
+	write(t, filepath.Join(good, "skills", "x", "SKILL.md"), skill("x", "from a plugin"))
+	outside := t.TempDir()
+	write(t, filepath.Join(outside, "skills", "evil", "SKILL.md"), skill("evil", ""))
+	write(t, filepath.Join(base, "installed_plugins.json"), `{"version":2,"plugins":{
+		"helper@market":[{"scope":"user","installPath":"`+good+`"}],
+		"sneaky@market":[{"installPath":"`+outside+`"}],
+		"empty@market":[{"installPath":""}],
+		"broken@market":"not an object"}}`)
+	got := Supplementary(Discovery{Plugins: true}, nil, home)
+	if len(got) != 1 || got[0].ID != "plugin-helper" || got[0].Name != "Plugin: helper" || got[0].Origin != OriginPlugin {
+		t.Fatalf("plugins = %+v", got)
+	}
+	if names(Scan(got[0].Root)) != "x" {
+		t.Fatal("the plugin's skill was not found")
+	}
+	write(t, filepath.Join(base, "installed_plugins.json"), `{nope`)
+	if got := Supplementary(Discovery{Plugins: true}, nil, home); len(got) != 0 {
+		t.Fatalf("malformed list = %+v", got)
+	}
+}
