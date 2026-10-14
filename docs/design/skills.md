@@ -43,10 +43,11 @@ prove that a skill cached from a Git repository is natively registered. #66 reco
 project, user, plugin and app-managed external sources before #50 promises their launch behavior.
 
 Use native invocation only where verified. Otherwise, choose and verify an explicit read-by-path briefing method for
-external sources, with supporting files resolved relative to their source directory and bounded agent read access.
-This is Claude-specific delivery behind the existing Launcher seam, not a generic adapter platform. Unsupported
-sources remain visible with a reason. Do not silently install/mirror skills, execute package scripts or discard the
-operator's chosen source to make a slash command succeed.
+external sources, with supporting files resolved relative to their source directory and bounded agent read access. This
+is Claude-specific delivery behind the existing Launcher seam, not a generic adapter platform. The briefing for a skill
+launch carries the skill's instructions and its absolute directory on this machine, so the agent can open the templates,
+examples and validators that ship beside it. Unsupported sources remain visible with a reason. Do not silently
+install/mirror skills, execute package scripts or discard the operator's chosen source to make a slash command succeed.
 
 ## 4. Launch review and task context
 
@@ -74,10 +75,18 @@ uses #61 and the issue-shape contract, not automatic skill-driven assignment on 
 
 ## 6. UI
 
-Settings: Skill sources (add folder/repository, pin, refresh, reorder, enable and remove), and per-project source mapping.
-The detail footer: hero configuration, skill suggestion/None, source and availability, then Review launch. Planning
-sessions can select the same methods without an issue. Selecting a source, method or model never launches by itself.
-Presets and user-editable suggestion rules can follow after the source and invocation contract works.
+Settings: Skill sources (add folder/repository, pin, refresh, reorder, enable and remove), and per-project source
+mapping. In Review launch the default is the current prompt; a combo box adds a skill from the sources enabled for the
+project, for that issue only. The footer has an Agent select (the hero) and a Method select whose default, "Automatic",
+means the suggestion for this issue (or no skill when none applies) and is resolved to a named, source-qualified method
+in the review, never at spawn. Below them, "Agents..." and "Skill sources..." open the matching Settings sections, and
+"Review launch" is the only button that leads to a launch; an optional "Additional direction" text field sits above
+them. Its text is the operator's own instruction: it is sent to the agent verbatim in the briefing, in its own labelled
+section apart from the issue text (which stays untrusted data), bounded in length with any truncation shown, and part of
+the reviewed plan, so editing it after review invalidates the review. Selecting or typing never launches. The detail
+footer: hero configuration, skill suggestion/None, source and availability, then Review launch. Planning sessions can
+select the same methods without an issue. Selecting a source, method or model never launches by itself. Presets and
+user-editable suggestion rules can follow after the source and invocation contract works.
 
 ## 7. Work order
 
