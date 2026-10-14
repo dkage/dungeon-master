@@ -3,8 +3,6 @@ status: current
 milestone: map and campaign workflow
 github_issues: [28, 24, 27, 61, 62, 67, 68]
 tracking: in-gh-issues
-next: keep the contract while map validation and issue-writing work remain open
-verified: 2026-10-13
 ---
 
 # Issue shape: what the map reads from GitHub

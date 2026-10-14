@@ -3,8 +3,6 @@ status: current
 milestone: M5a, M6
 github_issues: [28, 44, 72, 73, 74, 75, 76, 77, 93, 96, 97, 98, 99]
 tracking: in-gh-issues
-next: review as later art is added
-verified: 2026-10-13
 ---
 
 # Dungeon theme: art direction

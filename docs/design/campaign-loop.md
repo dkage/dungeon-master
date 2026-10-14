@@ -3,8 +3,6 @@ status: planned
 milestone: campaign workflow
 github_issues: [61, 67, 68, 71]
 tracking: in-gh-issues
-next: implement readiness, planning and outcome handoff after skill launch and trustworthy attention
-verified: 2026-10-13
 ---
 
 # Plan, choose, launch, steer and review

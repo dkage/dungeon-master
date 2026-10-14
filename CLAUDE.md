@@ -8,8 +8,9 @@ Status and next steps are in the GitHub open issues; the order of increments is 
 Themed words: `GLOSSARY.md`.
 
 Design for work not yet built lives in `docs/` (`architecture.md`, `ideas.md`, `design/`), not in the repo root. Each of
-those files starts with front-matter properties (`status`, `milestone`, `github_issues`, `tracking`, `next`,
-`verified`); update them when its state changes. When a milestone closes, delete its design doc (git keeps the history).
+those files starts with front-matter properties (`status`, `milestone`, `github_issues`, `tracking`, and `delete_when`
+where a doc has a deletion trigger). Status, next steps and evidence of delivery are not recorded in documents; they live
+in GitHub issues and their closing comments. When a milestone closes, delete its design doc (git keeps the history).
 The history of the project's design references and visual assets lives in
 [`design/index.md`](design/index.md). It lists each design folder and the
 commit dates when its asset batches were first recorded. The Google Stitch export in

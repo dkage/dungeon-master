@@ -3,8 +3,6 @@ status: planned
 milestone: M5b
 github_issues: [43, 49, 50, 51, 66]
 tracking: in-gh-issues
-next: register sources, discover their catalog, verify delivery, then launch a selected method
-verified: 2026-10-13
 ---
 
 # Skills and launch methods

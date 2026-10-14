@@ -3,8 +3,7 @@ status: current
 milestone: M5a
 github_issues: [28, 44]
 tracking: in-gh-issues
-next: use as the source for M5a sprite mapping; delete when M5a closes
-verified: 2026-10-13
+delete_when: M5a closes
 ---
 
 # Quest creature roster

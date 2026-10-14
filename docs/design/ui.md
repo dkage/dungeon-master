@@ -3,8 +3,6 @@ status: current
 milestone: cockpit and workspace focus
 github_issues: [28, 43, 63, 64, 65, 67, 68, 71, 72, 77, 82]
 tracking: in-gh-issues
-next: finish prototype parity, then expansion/shortcuts; see the roadmap for priority
-verified: 2026-10-13
 ---
 
 # Screens and controls

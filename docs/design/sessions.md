@@ -3,8 +3,6 @@ status: investigation
 milestone: session continuity
 github_issues: [69, 70, 79, 80, 81]
 tracking: in-gh-issues
-next: record the ownership decision before implementing recovery or wiring desktop-window shutdown
-verified: 2026-10-14
 ---
 
 # Session ownership and continuity

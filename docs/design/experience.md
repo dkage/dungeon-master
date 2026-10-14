@@ -3,8 +3,6 @@ status: current
 milestone: delivered cockpit and planned campaign workflow
 github_issues: [28, 43, 45, 48, 52, 63, 67, 68, 69, 70, 71]
 tracking: in-gh-issues
-next: review/publish the committed map, then focused workspace views, sources and trustworthy attention
-verified: 2026-10-13
 ---
 
 # Cockpit experience
@@ -16,7 +14,7 @@ makes relationships understandable; the theme represents real work and never sub
 ## 1. Baseline and evidence
 
 The cockpit shell, first-run flow, issue launch and heuristic attention are delivered through M4.5. The map and its review fixes are published,
-with automated checks passed; #28 is closed. Read `docs/roadmap.md` for the dated status audit. Earlier descriptions of an
+with automated checks passed. Read the GitHub issues for current status. Earlier descriptions of an
 empty launcher, a missing map scheduled last, or milestones waiting for a push were historical and are superseded.
 The Stitch v4 assets remain the visual baseline; behavior is specified by current design docs rather than generated HTML.
 
@@ -43,7 +41,7 @@ terminal; reading a blocker should expose its detail instead of changing process
 
 ## 4. Work order and exit criteria
 
-`docs/roadmap.md` is the sole ordered milestone table. Review/publish the committed map, add workspace focus/shortcuts, implement
+`docs/roadmap.md` is the sole ordered milestone table. Implement
 registered source-backed skills, verify hooks/attention, add ready-work/planning, settle session continuity and add the
 outcome handoff. Packaging consumes the lifecycle decision. Extra map presentation follows usable daily workflow.
 Do not duplicate milestone status tables here.
@@ -116,7 +114,7 @@ not a second dispatcher. Terminal/text input, IME, browser reservations and moda
 
 ## 8. Documentation discipline
 
-Plans state behavior and decisions. The roadmap records priority and dated delivery evidence; GitHub owns remaining
+Plans state behavior and decisions. The roadmap records order; GitHub owns status, delivery evidence, remaining
 work and relationships. Frontmatter tracks the applicable issues. Do not claim pending push without actual ahead commits,
 or completion from a successful process exit. When a design's milestone is fully closed, retain its behavior in the
 appropriate current contract and remove the obsolete plan per `CLAUDE.md`.

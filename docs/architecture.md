@@ -3,8 +3,6 @@ status: current
 milestone: delivered foundations and planned extensions
 github_issues: [28, 43, 63, 67, 68, 69, 70, 71, 79]
 tracking: in-gh-issues
-next: review/publish the committed map; use the roadmap for order and design docs for extensions
-verified: 2026-10-13
 ---
 
 # Dungeon Master architecture

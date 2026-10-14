@@ -3,8 +3,6 @@ status: parking-lot
 milestone: after v1
 github_issues: [79]
 tracking: none
-next: ideas only; promote an idea to an issue when v1 is stable
-verified: 2026-10-13
 ---
 
 # Dungeon Master — plan v2 (parking lot)

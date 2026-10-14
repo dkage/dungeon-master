@@ -3,8 +3,6 @@ status: planned
 milestone: workspace usability
 github_issues: [63, 64, 65, 78, 84, 87, 88, 160, 163]
 tracking: in-gh-issues
-next: desktop-shell menu wiring for the shared actions; quick switcher decision (#146)
-verified: 2026-10-14
 ---
 
 # Workspace focus and shortcuts

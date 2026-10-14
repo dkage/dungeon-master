@@ -3,8 +3,7 @@ status: reference
 milestone: M3.5 to M5a
 github_issues: []
 tracking: none
-next: keep as rationale for the plain-words rules, the Gatekeeper and the map stub; delete when those are covered by tests and the glossary
-verified: 2026-10-11
+delete_when: the plain-words rules, the Gatekeeper and the map stub are covered by tests and the glossary
 ---
 
 # Review findings and rules they led to

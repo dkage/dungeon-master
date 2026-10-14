@@ -3,8 +3,7 @@ status: current
 milestone: M5a, M6
 github_issues: [23, 28, 44, 73, 74]
 tracking: in-gh-issues
-next: review assets in the map as it ships; delete when M6 art work closes
-verified: 2026-10-13
+delete_when: M6 art work closes
 ---
 
 # Art checklist
