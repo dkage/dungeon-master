@@ -18,6 +18,11 @@ import (
 
 type launchPreviewRequest struct {
 	Hero string `json:"hero"`
+	// Skill is a source-qualified skill id from the project's catalog; empty
+	// means no skill. It is never a bare name and never falls back.
+	Skill string `json:"skill,omitempty"`
+	// Direction is the operator's own text for this launch.
+	Direction string `json:"direction,omitempty"`
 }
 
 type launchPreviewJSON struct {
@@ -35,6 +40,12 @@ type launchPreviewJSON struct {
 	ExistingSession *sessionJSON `json:"existingSession,omitempty"`
 	// WorkingCopy says where the session would run and what a copy lacks.
 	WorkingCopy *workingCopyJSON `json:"workingCopy,omitempty"`
+	// Method is the chosen skill with its pin and delivery; absent for none.
+	Method *methodJSON `json:"method,omitempty"`
+	// MethodCode names why a chosen skill cannot be used, so the page can
+	// ask the operator to choose again rather than launch something else.
+	MethodCode string `json:"methodCode,omitempty"`
+	Direction  string `json:"direction,omitempty"`
 }
 
 // handleQuestLaunchPreview assembles and saves the exact context that Start
@@ -96,11 +107,22 @@ func (s *Server) handleQuestLaunchPreview(w http.ResponseWriter, r *http.Request
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
-	plan, err := s.questLaunchPlan(c, d, h, "")
-	if err != nil {
+	if len([]rune(req.Direction)) > briefing.MaxDirectionRunes*2 {
+		httpErr(w, http.StatusBadRequest, "the additional direction is too long")
+		return
+	}
+	plan, err := s.questLaunchPlan(c, d, h, "", launchChoices{Skill: req.Skill, Direction: req.Direction})
+	switch {
+	case errors.Is(err, errMethodUnavailable), errors.Is(err, errMethodChanged):
+		out.Reason, out.MethodCode = err.Error()+". Choose a skill again.", "method_unavailable"
+		writeJSON(w, http.StatusOK, out)
+		return
+	case err != nil:
 		httpErr(w, http.StatusInternalServerError, "could not prepare the private task briefing")
 		return
 	}
+	out.Result = plan.result
+	out.Method, out.Direction = plan.method, strings.TrimSpace(req.Direction)
 	out.CanStart = true
 	out.Hero, out.HeroLabel = h.ID, h.Label
 	out.Directory, out.BriefingID, out.BriefingFile = c.Dir, plan.id, plan.path
@@ -115,16 +137,39 @@ type questLaunchPlan struct {
 	opener       string
 	systemPrompt string
 	command      []string
+	addDirs      []string
+	result       briefing.Result
+	method       *methodJSON
 }
 
-func (s *Server) questLaunchPlan(c campaign.Campaign, d quests.Detail, h party.Hero, previewID string) (questLaunchPlan, error) {
+// launchChoices are what the operator added to a launch. They only matter
+// when a preview is made; Start reuses the reviewed briefing and its record.
+type launchChoices struct {
+	Skill     string
+	Direction string
+}
+
+func (s *Server) questLaunchPlan(c campaign.Campaign, d quests.Detail, h party.Hero, previewID string, choice launchChoices) (questLaunchPlan, error) {
 	var id, path string
 	var content string
+	var result briefing.Result
+	var method *resolvedMethod
 	var err error
 	if previewID == "" {
-		built := briefing.Build(c.Repo, d)
-		content = built.Content
+		opt := briefing.Options{Direction: choice.Direction}
+		if choice.Skill != "" {
+			m, merr := s.resolveMethod(c.ID, choice.Skill)
+			if merr != nil {
+				return questLaunchPlan{}, merr
+			}
+			method, opt.Method = &m, &m.method
+		}
+		result = briefing.BuildWith(c.Repo, d, opt)
+		content = result.Content
 		id, path, err = briefing.SavePreview(s.cfg.StateDir, c.ID, d.Number, h.ID, content)
+		if err == nil && method != nil {
+			err = briefing.SaveMeta(path, briefing.PlanMeta{SkillID: method.entry.ID, SourceID: method.entry.SourceID, Revision: method.entry.Revision, SHA256: method.sum})
+		}
 	} else {
 		path, err = briefing.PreviewPath(s.cfg.StateDir, c.ID, d.Number, h.ID, previewID)
 		if err == nil {
@@ -133,21 +178,41 @@ func (s *Server) questLaunchPlan(c campaign.Campaign, d quests.Detail, h party.H
 			content = string(contentBytes)
 			id = previewID
 		}
+		// The reviewed method must still be exactly what was reviewed.
+		if err == nil {
+			meta, ok, metaErr := briefing.ReadMeta(path)
+			if metaErr != nil {
+				err = metaErr
+			} else if ok {
+				m, rerr := s.revalidate(c.ID, meta)
+				if rerr != nil {
+					return questLaunchPlan{}, rerr
+				}
+				method = &m
+			}
+		}
 	}
 	if err != nil {
 		return questLaunchPlan{}, err
 	}
 	opener := fmt.Sprintf("Read the task briefing file at %q in full, then work on GitHub issue #%d: %s.", path, d.Number, d.URL)
+	addDirs := []string{filepath.Dir(path)}
+	var methodOut *methodJSON
+	if method != nil {
+		opener = fmt.Sprintf("Read the task briefing file at %q in full, follow the method it names, then work on GitHub issue #%d: %s.", path, d.Number, d.URL)
+		addDirs = append(addDirs, method.entry.Dir)
+		methodOut = method.json(result.MethodTruncated)
+	}
 	systemPrompt := s.systemPrompt(briefing.Instructions)
 	opts := launcher.Opts{
 		Opener: opener, AppendSystemPrompt: briefing.Instructions,
-		AddDirs: []string{filepath.Dir(path)},
+		AddDirs: addDirs,
 	}
 	opts = s.withGatekeeperRule(opts)
 	return questLaunchPlan{
 		id: id, path: path, content: content, opener: opener,
-		systemPrompt: systemPrompt,
-		command:      launcher.Command(s.cfg.Claude, h, opts),
+		systemPrompt: systemPrompt, addDirs: addDirs, result: result, method: methodOut,
+		command: launcher.Command(s.cfg.Claude, h, opts),
 	}, nil
 }
 

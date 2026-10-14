@@ -578,8 +578,12 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 				httpErrCode(w, http.StatusConflict, "quest_session_active", fmt.Sprintf("%s is already working in this Git working tree. Start this one in its own working copy.", existing.Title))
 				return
 			}
-			plan, err := s.questLaunchPlan(camp, d, h, req.BriefingID)
+			plan, err := s.questLaunchPlan(camp, d, h, req.BriefingID, launchChoices{})
 			if err != nil {
+				if errors.Is(err, errMethodChanged) || errors.Is(err, errMethodUnavailable) {
+					httpErrCode(w, http.StatusConflict, "method_unavailable", err.Error()+". Review the launch again and choose a skill.")
+					return
+				}
 				if req.BriefingID != "" {
 					httpErrCode(w, http.StatusConflict, "preview_expired", "The briefing preview is no longer available. Preview it again before starting.")
 				} else {
@@ -589,7 +593,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 			}
 			spec = s.heroSpecWithOpts(h, launcher.Opts{
 				Opener: plan.opener, AppendSystemPrompt: briefing.Instructions,
-				AddDirs: []string{filepath.Dir(plan.path)},
+				AddDirs: plan.addDirs,
 			})
 			spec.Meta["title"] = fmt.Sprintf("#%d %s", d.Number, d.Title)
 			spec.Meta["quest"] = strconv.Itoa(d.Number)

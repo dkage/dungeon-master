@@ -56,12 +56,7 @@ func (s *Server) handleCampaignSkills(w http.ResponseWriter, r *http.Request) {
 		httpErr(w, http.StatusNotFound, "no such campaign")
 		return
 	}
-	eff := s.cfg.SkillSources.ForCampaign(id)
-	in := make([]skillcatalog.Source, 0, len(eff))
-	for _, e := range eff {
-		in = append(in, catalogSource(e.Source, e.Enabled))
-	}
-	writeJSON(w, http.StatusOK, skillcatalog.Build(in))
+	writeJSON(w, http.StatusOK, s.projectCatalog(id))
 }
 
 type skillSourceIn struct {
