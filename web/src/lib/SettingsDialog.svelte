@@ -8,6 +8,7 @@
   import { FILE_NAME, exportText, labelOf, planImport, show, type ImportPlan } from './appearanceFile'
   import { canvasMeasure, fontStatus, missingNotice, type FontStatus } from './termFont'
   import ShortcutsSettings from './ShortcutsSettings.svelte'
+  import SkillSources from './SkillSources.svelte'
   import { permission as notifyPermission, requestPermission } from './notify'
 
   let { store, onclose }: { store: AppStore; onclose: () => void } = $props()
@@ -344,6 +345,8 @@
       </div>
     {/if}
   </section>
+
+  <SkillSources campaignId={store.campaign?.id ?? ''} campaignName={store.campaign?.name ?? ''} wordMode={store.appearance.wordMode} />
 
   <section aria-labelledby="sizes-title">
     <h2 id="sizes-title">Panel text size</h2>
