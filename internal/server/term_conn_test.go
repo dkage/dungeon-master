@@ -237,7 +237,8 @@ func TestTermReattachReplaysOnlyWhatWasMissed(t *testing.T) {
 		t.Fatal("a fresh attach must not claim to resume")
 	}
 	send(t, c, "echo before-cut\n")
-	seen := readUntil(t, c, "before-cut")
+	// The output line, not the echo of the typed command (which also holds the word).
+	seen := readUntil(t, c, "\r\nbefore-cut\r\n")
 	pos := first.Start + uint64(len(seen))
 	c.CloseNow()
 
@@ -245,7 +246,7 @@ func TestTermReattachReplaysOnlyWhatWasMissed(t *testing.T) {
 	c2 := e.dialFrom(t, sj.ID, -1)
 	readAttach(t, c2)
 	send(t, c2, "echo while-away\n")
-	readUntil(t, c2, "while-away")
+	readUntil(t, c2, "\r\nwhile-away\r\n")
 	c2.CloseNow()
 
 	c3 := e.dialFrom(t, sj.ID, int64(pos))
