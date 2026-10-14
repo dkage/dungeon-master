@@ -53,3 +53,7 @@ export function faviconHref(count: number): string {
     '</svg>'
   return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
+
+/** A running session that is mid-work: closing it ends the agent and loses unfinished work, so it asks first. */
+export const needsStopConfirm = (s: Pick<SessionInfo, 'exited' | 'lost' | 'activity'>): boolean =>
+  !s.exited && !s.lost && (s.activity === 'working' || s.activity === 'needs-you')

@@ -4,6 +4,8 @@
   import Sidebar from './lib/Sidebar.svelte'
   import Toolbar from './lib/Toolbar.svelte'
   import Terminal from './lib/Terminal.svelte'
+  import SessionTabs from './lib/SessionTabs.svelte'
+  import StopConfirm from './lib/StopConfirm.svelte'
   import { connection, UNREACHABLE_NOTE } from './lib/connection.svelte'
   import { pingBackend } from './lib/api'
   import { Heartbeat } from './lib/heartbeat'
@@ -219,6 +221,8 @@
   <Sidebar {store} onsettings={() => (settingsOpen = true)} onwords={() => (wordsOpen = true)} />
   <div class="main">
     <Toolbar {store} />
+    <SessionTabs {store} />
+    <StopConfirm {store} />
     <main class="stage">
       {#each live as s (s.id)}
         <div class="pane" hidden={s.id !== store.activeId || store.guideOpen}>

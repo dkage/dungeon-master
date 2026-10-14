@@ -4,6 +4,8 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte'
 import { tick } from 'svelte'
 import Toolbar from './Toolbar.svelte'
 import Sidebar from './Sidebar.svelte'
+import SessionTabs from './SessionTabs.svelte'
+import StopConfirm from './StopConfirm.svelte'
 import { AppStore } from './store.svelte'
 import type { Campaign, Quest, QuestDetail as QuestDetailT, QuestResult, SessionInfo } from './api'
 import QuestsPanel from './QuestsPanel.svelte'
@@ -181,6 +183,77 @@ describe('first-run terminology and appearance', () => {
   })
 })
 
+describe('SessionTabs', () => {
+  const three = (st: AppStore) => {
+    st.sessions = [
+      sess('a', 'c1', { title: '#5 First', quest: 5, activity: 'working', hero: 'opus' }),
+      sess('b', 'c1', { title: 'Opus', activity: 'needs-you' }),
+      sess('s', 'c1', { kind: 'shell', title: 'Shell', activity: 'idle' }),
+      sess('o', 'c2', { title: 'Other project' }),
+      sess('x', 'c1', { title: 'Done', exited: true }),
+    ]
+    st.activeId = 'b'
+  }
+
+  it('shows the selected project\'s sessions as tabs in launch order, each with its state', () => {
+    render(SessionTabs, { store: store(three) })
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs.map((t) => t.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+      expect.stringContaining('#5 First (Opus)'), expect.stringContaining('Opus'), expect.stringContaining('Scratch terminal'), expect.stringContaining('Done'),
+    ])
+    expect(screen.queryByRole('tab', { name: /Other project/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Opus.*waiting for you/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /First.*working/ })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByRole('tab', { name: /Done.*exited/ })).toBeInTheDocument()
+    expect(screen.getByRole('tablist', { name: 'Sessions in this project' })).toBeInTheDocument()
+  })
+
+  it('shows nothing without sessions and follows the project selection', () => {
+    const { unmount } = render(SessionTabs, { store: store() })
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    unmount()
+    render(SessionTabs, { store: store((st) => { three(st); st.campaignId = 'c2' }) })
+    expect(screen.getAllByRole('tab')).toHaveLength(1)
+  })
+
+  it('selects a tab on click and moves with the arrow keys, wrapping at the ends', async () => {
+    const s = store(three)
+    const select = vi.spyOn(s, 'selectSession').mockResolvedValue()
+    render(SessionTabs, { store: s })
+    await fireEvent.click(screen.getByRole('tab', { name: /First/ }))
+    expect(select).toHaveBeenLastCalledWith('a')
+    await fireEvent.keyDown(screen.getByRole('tab', { name: /Opus.*waiting/ }), { key: 'ArrowRight' })
+    expect(select).toHaveBeenLastCalledWith('s')
+    await fireEvent.keyDown(screen.getByRole('tab', { name: /First/ }), { key: 'ArrowLeft' })
+    expect(select).toHaveBeenLastCalledWith('x')
+    await fireEvent.keyDown(screen.getByRole('tab', { name: /First/ }), { key: 'End' })
+    expect(select).toHaveBeenLastCalledWith('x')
+    await fireEvent.keyDown(screen.getByRole('tab', { name: /First/ }), { key: 'Home' })
+    expect(select).toHaveBeenLastCalledWith('a')
+    // Only the active tab is in the tab order.
+    expect(screen.getByRole('tab', { name: /Opus.*waiting/ })).toHaveAttribute('tabindex', '0')
+    expect(screen.getByRole('tab', { name: /First/ })).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('closes through the same confirmation as the project panel', async () => {
+    const s = store(three)
+    const close = vi.spyOn(s, 'close').mockResolvedValue()
+    render(SessionTabs, { store: s })
+    render(StopConfirm, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: 'Shell: close session' })) // idle: at once
+    expect(close).toHaveBeenCalledWith('s')
+    await fireEvent.click(screen.getByRole('button', { name: '#5 First: close session' })) // working: asks
+    expect(close).toHaveBeenCalledTimes(1)
+    expect(s.stopping).toBe('a')
+    await fireEvent.click(within(screen.getByRole('group', { name: 'Confirm stopping #5 First' })).getByRole('button', { name: 'Keep running' }))
+    expect(s.stopping).toBeNull()
+    expect(close).toHaveBeenCalledTimes(1)
+    await fireEvent.click(screen.getByRole('button', { name: '#5 First: close session' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Stop and close' }))
+    expect(close).toHaveBeenLastCalledWith('a')
+  })
+})
+
 describe('Sidebar', () => {
   it('opens the add form without a native dialog, and only picks on Choose folder', async () => {
     const s = store()
@@ -239,6 +312,7 @@ describe('Sidebar', () => {
     })
     const close = vi.spyOn(s, 'close').mockResolvedValue()
     render(Sidebar, { store: s })
+    render(StopConfirm, { store: s })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Close Idle one' }))
     expect(close).toHaveBeenCalledWith('idle')
@@ -260,6 +334,7 @@ describe('Sidebar', () => {
     const del = vi.fn(async () => {})
     ;(s as unknown as { client: { deleteSession: typeof del } }).client.deleteSession = del
     render(Sidebar, { store: s })
+    render(StopConfirm, { store: s })
     await fireEvent.click(screen.getByRole('button', { name: 'Close Runner' }))
     await fireEvent.click(screen.getByRole('button', { name: 'Stop and close' }))
     await tick()

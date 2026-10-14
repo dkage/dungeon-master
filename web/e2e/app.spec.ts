@@ -1717,3 +1717,51 @@ test('two issues of one project run at once, each in its own working copy', asyn
   await expect(page.getByRole('list', { name: /^Expeditions in/ })).toHaveCount(0)
   await expect.poll(listed).not.toContain('dungeon/issue-')
 })
+
+// --- Session tabs ---
+
+test('tabs switch between two live sessions by click and keyboard, each keeps its output, and closing asks', async ({ page }) => {
+  test.setTimeout(90_000)
+  await open(page)
+  const tabs = page.getByRole('tablist', { name: 'Sessions in this project' })
+  const prompt = process.platform === 'win32' ? '>' : '$'
+
+  await hero(page, 'Shell').click()
+  await expect(screenText(page)).toContainText(prompt, { timeout: 25_000 })
+  await page.locator('.pane:not([hidden]) .xterm').click()
+  await page.keyboard.type('echo FIRST-TAB-AAA')
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('FIRST-TAB-AAA')
+
+  // A new session opens in a new tab and becomes the active one.
+  await hero(page, 'Opus').click()
+  await expect(tabs.getByRole('tab')).toHaveCount(2)
+  await expect(tabs.getByRole('tab').nth(1)).toHaveAttribute('aria-selected', 'true')
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+
+  // Click the first tab: its terminal, with its output, is back without restarting.
+  await tabs.getByRole('tab').first().click()
+  await expect(tabs.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true')
+  await expect(screenText(page)).toContainText('FIRST-TAB-AAA')
+  await expect(screenText(page)).not.toContainText('FAKE-CLAUDE')
+
+  // The keyboard: arrows on the tab list, and the next/previous session shortcut.
+  await tabs.getByRole('tab').first().focus()
+  await page.keyboard.press('ArrowRight')
+  await expect(tabs.getByRole('tab').nth(1)).toHaveAttribute('aria-selected', 'true')
+  await expect(screenText(page)).toContainText('FAKE-CLAUDE')
+  await page.keyboard.press('Home')
+  await expect(tabs.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true')
+  await page.keyboard.press('Control+PageDown')
+  await expect(tabs.getByRole('tab').nth(1)).toHaveAttribute('aria-selected', 'true')
+
+  // Closing the hero session from its tab asks first if it is still working, then ends it.
+  await tabs.getByRole('button', { name: /: close session$/ }).nth(1).click()
+  const stop = page.getByRole('button', { name: 'Stop and close' })
+  if (await stop.isVisible()) await stop.click()
+  await expect(tabs.getByRole('tab')).toHaveCount(1)
+  await expect(tabs.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true')
+  await expect(screenText(page)).toContainText('FIRST-TAB-AAA')
+  await closeExpedition(page)
+  await expect(tabs).toHaveCount(0)
+})

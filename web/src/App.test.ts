@@ -398,7 +398,8 @@ describe('App', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Shell' }))
     await fireEvent.click(await screen.findByRole('button', { name: 'fake-exit-s1' }))
     expect(await screen.findByText('exit 5')).toBeInTheDocument()
-    expect(screen.getByText('exited with code 5')).toBeInTheDocument()
+    // The project list and the session tab both say so.
+    expect(screen.getAllByText('exited with code 5')).toHaveLength(2)
   })
 
   it('shows a lost expedition without a terminal and lets you dismiss it', async () => {

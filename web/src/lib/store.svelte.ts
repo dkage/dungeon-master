@@ -7,7 +7,7 @@ import type {
   AppState, Campaign, CampaignInput, CreateRequest, CampaignPatch, EffortTier, GithubStatus, Hero, HeroesConfig, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
   SessionInfo,
 } from './api'
-import { stillWaiting, unattended } from './attention'
+import { needsStopConfirm, stillWaiting, unattended } from './attention'
 import { buildModel, placeOf, type MapModel } from './map/model'
 import { pickToNotify } from './notify'
 import { TERMINAL_ACTION } from './termSearch'
@@ -85,6 +85,23 @@ export class AppStore {
   /** Sessions whose current wait the user has already looked at. */
   seen = $state<Set<string>>(new Set())
   error = $state<string | null>(null)
+  /** The session whose close is waiting for the user to confirm stopping it. */
+  stopping = $state<string | null>(null)
+  /** Closes a session; one that is mid-work asks first (answered by confirmStop or cancelStop). */
+  requestClose(id: string) {
+    const s = this.sessions.find((x) => x.id === id)
+    if (!s) return
+    if (needsStopConfirm(s)) this.stopping = id
+    else void this.close(id)
+  }
+  confirmStop() {
+    const id = this.stopping
+    this.stopping = null
+    if (id) void this.close(id)
+  }
+  cancelStop() {
+    this.stopping = null
+  }
   /** Something the user should know that is not an error, for example a working copy that was kept. */
   notice = $state<string | null>(null)
   busy = $state(false)
