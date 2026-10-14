@@ -197,3 +197,37 @@ describe('SkillSources when the server cannot be reached', () => {
     expect(await screen.findByText('Mine')).toBeInTheDocument()
   })
 })
+
+describe('SkillSources overlapping reloads', () => {
+  it('lets only the newest reload write its answer', async () => {
+    const api = fake()
+    const first = [folder, remote]
+    let release!: () => void
+    const slow = new Promise<void>((r) => { release = r })
+    // The first reload is slow and shows two sources; the second is quick and shows one.
+    api.getSkillSources
+      .mockImplementationOnce(async () => ({ sources: first, suggestions: [], reports: [] }))
+      .mockImplementationOnce(async () => { await slow; return { sources: first, suggestions: [], reports: [] } })
+      .mockImplementationOnce(async () => ({ sources: [remote], suggestions: [], reports: [] }))
+    open(api)
+    await screen.findByText('Mine')
+    await fireEvent.click(screen.getByRole('button', { name: 'Rescan' })) // slow, started first
+    await fireEvent.click(screen.getByRole('button', { name: 'Rescan' })) // quick, started second
+    await waitFor(() => expect(screen.queryByText('Mine')).not.toBeInTheDocument())
+    release()
+    await new Promise((r) => setTimeout(r, 20))
+    expect(screen.queryByText('Mine')).not.toBeInTheDocument() // the stale answer did not bring it back
+  })
+})
+
+describe('SkillSources with empty answers', () => {
+  it('copes with null lists from the server and stays usable', async () => {
+    const api = fake()
+    api.getSkillSources.mockResolvedValue({ sources: null, suggestions: null, reports: null } as never)
+    api.getProjectSkillSources.mockResolvedValue({ sources: null } as never)
+    open(api, { campaignId: 'c1', campaignName: 'Camp' })
+    expect(await screen.findByText(/No sources yet/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'New source' })).toBeEnabled()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})

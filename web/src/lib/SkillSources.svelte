@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
   import * as realApi from './api'
   import type { ProjectSkillSource, SkillSource, SkillSourceReport, SkillSourcesState, SkillSuggestion } from './api'
   import { wordLabel } from './words'
@@ -26,20 +25,29 @@
   // The registration dialog's draft; editing is the same form with the source's own values.
   let draft = $state<{ id: string; name: string; kind: 'folder' | 'git'; location: string; pin: string; suggestion: string; notice: string } | null>(null)
 
+  // The form takes focus when it opens, so it can be filled in from the keyboard.
+  let nameInput = $state<HTMLInputElement>()
+  $effect(() => { if (draft && nameInput) nameInput.focus() })
+
   const title = $derived(`${wordLabel('spell', wordMode)} sources`)
   const reportOf = (id: string): SkillSourceReport | undefined => sourcesState?.reports.find((r) => r.sourceId === id)
   const registered = (s: SkillSuggestion) => !!sourcesState?.sources.some((x) => x.location === s.location)
 
+  // Reloads can overlap (a change, a rescan, a project switch); only the newest one may write its answer.
+  let loadSeq = 0
   async function load() {
+    const seq = ++loadSeq
     loadError = ''
     try {
-      sourcesState = await api.getSkillSources()
-      project = campaignId ? (await api.getProjectSkillSources(campaignId)).sources : []
+      const book = await api.getSkillSources()
+      const mine = campaignId ? ((await api.getProjectSkillSources(campaignId)).sources ?? []) : []
+      if (seq !== loadSeq) return
+      sourcesState = { ...book, sources: book.sources ?? [], suggestions: book.suggestions ?? [], reports: book.reports ?? [] }
+      project = mine
     } catch (e) {
-      loadError = message(e, 'Could not load the sources.')
+      if (seq === loadSeq) loadError = message(e, 'Could not load the sources.')
     }
   }
-  onMount(() => { void load() })
   $effect(() => { void campaignId; void load() })
 
   const message = (e: unknown, fallback: string) => (e instanceof Error && e.message ? e.message : fallback)
@@ -98,7 +106,7 @@
 
   // A project lists its sources itself once the operator changes anything; "Use defaults" clears that.
   const saveProject = (list: ProjectSkillSource[]) =>
-    run(async () => { project = (await api.setProjectSkillSources(campaignId, list.map((s) => ({ sourceId: s.id, enabled: s.enabled })))).sources }, 'Could not save the project\'s sources.')
+    run(async () => { project = (await api.setProjectSkillSources(campaignId, list.map((s) => ({ sourceId: s.id, enabled: s.enabled })))).sources ?? [] }, 'Could not save the project\'s sources.')
   const setProjectEnabled = (id: string, enabled: boolean) => saveProject(project.map((s) => (s.id === id ? { ...s, enabled } : s)))
   function moveProject(id: string, by: -1 | 1) {
     const list = [...project]
@@ -108,7 +116,7 @@
     ;[list[i], list[j]] = [list[j], list[i]]
     return saveProject(list)
   }
-  const useDefaults = () => run(async () => { project = (await api.setProjectSkillSources(campaignId, [])).sources }, 'Could not reset the project\'s sources.')
+  const useDefaults = () => run(async () => { project = (await api.setProjectSkillSources(campaignId, [])).sources ?? [] }, 'Could not reset the project\'s sources.')
 
   function age(iso: string): string {
     const mins = Math.max(0, Math.round((now() - Date.parse(iso)) / 60000))
@@ -171,7 +179,7 @@
   {#if draft}
     <div class="editor" role="group" aria-labelledby="source-editor-title">
       <h3 id="source-editor-title">{draft.id ? `Edit ${draft.name}` : 'Register a source'}</h3>
-      <label class="field"><span>Name</span><input bind:value={draft.name} placeholder="my skills" maxlength="80" /></label>
+      <label class="field"><span>Name</span><input bind:this={nameInput} bind:value={draft.name} placeholder="my skills" maxlength="80" /></label>
       {#if !draft.id && !draft.suggestion}
         <label class="field"><span>Kind</span>
           <select bind:value={draft.kind}><option value="folder">Folder on this machine</option><option value="git">Git repository</option></select></label>
