@@ -16,6 +16,7 @@ import type { GithubStatus, ScopeOptions } from './api'
 import ScopePicker from './ScopePicker.svelte'
 import Term from './Term.svelte'
 import SettingsDialog from './SettingsDialog.svelte'
+import SkillChips from './SkillChips.svelte'
 
 const camp = (id: string, over: Partial<Campaign> = {}): Campaign => ({
   id, name: `Camp ${id}`, dir: `/p/${id}`, remote: 'origin', scope: { mode: 'labels', labels: ['tracked'] }, demo: false, repo: `acme/${id}`, ...over,
@@ -1459,5 +1460,59 @@ describe('parallel quests switch', () => {
     expect(box).not.toBeChecked()
     await fireEvent.click(box)
     expect(update).toHaveBeenCalledWith('c1', { parallelQuests: true })
+  })
+})
+
+describe('SkillChips', () => {
+  const entry = (id: string, sourceName: string, name: string, shadowed = false) => ({
+    id, sourceId: id.split('/')[0], sourceName, name, description: `${name} method`, path: name, dir: `/skills/${name}`, file: `/skills/${name}/SKILL.md`,
+    userInvocable: true, shadowed,
+  })
+  const catalog = { entries: [entry('s1/tdd', 'Team', 'tdd'), entry('s2/tdd', 'Upstream', 'tdd', true), entry('s2/plan', 'Upstream', 'plan')], reports: [] }
+
+  function setup(quest: number | null) {
+    const s = store((st) => { st.questNumber = quest })
+    vi.spyOn(s, 'loadProjectSkills').mockResolvedValue(catalog as never)
+    const create = vi.spyOn(s, 'launchQuest')
+    const preview = vi.spyOn(s, 'previewQuestLaunch')
+    render(SkillChips, { store: s })
+    return { s, create, preview }
+  }
+
+  it('lists the project\'s skills, naming the source only where a name is shadowed', async () => {
+    setup(3)
+    const group = await screen.findByRole('group', { name: /for the open issue/ })
+    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual(['tdd', 'tdd (Upstream)', 'plan'])
+    expect(within(group).getByRole('button', { name: 'plan' })).toHaveAttribute('title', 'Upstream: plan method')
+  })
+
+  it('choosing a chip selects the issue\'s method and starts or types nothing; choosing again clears it', async () => {
+    const { s, create, preview } = setup(3)
+    const plan = await screen.findByRole('button', { name: 'plan' })
+    await fireEvent.click(plan)
+    expect(s.choiceFor(3).skill).toBe('s2/plan')
+    expect(plan).toHaveAttribute('aria-pressed', 'true')
+    expect(create).not.toHaveBeenCalled()
+    expect(preview).not.toHaveBeenCalled()
+    await fireEvent.click(plan)
+    expect(s.choiceFor(3).skill).toBe('')
+    expect(plan).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('is disabled, with the reason, while no issue is open', async () => {
+    const { s } = setup(null)
+    const chip = await screen.findByRole('button', { name: 'plan' })
+    expect(chip).toBeDisabled()
+    expect(screen.getByText('Open an issue to choose its method.')).toBeInTheDocument()
+    await fireEvent.click(chip)
+    expect(s.methodChoices).toEqual({})
+  })
+
+  it('shows nothing when the project has no skills', async () => {
+    const s = store((st) => { st.questNumber = 3 })
+    vi.spyOn(s, 'loadProjectSkills').mockResolvedValue({ entries: [], reports: [] } as never)
+    const { container } = render(SkillChips, { store: s })
+    await tick()
+    expect(container.querySelector('.chips')).toBeNull()
   })
 })

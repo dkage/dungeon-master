@@ -860,6 +860,22 @@ export class AppStore {
   skillsVersion = $state(0)
   skillsChanged() { this.skillsVersion++ }
 
+  /**
+   * What the operator adds to each issue's launch, kept until it is launched: a skill (a source-qualified id;
+   * '' is Automatic, 'none' is no skill) and direction text. The Method select and the skill chips share it.
+   */
+  methodChoices = $state<Record<string, { skill: string; direction: string }>>({})
+  choiceFor(number: number | null | undefined): { skill: string; direction: string } {
+    return (number != null && this.methodChoices[`${this.campaignId}#${number}`]) || { skill: '', direction: '' }
+  }
+  setChoice(number: number, patch: Partial<{ skill: string; direction: string }>) {
+    this.methodChoices = { ...this.methodChoices, [`${this.campaignId}#${number}`]: { ...this.choiceFor(number), ...patch } }
+  }
+  clearChoice(number: number) {
+    const { [`${this.campaignId}#${number}`]: _gone, ...rest } = this.methodChoices
+    this.methodChoices = rest
+  }
+
   /** A section of Settings to open; the app opens the dialog and clears it on close. */
   settingsRequest = $state<'heroes' | 'skills' | null>(null)
 

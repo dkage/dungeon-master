@@ -58,14 +58,12 @@
   const wc = $derived(launchPreview?.workingCopy)
   const mainTaken = $derived(!!wc?.mainBusy && !store.campaign?.parallelQuests)
 
-  // What the operator adds to this issue's launch: a skill (source-qualified id; '' is Automatic, 'none' is none)
-  // and direction text. Kept per issue until it is launched, and never launching anything by itself.
-  let choices = $state<Record<string, { skill: string; direction: string }>>({})
-  const choiceKey = $derived(d ? `${store.campaignId}#${d.number}` : '')
-  const choice = $derived(choices[choiceKey] ?? { skill: '', direction: '' })
+  // What the operator adds to this issue's launch lives in the store, shared with the skill chips. Changing it
+  // never launches anything and discards a reviewed plan.
+  const choice = $derived(store.choiceFor(d?.number))
   function setChoice(next: Partial<{ skill: string; direction: string }>) {
-    if (!choiceKey) return
-    choices = { ...choices, [choiceKey]: { ...choice, ...next } }
+    if (!d) return
+    store.setChoice(d.number, next)
     launchPreview = null // a reviewed plan no longer matches what is chosen
   }
   let catalog = $state<SkillCatalog | null>(null)
@@ -109,6 +107,7 @@
       ? await store.previewQuestLaunch(d.number, selectedHero, { ...(skill && { skill }), ...(direction && { direction }) })
       : await store.previewQuestLaunch(d.number, selectedHero)
     launchPreview = result
+    if (result?.methodCode) store.skillsChanged()
     carry = {}
     where = result?.workingCopy?.available ? 'copy' : 'main'
     previewBusy = false
@@ -128,9 +127,11 @@
     if (!d || !launchPreview?.canStart || !selectedHero || store.busy) return
     const chosen = Object.fromEntries(Object.entries(carry).filter(([, how]) => how === 'copy' || how === 'link')) as Record<string, 'copy' | 'link'>
     const placement = where === 'copy' ? { workingCopy: 'copy' as const, carry: chosen } : { workingCopy: 'main' as const }
-    if (await store.launchQuest(d.number, selectedHero, launchPreview.briefingId, placement)) {
-      const { [choiceKey]: _launched, ...rest } = choices
-      choices = rest
+    const started = await store.launchQuest(d.number, selectedHero, launchPreview.briefingId, placement)
+    // A refused method means the sources changed under this page: list the skills again.
+    if (!started) store.skillsChanged()
+    if (started) {
+      store.clearChoice(d.number)
       closeBrief()
     }
   }

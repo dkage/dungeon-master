@@ -12,6 +12,7 @@
   import QuestsPanel from './lib/QuestsPanel.svelte'
   import StartHere from './lib/StartHere.svelte'
   import SettingsDialog from './lib/SettingsDialog.svelte'
+  import SkillChips from './lib/SkillChips.svelte'
   import WordsDialog from './lib/WordsDialog.svelte'
   import { attentionTitle, faviconHref } from './lib/attention'
   import { route as routeShortcut } from './lib/shortcuts'
@@ -241,6 +242,7 @@
         </p>
       {/if}
     </main>
+    <SkillChips {store} />
     {#if connection.unreachable}
       <footer class="backend-down" role="status" data-testid="backend-down">{UNREACHABLE_NOTE}</footer>
     {/if}
