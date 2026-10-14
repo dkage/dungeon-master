@@ -290,7 +290,15 @@ func (s *Session) Kill() {
 	case <-s.done:
 	case <-time.After(killGrace):
 		signalGroup(s.cmd.Process, true)
-		<-s.done
+		signalSession(s.cmd.Process)
+		select {
+		case <-s.done:
+		case <-time.After(killGrace):
+			// Something still holds the terminal open (a process that left the
+			// session): closing our end ends the read so the session can finish.
+			_ = s.p.Close()
+			<-s.done
+		}
 	}
 }
 

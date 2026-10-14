@@ -13,7 +13,18 @@ import (
 	"time"
 )
 
-func processAlive(pid int) bool { return syscall.Kill(pid, 0) == nil }
+// processAlive is false for a killed process nobody has reaped yet (a zombie).
+func processAlive(pid int) bool {
+	if syscall.Kill(pid, 0) != nil {
+		return false
+	}
+	b, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
+	if err != nil {
+		return true
+	}
+	f := strings.Fields(string(b)[strings.LastIndex(string(b), ")")+1:])
+	return len(f) == 0 || f[0] != "Z"
+}
 
 // Closing a running session stops the agent and everything it started, and the
 // record keeps a "stopped by the user" outcome instead of vanishing.
