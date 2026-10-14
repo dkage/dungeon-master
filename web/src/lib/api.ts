@@ -155,6 +155,32 @@ export interface LaunchPreview {
   command?: string[]
   existingSession?: SessionInfo
   workingCopy?: WorkingCopyPlan
+  /** The chosen skill with its source, pin and how it reaches the agent; absent for none. */
+  method?: LaunchMethod
+  /** Set when a chosen skill cannot be used; the page asks the operator to choose again. */
+  methodCode?: string
+  direction?: string
+  directionTruncated?: boolean
+  methodTruncated?: boolean
+}
+
+export interface LaunchMethod {
+  id: string
+  name: string
+  sourceName: string
+  revision?: string
+  dir: string
+  file: string
+  /** "briefing": the skill's text and directory are in the reviewed briefing. */
+  delivery: string
+  truncated?: boolean
+}
+
+/** What the operator adds to a launch; both are part of the reviewed plan. */
+export interface LaunchChoices {
+  /** A source-qualified skill id; empty means no skill. */
+  skill?: string
+  direction?: string
 }
 
 export type QuestState = 'open' | 'locked' | 'claimed' | 'cleared'
@@ -341,8 +367,8 @@ export const getScopeOptions = (campaignId: string) =>
 export const getGithub = () => call<GithubStatus>('GET', '/api/github') as Promise<GithubStatus>
 export const getQuest = (campaignId: string, number: number) =>
   call<QuestDetail>('GET', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}`) as Promise<QuestDetail>
-export const previewQuestLaunch = (campaignId: string, number: number, hero: string) =>
-  call<LaunchPreview>('POST', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}/launch-preview`, { hero }) as Promise<LaunchPreview>
+export const previewQuestLaunch = (campaignId: string, number: number, hero: string, choices?: LaunchChoices) =>
+  call<LaunchPreview>('POST', `/api/campaigns/${encodeURIComponent(campaignId)}/quests/${number}/launch-preview`, { hero, ...choices }) as Promise<LaunchPreview>
 export const setEffortLabels = (campaignId: string, labels: Record<string, EffortTier>) =>
   call<Campaign>('PUT', `/api/campaigns/${encodeURIComponent(campaignId)}/effort-labels`, { labels }) as Promise<Campaign>
 export const setEffortOverride = (campaignId: string, number: number, tier: EffortTier | '') =>

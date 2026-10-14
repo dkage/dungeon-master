@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS } from './appearance'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/svelte'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte'
 import { tick } from 'svelte'
 import Toolbar from './Toolbar.svelte'
 import Sidebar from './Sidebar.svelte'
@@ -832,6 +832,108 @@ describe('QuestDetail', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Start expedition' }))
     expect(start).toHaveBeenCalledWith(3, 'opus', 'preview-1', { workingCopy: 'main' }) // no copy plan: the main tree
     expect(screen.queryByRole('dialog', { name: 'Review launch plan' })).not.toBeInTheDocument()
+  })
+
+  describe('method and direction', () => {
+    const entry = (id: string, sourceName: string, name: string, over: Record<string, unknown> = {}) => ({
+      id, sourceId: id.split('/')[0], sourceName, name, description: '', path: name, dir: `/skills/${name}`, file: `/skills/${name}/SKILL.md`,
+      userInvocable: true, shadowed: false, ...over,
+    })
+    const catalog = { entries: [entry('s1/tdd', 'Team', 'tdd'), entry('s2/tdd', 'Upstream', 'tdd', { shadowed: true, shadowedBy: 'Team' }), entry('s2/plan', 'Upstream', 'plan')], reports: [] }
+    const plan = (over: Record<string, unknown> = {}) => ({
+      content: 'briefing', truncated: false, commentsShown: 0, commentsTotal: 0, canStart: true, hero: 'opus', heroLabel: 'Opus',
+      directory: '/p/c1', briefingId: 'preview-9', briefingFile: '/state/b.md', opener: 'Read it.', systemPrompt: 's', command: ['claude'], ...over,
+    })
+    function setup(skills: unknown = catalog) {
+      const s = open(detail({ state: 'open' }))
+      vi.spyOn(s, 'loadProjectSkills').mockResolvedValue(skills as never)
+      const preview = vi.spyOn(s, 'previewQuestLaunch').mockResolvedValue(plan() as never)
+      const start = vi.spyOn(s, 'launchQuest').mockResolvedValue(true)
+      render(QuestDetail, { store: s })
+      return { s, preview, start }
+    }
+
+    it('offers direction, a method that defaults to Automatic, and links to the settings', async () => {
+      const { s, preview } = setup()
+      const method = await screen.findByLabelText('Method')
+      expect(method).toHaveValue('')
+      await waitFor(() => expect(within(method).getAllByRole('option').map((o) => o.textContent)).toEqual(['Automatic', 'None', 'tdd', 'tdd (shadowed)', 'plan']))
+      expect(within(method).getByRole('group', { name: 'Team' })).toBeInTheDocument()
+      expect(within(method).getByRole('group', { name: 'Upstream' })).toBeInTheDocument()
+      expect(screen.getByLabelText(/Additional direction/)).toHaveValue('')
+      await fireEvent.click(screen.getByRole('button', { name: /^Spell sources…|^Skill sources…/ }))
+      expect(s.settingsRequest).toBe('skills')
+      await fireEvent.click(screen.getByRole('button', { name: /^Heroes…|^Agent setups…/ }))
+      expect(s.settingsRequest).toBe('heroes')
+      expect(preview).not.toHaveBeenCalled() // nothing runs by choosing or opening a link
+    })
+
+    it('sends the chosen skill and the direction with the review, and nothing before it', async () => {
+      const { preview, start } = setup()
+      const method = await screen.findByLabelText('Method')
+      await waitFor(() => expect(within(method).getAllByRole('option').length).toBe(5))
+      await fireEvent.change(method, { target: { value: 's2/plan' } })
+      await fireEvent.input(screen.getByLabelText(/Additional direction/), { target: { value: '  Only the form.  ' } })
+      expect(preview).not.toHaveBeenCalled()
+      expect(start).not.toHaveBeenCalled()
+      await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+      expect(preview).toHaveBeenCalledWith(3, 'opus', { skill: 's2/plan', direction: 'Only the form.' })
+      await fireEvent.click(screen.getByRole('button', { name: 'Start expedition' }))
+      expect(start).toHaveBeenCalledWith(3, 'opus', 'preview-9', { workingCopy: 'main' })
+    })
+
+    it('None and Automatic send no skill', async () => {
+      const { preview } = setup()
+      const method = await screen.findByLabelText('Method')
+      await fireEvent.change(method, { target: { value: 'none' } })
+      await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+      expect(preview).toHaveBeenLastCalledWith(3, 'opus')
+      expect(screen.getByText(/No skill was chosen/)).toBeInTheDocument()
+    })
+
+    it('shows the method with its source, pin, delivery and directory in the review', async () => {
+      const { s, preview } = setup()
+      preview.mockResolvedValue(plan({
+        method: { id: 's1/tdd', name: 'tdd', sourceName: 'Team', revision: 'abcdef0123456789', dir: '/skills/tdd', file: '/skills/tdd/SKILL.md', delivery: 'briefing' },
+        direction: 'Only the form.', directionTruncated: true,
+      }) as never)
+      void s
+      await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+      const dialog = screen.getByRole('dialog', { name: 'Review launch plan' })
+      expect(within(dialog).getByText('tdd · Team @ abcdef012345')).toBeInTheDocument()
+      expect(within(dialog).getByText(/Added to the briefing: the skill's instructions and its directory/)).toBeInTheDocument()
+      expect(within(dialog).getByText('/skills/tdd')).toBeInTheDocument()
+      expect(within(dialog).getByText('Only the form. · shortened to fit')).toBeInTheDocument()
+    })
+
+    it('keeps a choice that is no longer offered visible, and the server\'s refusal stops the launch', async () => {
+      const { s, preview } = setup()
+      const method = await screen.findByLabelText('Method')
+      await waitFor(() => expect(within(method).getAllByRole('option').length).toBe(5))
+      await fireEvent.change(method, { target: { value: 's1/tdd' } })
+      // The source is disabled in Settings: the catalog no longer lists the skill.
+      vi.mocked(s.loadProjectSkills).mockResolvedValue({ entries: [entry('s2/plan', 'Upstream', 'plan')], reports: [] } as never)
+      s.skillsChanged()
+      await waitFor(() => expect(within(method).getByRole('option', { name: 'Unavailable skill' })).toBeDisabled())
+      expect(method).toHaveValue('s1/tdd') // not silently swapped for another skill
+      preview.mockResolvedValue(plan({ canStart: false, reason: 'The chosen skill is no longer available to this project. Choose a skill again.', methodCode: 'method_unavailable' }) as never)
+      await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+      expect(preview).toHaveBeenCalledWith(3, 'opus', { skill: 's1/tdd' })
+      expect(screen.getByText(/no longer available to this project/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Start expedition' })).toBeDisabled()
+    })
+
+    it('forgets a review when the choice changes, so the next review is made again', async () => {
+      const { preview } = setup()
+      const method = await screen.findByLabelText('Method')
+      await waitFor(() => expect(within(method).getAllByRole('option').length).toBe(5))
+      await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+      await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      await fireEvent.change(method, { target: { value: 's1/tdd' } })
+      await fireEvent.click(screen.getByRole('button', { name: 'Review launch' }))
+      expect(preview).toHaveBeenCalledTimes(2)
+      expect(preview).toHaveBeenLastCalledWith(3, 'opus', { skill: 's1/tdd' })
+    })
   })
 
   it('navigates to related quests and back to the list', async () => {

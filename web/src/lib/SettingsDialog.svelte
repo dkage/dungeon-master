@@ -11,7 +11,7 @@
   import SkillSources from './SkillSources.svelte'
   import { permission as notifyPermission, requestPermission } from './notify'
 
-  let { store, onclose }: { store: AppStore; onclose: () => void } = $props()
+  let { store, onclose, section = '' }: { store: AppStore; onclose: () => void; section?: 'heroes' | 'skills' | '' } = $props()
   let dialog: HTMLDialogElement
   let heroConfig = $state<HeroesConfig | null>(null)
   let heroError = $state('')
@@ -28,6 +28,8 @@
     if (typeof dialog.showModal === 'function') dialog.showModal()
     else dialog.setAttribute('open', '')
     void loadHeroes()
+    // Opened from a link elsewhere: bring that section into view.
+    if (section) queueMicrotask(() => document.getElementById(section === 'skills' ? 'skill-sources' : 'heroes-section')?.scrollIntoView?.({ block: 'start' }))
     const watcher = window.setInterval(() => {
       if (!draft) void loadHeroes()
     }, 1500)
@@ -303,7 +305,7 @@
     {/if}
   </section>
 
-  <section class="hero-section" aria-labelledby="heroes-title">
+  <section class="hero-section" id="heroes-section" aria-labelledby="heroes-title">
     <div class="section-heading"><div><h2 id="heroes-title">Heroes</h2><p>Claude setups used to start agents.</p></div><button type="button" onclick={beginNew}>New hero</button></div>
     {#if heroBusy}<p>Loading local hero settings…</p>
     {:else if heroConfig}
@@ -346,7 +348,7 @@
     {/if}
   </section>
 
-  <SkillSources campaignId={store.campaign?.id ?? ''} campaignName={store.campaign?.name ?? ''} wordMode={store.appearance.wordMode} />
+  <SkillSources campaignId={store.campaign?.id ?? ''} campaignName={store.campaign?.name ?? ''} wordMode={store.appearance.wordMode} onchange={() => store.skillsChanged()} />
 
   <section aria-labelledby="sizes-title">
     <h2 id="sizes-title">Panel text size</h2>

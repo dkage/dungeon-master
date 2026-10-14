@@ -3,7 +3,7 @@
   import { tick } from 'svelte'
   import type { AppStore } from './store.svelte'
   import type { QuestRef } from './api'
-  import type { LaunchPreview } from './api'
+  import type { LaunchPreview, SkillCatalog } from './api'
   import type { EffortTier } from './api'
   import { STATE_LABEL, labelStyle, timeAgo } from './quests'
   import { TIERS, effortWord } from './map/art'
@@ -58,6 +58,38 @@
   const wc = $derived(launchPreview?.workingCopy)
   const mainTaken = $derived(!!wc?.mainBusy && !store.campaign?.parallelQuests)
 
+  // What the operator adds to this issue's launch: a skill (source-qualified id; '' is Automatic, 'none' is none)
+  // and direction text. Kept per issue until it is launched, and never launching anything by itself.
+  let choices = $state<Record<string, { skill: string; direction: string }>>({})
+  const choiceKey = $derived(d ? `${store.campaignId}#${d.number}` : '')
+  const choice = $derived(choices[choiceKey] ?? { skill: '', direction: '' })
+  function setChoice(next: Partial<{ skill: string; direction: string }>) {
+    if (!choiceKey) return
+    choices = { ...choices, [choiceKey]: { ...choice, ...next } }
+    launchPreview = null // a reviewed plan no longer matches what is chosen
+  }
+  let catalog = $state<SkillCatalog | null>(null)
+  $effect(() => {
+    void store.skillsVersion
+    const campaign = store.campaignId
+    if (!campaign) { catalog = null; return }
+    let current = true
+    void store.loadProjectSkills().then((c) => { if (current) catalog = c })
+    return () => { current = false }
+  })
+  const skillGroups = $derived.by(() => {
+    const groups: { source: string; entries: NonNullable<SkillCatalog>['entries'] }[] = []
+    for (const e of catalog?.entries ?? []) {
+      let g = groups.find((x) => x.source === e.sourceName)
+      if (!g) groups.push((g = { source: e.sourceName, entries: [] }))
+      g.entries.push(e)
+    }
+    return groups
+  })
+  // A chosen skill that is no longer offered stays shown as unavailable; it is never swapped for another.
+  const missingSkill = $derived(choice.skill !== '' && choice.skill !== 'none' && !catalog?.entries.some((e) => e.id === choice.skill))
+  const word = $derived(store.appearance.wordMode)
+
   $effect(() => {
     const campaign = store.campaignId ?? ''
     let remembered = ''
@@ -71,7 +103,11 @@
     if (!d || !selectedHero || previewBusy) return
     previewBusy = true
     launchPreview = null
-    const result = await store.previewQuestLaunch(d.number, selectedHero)
+    const skill = choice.skill === 'none' ? '' : choice.skill
+    const direction = choice.direction.trim()
+    const result = skill || direction
+      ? await store.previewQuestLaunch(d.number, selectedHero, { ...(skill && { skill }), ...(direction && { direction }) })
+      : await store.previewQuestLaunch(d.number, selectedHero)
     launchPreview = result
     carry = {}
     where = result?.workingCopy?.available ? 'copy' : 'main'
@@ -92,7 +128,11 @@
     if (!d || !launchPreview?.canStart || !selectedHero || store.busy) return
     const chosen = Object.fromEntries(Object.entries(carry).filter(([, how]) => how === 'copy' || how === 'link')) as Record<string, 'copy' | 'link'>
     const placement = where === 'copy' ? { workingCopy: 'copy' as const, carry: chosen } : { workingCopy: 'main' as const }
-    if (await store.launchQuest(d.number, selectedHero, launchPreview.briefingId, placement)) closeBrief()
+    if (await store.launchQuest(d.number, selectedHero, launchPreview.briefingId, placement)) {
+      const { [choiceKey]: _launched, ...rest } = choices
+      choices = rest
+      closeBrief()
+    }
   }
 
   function closeBrief() {
@@ -268,11 +308,28 @@
       {/if}
     </article>
     <footer class="launch-footer">
-      <label class="hero-label" for="quest-hero">Hero</label>
-      <select id="quest-hero" value={selectedHero} onchange={(event) => changeHero(event.currentTarget.value)} disabled={store.heroes.length === 0 || store.busy}>
+      <label class="dir-label" for="quest-direction">Additional direction <span class="opt">Optional</span></label>
+      <textarea id="quest-direction" class="dir" rows="2" placeholder="Add context for the agent…" value={choice.direction} oninput={(event) => setChoice({ direction: event.currentTarget.value })} disabled={store.busy}></textarea>
+      <label class="hero-label" for="quest-hero">{wordLabel('hero', word)}</label>
+      <select id="quest-hero" class="hero-select" value={selectedHero} onchange={(event) => changeHero(event.currentTarget.value)} disabled={store.heroes.length === 0 || store.busy}>
         {#if store.heroes.length === 0}<option value="">No heroes configured</option>{/if}
         {#each store.heroes as h (h.id)}<option value={h.id}>{h.label}</option>{/each}
       </select>
+      <label class="skill-label" for="quest-skill">Method</label>
+      <select id="quest-skill" class="skill-select" value={choice.skill} onchange={(event) => setChoice({ skill: event.currentTarget.value })} disabled={store.busy}>
+        <option value="">Automatic</option>
+        <option value="none">None</option>
+        {#if missingSkill}<option value={choice.skill} disabled>Unavailable skill</option>{/if}
+        {#each skillGroups as g (g.source)}
+          <optgroup label={g.source}>
+            {#each g.entries as e (e.id)}<option value={e.id}>{e.name}{e.shadowed ? ' (shadowed)' : ''}</option>{/each}
+          </optgroup>
+        {/each}
+      </select>
+      <span class="settings-links">
+        <button type="button" class="link" onclick={() => (store.settingsRequest = 'heroes')}>{wordLabel('hero', word, true)}…</button>
+        <button type="button" class="link" onclick={() => (store.settingsRequest = 'skills')}>{wordLabel('spell', word)} sources…</button>
+      </span>
       <button type="button" class="launch-button" onclick={openBrief} disabled={!d || d.state === 'cleared' || d.state === 'locked' || !selectedHero || previewBusy || store.busy || !!blockedBySession}>
         {previewBusy ? 'Preparing…' : 'Review launch'}
       </button>
@@ -302,6 +359,12 @@
           {#if launchPreview.directory}<dt>Working directory</dt><dd>{where === 'copy' && wc?.location ? `a new working copy in ${wc.location}` : launchPreview.directory}</dd>{/if}
           {#if launchPreview.briefingFile}<dt>Private briefing</dt><dd>{launchPreview.briefingFile}</dd>{/if}
           {#if launchPreview.opener}<dt>Opening instruction</dt><dd>{launchPreview.opener}</dd>{/if}
+          {#if launchPreview.method}
+            <dt>Method</dt><dd>{launchPreview.method.name} · {launchPreview.method.sourceName}{launchPreview.method.revision ? ` @ ${launchPreview.method.revision.slice(0, 12)}` : ''}</dd>
+            <dt>Delivery</dt><dd>{launchPreview.method.delivery === 'briefing' ? "Added to the briefing: the skill's instructions and its directory" : launchPreview.method.delivery}{launchPreview.method.truncated ? ' · only the start of a long skill is copied; the whole file is readable in its directory' : ''}</dd>
+            <dt>Skill directory</dt><dd>{launchPreview.method.dir}</dd>
+          {:else if launchPreview.canStart}<dt>Method</dt><dd>None. {choice.skill === '' ? 'No skill was suggested for this issue.' : 'No skill was chosen.'}</dd>{/if}
+          {#if launchPreview.direction}<dt>Additional direction</dt><dd>{launchPreview.direction}{launchPreview.directionTruncated ? ' · shortened to fit' : ''}</dd>{/if}
         </dl>
         {#if wc && !launchPreview.existingSession}
           <fieldset class="where" aria-label="Where the session runs">
@@ -385,10 +448,19 @@
   .jump { margin: 8px 0 0; }
   .jump-button { padding: 4px 10px; border: 1px solid var(--accent); border-radius: 6px; background: transparent; color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; }
   .jump-list { margin: 4px 0 0; padding-left: 16px; }
-  /* Two columns: the hero on the left, a place kept free on the right for the skill selector (#50). */
-  .launch-footer { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'hlabel slabel' 'hero skill' 'note go'; align-items: center; gap: 4px 12px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--panel); }
-  .launch-footer label { grid-area: hlabel; color: var(--muted); font-size: 11px; }
-  .launch-footer select { grid-area: hero; min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: var(--bg); color: var(--text); font: inherit; }
+  /* Direction on top; the hero and the method side by side; links to Settings and the review button below. */
+  .launch-footer { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'dlabel dlabel' 'dir dir' 'hlabel slabel' 'hero skill' 'links go' 'note note'; align-items: center; gap: 4px 12px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--panel); }
+  .launch-footer label { color: var(--muted); font-size: 11px; }
+  .dir-label { grid-area: dlabel; }
+  .hero-label { grid-area: hlabel; }
+  .skill-label { grid-area: slabel; }
+  .opt { margin-left: 4px; opacity: .8; }
+  .launch-footer select, .launch-footer textarea { min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; background: var(--bg); color: var(--text); font: inherit; }
+  .dir { grid-area: dir; resize: vertical; min-height: 44px; max-height: 160px; }
+  .hero-select { grid-area: hero; }
+  .skill-select { grid-area: skill; }
+  .settings-links { grid-area: links; display: flex; gap: 12px; flex-wrap: wrap; }
+  .settings-links .link { padding: 0; border: none; background: none; color: var(--accent); font-size: 12px; cursor: pointer; }
   .launch-button { grid-area: go; justify-self: end; border: 1px solid #a34c39; border-radius: 7px; padding: 7px 12px; background: linear-gradient(#8b3025, #5d1718); color: #f4dfbd; font: inherit; cursor: pointer; }
   .launch-button:disabled { opacity: .5; cursor: not-allowed; }
   .go-session { grid-column: 1 / -1; justify-self: end; border: 1px solid var(--accent); border-radius: 7px; padding: 6px 10px; background: transparent; color: var(--accent); cursor: pointer; }

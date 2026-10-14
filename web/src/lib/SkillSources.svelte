@@ -6,12 +6,14 @@
 
   type Api = Pick<typeof realApi, 'getSkillSources' | 'addSkillSource' | 'updateSkillSource' | 'refreshSkillSource' | 'removeSkillSource'
     | 'reorderSkillSources' | 'getProjectSkillSources' | 'setProjectSkillSources' | 'pickFolder'>
-  let { campaignId = '', campaignName = '', wordMode = 'hints', api = realApi, now = () => Date.now() }: {
+  let { campaignId = '', campaignName = '', wordMode = 'hints', api = realApi, now = () => Date.now(), onchange = () => {} }: {
     campaignId?: string
     campaignName?: string
     wordMode?: 'hints' | 'themed' | 'plain'
     api?: Api
     now?: () => number
+    /** Called after anything that changes which skills a project can use. */
+    onchange?: () => void
   } = $props()
 
   let sourcesState = $state<SkillSourcesState | null>(null)
@@ -45,7 +47,7 @@
   async function run(work: () => Promise<void>, fallback: string) {
     busy = true
     error = ''
-    try { await work() } catch (e) { error = message(e, fallback) } finally { busy = false }
+    try { await work(); onchange() } catch (e) { error = message(e, fallback); onchange() } finally { busy = false }
   }
 
   function beginNew(kind: 'folder' | 'git' = 'folder', from?: SkillSuggestion) {

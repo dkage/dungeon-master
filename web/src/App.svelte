@@ -24,6 +24,8 @@
 
   let { store = new AppStore() }: { store?: AppStore } = $props()
   let settingsOpen = $state(false)
+  // Other panels ask for Settings (and a section of it) through the store.
+  $effect(() => { if (store.settingsRequest) settingsOpen = true })
   let wordsOpen = $state(false)
 
   // While the page is visible: keep the GitHub budget fresh, and re-read the
@@ -266,7 +268,7 @@
       onkeydown={(e) => borderKey(edge, e)}
     ></div>
   {/each}
-  {#if settingsOpen}<SettingsDialog {store} onclose={() => (settingsOpen = false)} />{/if}
+  {#if settingsOpen}<SettingsDialog {store} section={store.settingsRequest ?? ''} onclose={() => { settingsOpen = false; store.settingsRequest = null }} />{/if}
   {#if wordsOpen}<WordsDialog onclose={() => (wordsOpen = false)} />{/if}
 </div>
 {/if}

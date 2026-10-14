@@ -4,8 +4,8 @@ import { PLACE_KEY, format as formatPlace, type Place } from './place'
 import { DEFAULTS, KEY as COLUMNS_KEY, fit, parse as parseColumns, setWidth, type Columns, type Edge } from './columns'
 import { SPLIT, restore, toggle, type Region, type Workspace } from './workspace'
 import type {
-  AppState, Campaign, CampaignInput, CreateRequest, CampaignPatch, EffortTier, GithubStatus, Hero, HeroesConfig, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
-  SessionInfo,
+  AppState, Campaign, CampaignInput, CreateRequest, CampaignPatch, EffortTier, GithubStatus, Hero, HeroesConfig, LaunchChoices, LaunchPreview, ProjectSuggestion, QuestDetail, QuestResult, Scope, ScopeOptions,
+  SessionInfo, SkillCatalog,
 } from './api'
 import { needsStopConfirm, stillWaiting, unattended } from './attention'
 import { buildModel, placeOf, type MapModel } from './map/model'
@@ -20,7 +20,7 @@ export type Client = Pick<
   | 'getQuests' | 'getQuest' | 'previewQuestLaunch' | 'getGithub' | 'setScope' | 'getScopeOptions' | 'getProjectSuggestions' | 'createSampleCampaign'
   | 'adoptStarterHeroes' | 'getHeroesConfig' | 'saveHeroesConfig' | 'pickFolder' | 'openCampaignFolder'
   | 'setEffortLabels' | 'setEffortOverride' | 'getAppearance' | 'saveAppearance'
->
+> & Partial<Pick<typeof realApi, 'getProjectSkills'>>
 
 const CAMPAIGN_KEY = 'dungeon.campaign'
 const VIEW_KEY = 'dungeon.panel.view'
@@ -845,11 +845,31 @@ export class AppStore {
     }
   }
 
-  async previewQuestLaunch(number: number, hero: string): Promise<LaunchPreview | null> {
+  /** The skills the current project can use, from its enabled sources; null when they cannot be listed. */
+  async loadProjectSkills(): Promise<SkillCatalog | null> {
+    const campaign = this.campaign
+    if (!campaign || !this.client.getProjectSkills) return null
+    try {
+      return await this.client.getProjectSkills(campaign.id)
+    } catch {
+      return null
+    }
+  }
+
+  /** Bumped when sources or mappings change, so lists built from them reload. */
+  skillsVersion = $state(0)
+  skillsChanged() { this.skillsVersion++ }
+
+  /** A section of Settings to open; the app opens the dialog and clears it on close. */
+  settingsRequest = $state<'heroes' | 'skills' | null>(null)
+
+  async previewQuestLaunch(number: number, hero: string, choices?: LaunchChoices): Promise<LaunchPreview | null> {
     const campaign = this.campaign
     if (!campaign) return null
     try {
-      return await this.client.previewQuestLaunch(campaign.id, number, hero)
+      return choices
+        ? await this.client.previewQuestLaunch(campaign.id, number, hero, choices)
+        : await this.client.previewQuestLaunch(campaign.id, number, hero)
     } catch (e) {
       this.error = this.fail(e)
       return null
