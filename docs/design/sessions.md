@@ -71,3 +71,9 @@ keeping a slow viewer attached, because the server's bounded subscription buffer
 restores everything. A footer note shows when the API or any terminal cannot reach the backend (a 4 s heartbeat detects
 a stopped backend). Browser tests simulate drops and a changed token with Playwright websocket and request routing;
 restarting the shared test server under an open page is not done.
+
+Reattach by position (#178): the session counts every byte it has produced. Each connection opens with a text frame
+`{"type":"attach","start":N,"resume":B}`; the page counts the bytes it receives and reconnects with `?from=<position>`.
+When the retained scrollback still reaches back to that position the server replays only the missed bytes and the page
+keeps its screen; otherwise (position overwritten, unknown, or an older server that sends no attach frame) everything is
+replayed and the page clears first.

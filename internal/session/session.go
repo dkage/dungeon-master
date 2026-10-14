@@ -206,6 +206,30 @@ func (s *Session) Attach() (replay []byte, sub *Subscription) {
 	return replay, sub
 }
 
+// AttachFrom is Attach for a viewer that already holds the stream up to
+// position from (bytes since the session began). When the scrollback still
+// reaches back that far, only the missed bytes are replayed and resumed is
+// true; otherwise the whole scrollback is. start is the stream position of
+// the first byte of replay, so the viewer can keep counting.
+func (s *Session) AttachFrom(from uint64) (replay []byte, start uint64, resumed bool, sub *Subscription) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if data, ok := s.scroll.since(from); ok {
+		replay, start, resumed = data, from, true
+	} else {
+		replay, start = s.scroll.snapshot(), s.scroll.start()
+	}
+	c := make(chan []byte, subBuffer)
+	sub = &Subscription{C: c, c: c}
+	if s.exited {
+		sub.closed = true
+		close(c)
+		return replay, start, resumed, sub
+	}
+	s.subs[sub] = struct{}{}
+	return replay, start, resumed, sub
+}
+
 // Detach stops a subscription early.
 func (s *Session) Detach(sub *Subscription) {
 	s.mu.Lock()

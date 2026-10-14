@@ -1,9 +1,12 @@
 // Client side of the terminal websocket protocol:
-//   server → client  binary: terminal output; text: {"type":"exit","code":N}
+//   server → client  text: {"type":"attach","start":N,"resume":B} first; binary: terminal output;
+//                    text: {"type":"exit","code":N}
 //   client → server  binary: keystrokes;      text: {"type":"resize","cols":N,"rows":N}
 // A connection that drops while the session may still run is reattached with a
-// bounded backoff; the server replays the scrollback on every attach, so the
-// caller clears its screen first (onReset).
+// bounded backoff. The page tells the server how far into the output it got
+// (?from=), and the server replays only the rest; when it cannot (the position
+// fell out of its scrollback, or it is an older server) it replays everything
+// and the caller clears its screen first (onReset).
 
 export interface SocketLike {
   binaryType: string
@@ -27,7 +30,7 @@ export interface TermHandlers {
   onOpen?(): void
   /** The connection dropped and a reattach is scheduled. */
   onReconnecting?(attempt: number, kind?: Refusal): void
-  /** A reattach opened: the replay that follows repeats what is on screen, so clear it first. */
+  /** A reattach will replay everything, which repeats what is on screen: clear it first. */
   onReset?(): void
   /** Typed input could not be kept or sent: the session is gone or the wait queue is full. */
   onInputRefused?(reason: 'closed' | 'full'): void
@@ -69,7 +72,10 @@ export class TermSocket {
   private exited = false
   private stopped = false
   private attempt = 0
-  private reopened = false
+  private opens = 0
+  private awaitingAttach = false
+  private pos = 0 // stream position after the last byte received
+  private known = false // pos is meaningful: the server told us where the stream started
   private timer: ReturnType<typeof setTimeout> | undefined
   private enc = new TextEncoder()
   private queued: Uint8Array[] = []
@@ -89,14 +95,14 @@ export class TermSocket {
   }
 
   private connect() {
-    const ws = this.factory(this.url)
+    const ws = this.factory(this.known ? `${this.url}?from=${this.pos}` : this.url)
     this.ws = ws
     ws.binaryType = 'arraybuffer'
     ws.onopen = () => {
       if (ws !== this.ws) return
       this.attempt = 0
-      if (this.reopened) this.h.onReset?.()
-      this.reopened = true
+      this.opens++
+      this.awaitingAttach = true
       this.h.onOpen?.()
       this.flush()
     }
@@ -140,8 +146,13 @@ export class TermSocket {
   private message(data: unknown) {
     if (typeof data === 'string') {
       try {
-        const m = JSON.parse(data) as { type?: string; code?: number }
-        if (m.type === 'exit') {
+        const m = JSON.parse(data) as { type?: string; code?: number; start?: number; resume?: boolean }
+        if (m.type === 'attach') {
+          this.awaitingAttach = false
+          if (this.opens > 1 && !m.resume) this.h.onReset?.()
+          this.pos = typeof m.start === 'number' ? m.start : 0
+          this.known = typeof m.start === 'number'
+        } else if (m.type === 'exit') {
           this.exited = true
           this.h.onExit(typeof m.code === 'number' ? m.code : -1)
         }
@@ -150,13 +161,23 @@ export class TermSocket {
       }
       return
     }
+    if (this.awaitingAttach) {
+      // Output before any attach frame: an older server, which always replays everything.
+      this.awaitingAttach = false
+      this.known = false
+      if (this.opens > 1) this.h.onReset?.()
+    }
     // Tag checks instead of instanceof: they hold across realms (iframes, jsdom).
     const tag = Object.prototype.toString.call(data)
-    if (tag === '[object ArrayBuffer]') this.h.onOutput(new Uint8Array(data as ArrayBuffer))
+    let bytes: Uint8Array | undefined
+    if (tag === '[object ArrayBuffer]') bytes = new Uint8Array(data as ArrayBuffer)
     else if (ArrayBuffer.isView(data)) {
       const v = data as ArrayBufferView
-      this.h.onOutput(new Uint8Array(v.buffer, v.byteOffset, v.byteLength))
+      bytes = new Uint8Array(v.buffer, v.byteOffset, v.byteLength)
     }
+    if (!bytes) return
+    if (this.known) this.pos += bytes.length
+    this.h.onOutput(bytes)
   }
 
   sendInput(text: string) {

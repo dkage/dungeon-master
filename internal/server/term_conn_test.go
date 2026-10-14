@@ -3,9 +3,11 @@ package server
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -183,4 +185,85 @@ func TestTermProbeAnswers(t *testing.T) {
 			t.Errorf("%s: body leaks the token", name)
 		}
 	}
+}
+
+type attachFrame struct {
+	Type   string
+	Start  uint64
+	Resume bool
+}
+
+// dialFrom attaches asking to resume at stream position from (negative: no position).
+func (e *env) dialFrom(t *testing.T, id string, from int64) *websocket.Conn {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	u := "ws" + strings.TrimPrefix(e.base, "http") + "/api/sessions/" + id + "/term"
+	if from >= 0 {
+		u += "?from=" + strconv.FormatInt(from, 10)
+	}
+	c, _, err := websocket.Dial(ctx, u, &websocket.DialOptions{HTTPHeader: http.Header{
+		"Authorization": {"Bearer " + e.token}, "Origin": {"http://" + e.host}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
+
+// readAttach reads the attach frame that opens every connection.
+func readAttach(t *testing.T, c *websocket.Conn) attachFrame {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	typ, data, err := c.Read(ctx)
+	if err != nil || typ != websocket.MessageText {
+		t.Fatalf("attach frame: %v %v", typ, err)
+	}
+	var f attachFrame
+	if json.Unmarshal(data, &f) != nil || f.Type != "attach" {
+		t.Fatalf("attach frame: %s", data)
+	}
+	return f
+}
+
+// A page that was cut mid-output reattaches with the position it reached and
+// receives only the bytes it missed: no gap and no repeat.
+func TestTermReattachReplaysOnlyWhatWasMissed(t *testing.T) {
+	e, _ := connServer(t, time.Hour, time.Hour)
+	sj := e.create(map[string]any{"shell": true})
+	c := e.dialFrom(t, sj.ID, -1)
+	first := readAttach(t, c)
+	if first.Resume {
+		t.Fatal("a fresh attach must not claim to resume")
+	}
+	send(t, c, "echo before-cut\n")
+	seen := readUntil(t, c, "before-cut")
+	pos := first.Start + uint64(len(seen))
+	c.CloseNow()
+
+	// Output the page misses while it is away.
+	c2 := e.dialFrom(t, sj.ID, -1)
+	readAttach(t, c2)
+	send(t, c2, "echo while-away\n")
+	readUntil(t, c2, "while-away")
+	c2.CloseNow()
+
+	c3 := e.dialFrom(t, sj.ID, int64(pos))
+	defer c3.CloseNow()
+	f := readAttach(t, c3)
+	if !f.Resume || f.Start != pos {
+		t.Fatalf("attach frame %+v, want a resume at %d", f, pos)
+	}
+	got := readUntil(t, c3, "while-away")
+	if strings.Contains(got, "before-cut") {
+		t.Errorf("replay repeats output the page already had: %q", got)
+	}
+
+	// A position the scrollback no longer holds (or never had) gets the whole scrollback.
+	c4 := e.dialFrom(t, sj.ID, 1<<40)
+	defer c4.CloseNow()
+	if f := readAttach(t, c4); f.Resume {
+		t.Errorf("an unknown position must not resume: %+v", f)
+	}
+	readUntil(t, c4, "before-cut")
 }

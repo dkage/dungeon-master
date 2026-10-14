@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -13,9 +15,11 @@ import (
 
 // Terminal websocket protocol.
 //
-//	server → client: binary frames are terminal output (the first one is the
-//	retained scrollback); one final text frame {"type":"exit","code":N} when
-//	the process ends.
+//	server → client: first a text frame {"type":"attach","start":N,"resume":B}
+//	(N is the stream position of the first byte that follows; B says the
+//	replay continues from the position the page asked for with ?from=), then
+//	binary frames of terminal output (the first one is the replay); one final
+//	text frame {"type":"exit","code":N} when the process ends.
 //	client → server: binary frames are keystrokes; text frames are JSON
 //	control messages, currently {"type":"resize","cols":N,"rows":N}.
 func (s *Server) handleTerm(w http.ResponseWriter, r *http.Request) {
@@ -66,8 +70,21 @@ func (s *Server) handleTerm(w http.ResponseWriter, r *http.Request) {
 			"silent", time.Since(time.Unix(0, lastHeard.Load())).Round(time.Millisecond))
 	}()
 
-	replay, sub := sess.Attach()
+	// A page that already holds the stream up to some position says so and is
+	// replayed only what it missed; anything else gets the whole scrollback.
+	from := uint64(math.MaxUint64)
+	if q := r.URL.Query().Get("from"); q != "" {
+		if n, err := strconv.ParseUint(q, 10, 64); err == nil {
+			from = n
+		}
+	}
+	replay, start, resumed, sub := sess.AttachFrom(from)
 	defer sess.Detach(sub)
+	attach, _ := json.Marshal(map[string]any{"type": "attach", "start": start, "resume": resumed})
+	if err := c.Write(ctx, websocket.MessageText, attach); err != nil {
+		end("write error")
+		return
+	}
 
 	// Reader: keystrokes and control messages.
 	go func() {

@@ -216,3 +216,46 @@ func TestSlowViewerDroppedCanReattachAndReplay(t *testing.T) {
 		t.Fatalf("replay does not end on the last line: %q", replay[max(0, len(replay)-40):])
 	}
 }
+
+func TestRingSince(t *testing.T) {
+	r := newRing(5)
+	r.write([]byte("abc"))
+	if d, ok := r.since(1); !ok || string(d) != "bc" {
+		t.Fatalf("got %q %v", d, ok)
+	}
+	if d, ok := r.since(3); !ok || len(d) != 0 {
+		t.Fatalf("at the end: %q %v", d, ok)
+	}
+	r.write([]byte("defgh")) // total 8, retained "defgh"
+	if d, ok := r.since(3); !ok || string(d) != "defgh" {
+		t.Fatalf("got %q %v", d, ok)
+	}
+	if _, ok := r.since(2); ok {
+		t.Fatal("a position that was overwritten must not resume")
+	}
+	if _, ok := r.since(9); ok {
+		t.Fatal("a position beyond the stream must not resume")
+	}
+	if r.start() != 3 {
+		t.Fatalf("start %d", r.start())
+	}
+}
+
+func TestAttachFromReplaysOnlyWhatWasMissed(t *testing.T) {
+	m := NewManager()
+	defer m.Shutdown()
+	s, err := m.Spawn(Spec{Argv: []string{testutil.Program(t, "hello", testutil.ProgramOptions{Output: "hello-dungeon", SleepMS: 200})}, Env: Environ()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-s.Done()
+	full, start, resumed, _ := s.AttachFrom(1 << 40) // unknown position
+	if resumed || start != 0 || !strings.Contains(string(full), "hello-dungeon") {
+		t.Fatalf("beyond the stream: resumed=%v start=%d %q", resumed, start, full)
+	}
+	cut := uint64(len(full) - 3)
+	tail, start, resumed, _ := s.AttachFrom(cut)
+	if !resumed || start != cut || string(tail) != string(full[len(full)-3:]) {
+		t.Fatalf("resume: resumed=%v start=%d %q", resumed, start, tail)
+	}
+}

@@ -31,7 +31,9 @@ class FakeSocket implements SocketLike {
 
 function setup(probe: (url: string) => Promise<number> = () => Promise.resolve(426)) {
   const socks: FakeSocket[] = []
-  const factory = () => {
+  const urls: string[] = []
+  const factory = (url: string) => {
+    urls.push(url)
     const s = new FakeSocket()
     socks.push(s)
     return s
@@ -46,10 +48,50 @@ function setup(probe: (url: string) => Promise<number> = () => Promise.resolve(4
     onInputRefused: vi.fn(),
   }
   const ts = new TermSocket('ws://x/y', h, factory, { backoff: () => 10, probe })
-  return { sock: socks[0], socks, h, ts }
+  return { sock: socks[0], socks, urls, h, ts }
 }
 
+const attach = (start: number, resume: boolean) => JSON.stringify({ type: 'attach', start, resume })
+const bytes = (n: number) => new Uint8Array(n).buffer
+
 describe('TermSocket', () => {
+  it('asks to resume from the position it reached and keeps the screen when the server does', async () => {
+    vi.useFakeTimers()
+    const { sock, socks, urls, h } = setup()
+    sock.open()
+    expect(urls[0]).toBe('ws://x/y') // nothing known yet
+    sock.msg(attach(100, false))
+    sock.msg(bytes(30))
+    sock.msg(bytes(12))
+    sock.drop(1006)
+    await vi.advanceTimersByTimeAsync(10)
+    expect(urls[1]).toBe('ws://x/y?from=142')
+    socks[1].open()
+    socks[1].msg(attach(142, true))
+    socks[1].msg(bytes(8))
+    expect(h.onReset).not.toHaveBeenCalled()
+    expect(h.onOutput).toHaveBeenCalledTimes(3)
+    socks[1].drop(1006)
+    await vi.advanceTimersByTimeAsync(10)
+    expect(urls[2]).toBe('ws://x/y?from=150') // the resumed bytes were counted too
+    vi.useRealTimers()
+  })
+
+  it('clears the screen when output arrives with no attach frame (an older server)', async () => {
+    vi.useFakeTimers()
+    const { sock, socks, urls, h } = setup()
+    sock.open()
+    sock.msg(bytes(5)) // first connection: nothing to clear
+    expect(h.onReset).not.toHaveBeenCalled()
+    sock.drop(1006)
+    await vi.advanceTimersByTimeAsync(10)
+    expect(urls[1]).toBe('ws://x/y') // never told a position, so it asks for everything
+    socks[1].open()
+    socks[1].msg(bytes(5))
+    expect(h.onReset).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+
   it('requests arraybuffers and reports open', () => {
     const { sock, h } = setup()
     expect(sock.binaryType).toBe('arraybuffer')
@@ -99,8 +141,10 @@ describe('TermSocket', () => {
     await vi.advanceTimersByTimeAsync(10)
     expect(socks).toHaveLength(2)
     socks[1].open()
-    expect(h.onReset).toHaveBeenCalledTimes(1)
     expect(h.onOpen).toHaveBeenCalledTimes(2)
+    expect(h.onReset).not.toHaveBeenCalled() // decided by the attach frame
+    socks[1].msg(attach(0, false)) // the server could not resume: it replays everything
+    expect(h.onReset).toHaveBeenCalledTimes(1)
     socks[1].msg(new TextEncoder().encode('replay').buffer)
     expect(h.onOutput).toHaveBeenCalledTimes(1)
     vi.useRealTimers()

@@ -1561,6 +1561,30 @@ test('a dropped terminal connection reattaches by itself, typing works and nothi
   expect(text.split('ONE-MARK-111').length - 1).toBe(2)
 })
 
+test('a connection cut mid-output resumes where it stopped: every line once, in order', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+  test.skip(process.platform === 'win32', 'the loop is POSIX shell')
+  test.setTimeout(60_000)
+  const urls: string[] = []
+  page.on('websocket', (ws) => ws.url().includes('/term') && urls.push(ws.url()))
+  const sockets = await watchTerminals(page)
+  await startShell(page)
+  await page.keyboard.type('i=1; while [ $i -le 40 ]; do echo "LINE-$i"; i=$((i+1)); sleep 0.15; done')
+  await page.keyboard.press('Enter')
+  await expect(screenText(page)).toContainText('LINE-8')
+  await sockets.cut()
+  await expect(screenText(page)).toContainText('LINE-40', { timeout: 20_000 })
+  // The whole scrollback, not just the rows on screen.
+  const pane = page.locator('.pane:not([hidden])')
+  await pane.getByRole('button', { name: 'Copy output as text' }).click()
+  await expect(pane.locator('.term-note')).toHaveText('Output copied.')
+  const copied = await page.evaluate(() => navigator.clipboard.readText())
+  const lines = [...copied.matchAll(/^LINE-(\d+)/gm)].map((m) => Number(m[1]))
+  expect(lines).toEqual(Array.from({ length: 40 }, (_, i) => i + 1))
+  // Earlier tests' leftover sessions may connect first; this session's reattach is the last one.
+  expect(urls.at(-1)).toMatch(/\?from=\d+$/) // it asked only for what it missed
+})
+
 test('typing while the connection is down is kept and reaches the session after it returns', async ({ page }) => {
   test.setTimeout(60_000)
   const sockets = await watchTerminals(page)
