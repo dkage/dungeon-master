@@ -3,6 +3,7 @@ package briefing
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -46,4 +47,41 @@ func PreviewPath(stateDir, campaignID string, issue int, heroID, id string) (str
 		return "", errors.New("briefing: invalid preview reference")
 	}
 	return filepath.Join(stateDir, "briefings", campaignID, fmt.Sprintf("%d-%s-%s.md", issue, heroID, id)), nil
+}
+
+// PlanMeta is what a reviewed launch relied on besides the briefing text: the
+// exact skill. Start compares it with the skill as it is now, and refuses a
+// launch whose method changed instead of substituting another.
+type PlanMeta struct {
+	SkillID  string `json:"skillId"`
+	SourceID string `json:"sourceId"`
+	Revision string `json:"revision,omitempty"`
+	SHA256   string `json:"sha256"`
+}
+
+func metaPath(briefingPath string) string { return briefingPath + ".plan.json" }
+
+// SaveMeta stores the metadata beside the briefing file it describes.
+func SaveMeta(briefingPath string, m PlanMeta) error {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	return fsutil.WriteFileAtomic(metaPath(briefingPath), append(b, '\n'))
+}
+
+// ReadMeta returns the metadata saved for a briefing; ok is false when the
+// launch has no method.
+func ReadMeta(briefingPath string) (m PlanMeta, ok bool, err error) {
+	b, err := os.ReadFile(metaPath(briefingPath))
+	if errors.Is(err, os.ErrNotExist) {
+		return PlanMeta{}, false, nil
+	}
+	if err != nil {
+		return PlanMeta{}, false, err
+	}
+	if err := json.Unmarshal(b, &m); err != nil {
+		return PlanMeta{}, false, err
+	}
+	return m, true, nil
 }

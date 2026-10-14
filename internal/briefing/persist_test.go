@@ -44,3 +44,19 @@ func TestSavePreviewIsPrivateAndCannotEscapeStateDirectory(t *testing.T) {
 		}
 	}
 }
+
+func TestPlanMetaRoundTripsBesideTheBriefingAndIsAbsentWithoutAMethod(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "briefings", "c1", "7-opus-x.md")
+	if _, ok, err := ReadMeta(path); ok || err != nil {
+		t.Fatalf("no meta: ok=%v err=%v", ok, err)
+	}
+	want := PlanMeta{SkillID: "s1/tdd", SourceID: "s1", Revision: "abc", SHA256: "ff"}
+	if err := SaveMeta(path, want); err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := ReadMeta(path)
+	if err != nil || !ok || got != want {
+		t.Fatalf("got %+v ok=%v err=%v", got, ok, err)
+	}
+}
