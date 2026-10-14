@@ -1593,5 +1593,26 @@ test('the page says when the app cannot be reached, and clears when it can again
   await expect(note).toContainText('Cannot reach the app', { timeout: 15_000 })
   await expect(note).toContainText('out of date')
   await page.unroute('**/api/**')
-  await expect(note).toHaveCount(0, { timeout: 15_000 })
+  await expect(note).toHaveCount(0, { timeout: 25_000 }) // the heartbeat backs off while the app is down
+})
+
+test('a hidden page does not poll the backend and checks at once when shown', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.addInitScript(() => {
+    let state = 'visible'
+    Object.defineProperty(document, 'visibilityState', { get: () => state })
+    ;(window as unknown as { __show(v: string): void }).__show = (v) => {
+      state = v
+      document.dispatchEvent(new Event('visibilitychange'))
+    }
+  })
+  await open(page)
+  let beats = 0
+  page.on('request', (r) => r.url().endsWith('/api/health') && beats++)
+  await page.evaluate(() => (window as unknown as { __show(v: string): void }).__show('hidden'))
+  const before = beats
+  await page.waitForTimeout(9000) // more than two heartbeat intervals
+  expect(beats).toBe(before)
+  await page.evaluate(() => (window as unknown as { __show(v: string): void }).__show('visible'))
+  await expect.poll(() => beats, { timeout: 2000 }).toBeGreaterThan(before)
 })

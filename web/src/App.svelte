@@ -6,6 +6,7 @@
   import Terminal from './lib/Terminal.svelte'
   import { connection, UNREACHABLE_NOTE } from './lib/connection.svelte'
   import { pingBackend } from './lib/api'
+  import { Heartbeat } from './lib/heartbeat'
   import QuestsPanel from './lib/QuestsPanel.svelte'
   import StartHere from './lib/StartHere.svelte'
   import SettingsDialog from './lib/SettingsDialog.svelte'
@@ -102,7 +103,9 @@
     const sessions = setInterval(() => {
       if (!store.unauthorised && store.sessions.length > 0) void store.refreshSessions()
     }, SESSIONS_EVERY)
-    const heartbeat = setInterval(() => void pingBackend(), HEARTBEAT_EVERY)
+    const heartbeat = new Heartbeat({ ping: pingBackend, visible, every: HEARTBEAT_EVERY })
+    const wakeHeartbeat = () => heartbeat.wake()
+    document.addEventListener('visibilitychange', wakeHeartbeat)
     const budget = setInterval(() => visible() && store.loadGithub(), BUDGET_EVERY)
     const quests = setInterval(() => {
       if (visible() && store.campaignId && !store.unauthorised) void store.loadQuests(false, true)
@@ -116,7 +119,8 @@
     document.addEventListener('visibilitychange', onFocus)
     return () => {
       clearInterval(budget)
-      clearInterval(heartbeat)
+      heartbeat.stop()
+      document.removeEventListener('visibilitychange', wakeHeartbeat)
       clearInterval(sessions)
       window.removeEventListener('focus', look)
       window.removeEventListener('blur', look)
