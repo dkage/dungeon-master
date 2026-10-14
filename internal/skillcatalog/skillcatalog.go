@@ -8,6 +8,8 @@ package skillcatalog
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -244,4 +246,41 @@ func clean(s string) string {
 func within(root, p string) bool {
 	rel, err := filepath.Rel(root, p)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
+}
+
+// Read returns a skill's instructions (its front matter removed) and the
+// SHA-256 of the whole file, so a launch can tell later whether the text it
+// reviewed has changed. The file must still resolve inside root.
+func Read(root, file string) (body, sum string, err error) {
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", "", err
+	}
+	real, err := filepath.EvalSymlinks(file)
+	if err != nil || !within(realRoot, real) {
+		return "", "", fs.ErrNotExist
+	}
+	fi, err := os.Stat(real)
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() > MaxFileBytes {
+		return "", "", fs.ErrNotExist
+	}
+	data, err := os.ReadFile(real)
+	if err != nil {
+		return "", "", err
+	}
+	h := sha256.Sum256(data)
+	return stripFrontMatter(string(data)), hex.EncodeToString(h[:]), nil
+}
+
+func stripFrontMatter(s string) string {
+	s = strings.NewReplacer("\r\n", "\n", "\r", "\n").Replace(s)
+	if !strings.HasPrefix(s, "---\n") {
+		return s
+	}
+	rest := s[len("---\n"):]
+	i := strings.Index("\n"+rest, "\n---\n")
+	if i < 0 {
+		return s
+	}
+	return strings.TrimLeft(rest[min(len(rest), i+len("---\n")):], "\n")
 }

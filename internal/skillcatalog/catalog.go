@@ -20,6 +20,8 @@ type Entry struct {
 	SourceName string `json:"sourceName"`
 	Revision   string `json:"revision,omitempty"`
 	Skill
+	// Root is the source's directory; reads are confined to it.
+	Root string `json:"-"`
 	// Shadowed names the source whose same-named skill wins, when one does.
 	Shadowed   bool   `json:"shadowed"`
 	ShadowedBy string `json:"shadowedBy,omitempty"`
@@ -63,7 +65,7 @@ func Build(sources []Source) Catalog {
 			continue
 		}
 		for _, sk := range res.Skills {
-			e := Entry{ID: src.ID + "/" + sk.Name, SourceID: src.ID, SourceName: src.Name, Revision: src.Revision, Skill: sk}
+			e := Entry{ID: src.ID + "/" + sk.Name, SourceID: src.ID, SourceName: src.Name, Revision: src.Revision, Skill: sk, Root: src.Root}
 			key := strings.ToLower(sk.Name)
 			if by, taken := winner[key]; taken {
 				e.Shadowed, e.ShadowedBy = true, by

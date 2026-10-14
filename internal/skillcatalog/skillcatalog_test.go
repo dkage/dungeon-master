@@ -204,3 +204,46 @@ func TestBuildAppliesPrecedenceShadowingAndDisabledSources(t *testing.T) {
 		t.Fatalf("reports = %+v", cat.Reports)
 	}
 }
+
+func TestReadReturnsTheInstructionsWithoutFrontMatterAndAStableHash(t *testing.T) {
+	root := t.TempDir()
+	f := filepath.Join(root, "s", "SKILL.md")
+	write(t, f, "---\nname: s\ndescription: d\n---\n\n# Do it\n\nSteps.\n")
+	body, sum, err := Read(root, f)
+	if err != nil || body != "# Do it\n\nSteps.\n" || len(sum) != 64 {
+		t.Fatalf("body=%q sum=%q err=%v", body, sum, err)
+	}
+	again, sum2, _ := Read(root, f)
+	if again != body || sum2 != sum {
+		t.Fatal("not stable")
+	}
+	write(t, f, "---\nname: s\n---\nchanged\n")
+	if _, sum3, _ := Read(root, f); sum3 == sum {
+		t.Fatal("a changed file kept its hash")
+	}
+	write(t, f, "no front matter\n")
+	if b, _, _ := Read(root, f); b != "no front matter\n" {
+		t.Fatalf("body = %q", b)
+	}
+}
+
+func TestReadRefusesAFileThatLeavesTheSourceOrIsTooLarge(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		outside := t.TempDir()
+		write(t, filepath.Join(outside, "SKILL.md"), "secret")
+		root := t.TempDir()
+		_ = os.MkdirAll(filepath.Join(root, "s"), 0o755)
+		_ = os.Symlink(filepath.Join(outside, "SKILL.md"), filepath.Join(root, "s", "SKILL.md"))
+		if _, _, err := Read(root, filepath.Join(root, "s", "SKILL.md")); err == nil {
+			t.Fatal("read a file outside the source")
+		}
+	}
+	root := t.TempDir()
+	write(t, filepath.Join(root, "big", "SKILL.md"), strings.Repeat("x", MaxFileBytes+1))
+	if _, _, err := Read(root, filepath.Join(root, "big", "SKILL.md")); err == nil {
+		t.Fatal("read an oversized file")
+	}
+	if _, _, err := Read(root, filepath.Join(root, "gone", "SKILL.md")); err == nil {
+		t.Fatal("read a missing file")
+	}
+}
