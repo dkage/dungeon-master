@@ -460,3 +460,13 @@ func TestEditingALocationRefetchesAndKeepsTheOldOneOnFailure(t *testing.T) {
 		t.Fatal("missing folder accepted")
 	}
 }
+
+func TestEmptyListsAreEmptyNotNil(t *testing.T) {
+	r, _ := open(t, &fakeFetcher{})
+	if got := r.ForCampaign("c1"); got == nil || len(got) != 0 {
+		t.Fatalf("ForCampaign = %#v, want an empty non-nil list", got)
+	}
+	if got := r.List(); got == nil {
+		t.Fatal("List is nil")
+	}
+}

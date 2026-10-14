@@ -256,3 +256,12 @@ func evalDir(t *testing.T, d string) string {
 	}
 	return r
 }
+
+func TestEmptyRegistryAnswersWithEmptyListsNeverNull(t *testing.T) {
+	e, _ := skillServer(t, stubFetcher{})
+	for _, path := range []string{"/api/skill-sources", "/api/campaigns/" + e.campaign + "/skill-sources", "/api/campaigns/" + e.campaign + "/skills"} {
+		if out := string(getBody(t, e, path)); strings.Contains(out, "null") {
+			t.Errorf("GET %s = %s", path, out)
+		}
+	}
+}

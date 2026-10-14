@@ -421,7 +421,7 @@ func (r *Registry) ForCampaign(campaignID string) []Effective {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	mine := r.data.Campaigns[campaignID]
-	var out []Effective
+	out := []Effective{} // never nil: it is sent as a JSON list
 	seen := map[string]bool{}
 	for _, m := range mine {
 		i := r.indexLocked(m.SourceID)
