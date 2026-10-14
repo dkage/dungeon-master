@@ -22,7 +22,9 @@ into a user's repository or written to their GitHub merely to make discovery wor
 without deleting a folder they own. Failed refresh keeps the previous verified catalog and explains its age/error.
 
 Optional discovery of project `.claude/skills`/`.agents/skills`, user folders and installed plugins supplements the
-registered catalog. Distinguish where a skill was found from whether Claude can invoke it natively. Bound scanning,
+registered catalog. Each place is off until the user turns it on in Settings; registered sources come first, so they win
+a name, and every entry says where it was found. Plugins are read from Claude's list of installed plugins and confined
+to its plugins folder. Distinguish where a skill was found from whether Claude can invoke it natively. Bound scanning,
 file size and supporting-file access; reject symlink escapes outside registered roots and skip malformed entries.
 
 ## 2. Identity and selection
@@ -65,8 +67,11 @@ operator's authorized scope. A method never grants permission to publish issues,
 ## 5. External sourcing and ownership
 
 Offer Matt Pocock's MIT skills as an opt-in pinned source, with license notice and existing credits; no content bundled
-silently into the binary. Inspect the chosen revision for capabilities and tracker contracts. Reuse unmodified methods
-where compatible; adapt only a demonstrated gap, preserving notice and credits and documenting the changes.
+silently into the binary. Inspect the chosen revision for capabilities and tracker contracts: a read-only look at each
+skill's text and files produces compatibility notes (it mentions creating GitHub issues or pull requests, keeps tickets
+in local files, asks for setup files in the repository, ships scripts). The notes are hints shown in Settings and in the
+launch review; they never block a launch and are not a verdict. Reuse unmodified methods where compatible; adapt only a
+demonstrated gap, preserving notice and credits and documenting the changes.
 
 Tracker conventions are independent of engineering methods. Provide neutral GitHub facts and explicit boundaries in
 our launch context. An upstream method requiring repository setup files or a file tracker is unavailable for that
