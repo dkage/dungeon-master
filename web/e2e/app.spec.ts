@@ -15,6 +15,12 @@ const { url, workdir, subdir, plaindir, ghLog } = JSON.parse(readFileSync(join(h
 
 // The close button of an expedition (not the quest drawer's).
 const closeSession = /^Close (?!quests)/
+// Closing a session that is mid-work asks first; answer that question too.
+async function closeExpedition(page: Page) {
+  await page.getByRole('button', { name: closeSession }).first().click()
+  const stop = page.getByRole('button', { name: 'Stop and close' })
+  if (await stop.isVisible()) await stop.click()
+}
 const questPanel = (page: Page) => page.getByRole('complementary', { name: 'Quests' })
 const nav = (page: Page) => page.getByRole('navigation', { name: 'Campaigns' })
 const hero = (page: Page, name: string) => page.getByRole('button', { name, exact: true })
@@ -87,7 +93,7 @@ async function open(page: Page) {
   const close = page.getByRole('button', { name: closeSession })
   while ((await close.count()) > 0) {
     const before = await close.count()
-    await close.first().click()
+    await closeExpedition(page)
     await expect(close).toHaveCount(before - 1)
   }
 }
@@ -131,7 +137,7 @@ test('a fresh install shows the getting-started checklist and a separate sample 
   await expect(screenText(page)).toContainText('FAKE-CLAUDE')
   await expect(screenText(page)).toContainText('sample-workspace')
   await captureMilestoneScreen(page, 'session-running')
-  await page.getByRole('button', { name: closeSession }).click()
+  await closeExpedition(page)
   await requestCampaignRemoval(page, 'Sample (not a real project)', true)
   await confirmCampaignRemoval(page, 'Sample (not a real project)', true)
   await expect(page.getByRole('button', { name: /^Sample/ })).toHaveCount(0)
@@ -172,7 +178,7 @@ test('a monorepo subfolder runs agents in the subfolder but uses the repository 
   await expect(screenText(page)).toContainText(join('apps', 'api')) // cwd is the subfolder
 
   // Clean up so later tests start from one campaign.
-  await page.getByRole('button', { name: closeSession }).click()
+  await closeExpedition(page)
   await requestCampaignRemoval(page, 'api')
   await confirmCampaignRemoval(page, 'api')
   await expect(nav(page).getByRole('button', { name: /^api/ })).toHaveCount(0)
@@ -974,7 +980,7 @@ test('a campaign with a running expedition cannot be removed', async ({ page }) 
   // Close the expedition, then removal succeeds. The row disappears only once the
   // server has ended the process, which takes longer on Windows; removing earlier
   // would still be refused.
-  await page.getByRole('button', { name: closeSession }).click()
+  await closeExpedition(page)
   await expect(expeditions(page, 'busy')).toHaveCount(0)
   await requestCampaignRemoval(page, 'busy')
   await confirmCampaignRemoval(page, 'busy')
@@ -985,7 +991,7 @@ test('closing an expedition ends it on the server', async ({ page }) => {
   await open(page)
   await hero(page, 'Shell').click()
   await expect(expeditions(page).getByRole('listitem')).toHaveCount(1)
-  await page.getByRole('button', { name: closeSession }).click()
+  await closeExpedition(page)
   await expect(page.getByRole('list', { name: /^Expeditions in/ })).toHaveCount(0)
   await page.reload()
   await expect(hero(page, 'Opus')).toBeEnabled()
@@ -1251,7 +1257,7 @@ test('a campaign without a GitHub repository can open the separate sample projec
   await expect(launchDetail.getByRole('heading', { name: /#9 Evaluate rate-limit libraries/ })).toBeVisible()
   await launchDetail.getByRole('button', { name: 'Go to session' }).click()
   await expect(page.locator('.quest-session-chip')).toHaveText('#9')
-  await page.getByRole('button', { name: closeSession }).click()
+  await closeExpedition(page)
   await launchDetail.getByRole('button', { name: /← Quests/ }).click()
   await panel.getByRole('region', { name: 'Quest browser' }).getByRole('button', { name: /Login button unresponsive/ }).click()
   const selectedDetail = panel.getByRole('region', { name: 'Selected issue detail' })

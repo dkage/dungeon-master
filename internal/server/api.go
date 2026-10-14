@@ -124,6 +124,9 @@ func (s *Server) sessionViews() []sessionJSON {
 	recs := s.cfg.History.List()
 	out := make([]sessionJSON, 0, len(recs))
 	for _, r := range recs {
+		if r.Hidden {
+			continue
+		}
 		v := sessionJSON{
 			ID: r.ID, Kind: r.Kind, Hero: r.Hero, Quest: r.Quest, Title: r.Title, Campaign: r.Campaign,
 			Dir: r.Dir, Created: r.Created, Lost: r.Lost,
@@ -592,9 +595,26 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	// Closing a running session stops the agent and everything it started.
+	// The record is kept, marked as stopped by the user; a finished session's
+	// record is simply dropped.
+	if known, ok := s.cfg.History.Get(id); ok && known.Hidden {
+		httpErr(w, http.StatusNotFound, "no such session") // already closed; its record keeps the outcome
+		return
+	}
+	var rec bool
+	var err error
+	if sess, running := s.cfg.Sessions.Get(id); running {
+		if exited, _ := sess.Exited(); !exited {
+			rec, err = s.cfg.History.MarkStopped(id)
+		} else {
+			rec, err = s.cfg.History.Remove(id)
+		}
+	} else {
+		rec, err = s.cfg.History.Remove(id)
+	}
 	live := s.cfg.Sessions.Remove(id)
 	s.removeUploads(id)
-	rec, err := s.cfg.History.Remove(id)
 	if err != nil {
 		httpErr(w, http.StatusInternalServerError, err.Error())
 		return

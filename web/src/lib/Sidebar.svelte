@@ -13,6 +13,13 @@
   let search = $state('')
   let adding = $state(false)
   let confirming = $state<string | null>(null)
+  // A running session that is mid-work asks before it is stopped (closing ends the agent).
+  let stopping = $state<string | null>(null)
+  const midWork = (s: { exited?: boolean; activity?: string }) => !s.exited && (s.activity === 'working' || s.activity === 'needs-you')
+  function closeSession(s: { id: string; exited?: boolean; activity?: string }) {
+    if (midWork(s)) stopping = s.id
+    else void store.close(s.id)
+  }
   let menuFor = $state<string | null>(null)
   let renameFor = $state<string | null>(null)
   let renameName = $state('')
@@ -130,8 +137,15 @@
                     {#if s.exited && !s.lost}<span class="badge">exit {s.exitCode}</span>{/if}
                     {#if s.lost}<span class="badge">lost</span>{/if}
                   </button>
-                  <button type="button" class="ghost" aria-label={`Close ${s.title}`} onclick={() => store.close(s.id)}>×</button>
+                  <button type="button" class="ghost" aria-label={`Close ${s.title}`} onclick={() => closeSession(s)}>×</button>
                 </li>
+                {#if stopping === s.id}
+                  <li class="remove-confirm" role="group" aria-label={`Confirm stopping ${s.title}`}>
+                    <p>{s.title} is still working. Closing it stops the agent and anything it started, and unfinished work in the session is lost.</p>
+                    <button type="button" class="danger" onclick={() => { stopping = null; void store.close(s.id) }}>Stop and close</button>
+                    <button type="button" class="secondary" onclick={() => (stopping = null)}>Keep running</button>
+                  </li>
+                {/if}
               {/each}
             </ul>
           {/if}

@@ -117,3 +117,23 @@ func TestOpenRejectsCorruptFile(t *testing.T) {
 		t.Fatal("corrupt file accepted")
 	}
 }
+
+func TestMarkStoppedKeepsTheOutcomeAndSurvivesARestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sessions.json")
+	s, _ := Open(path)
+	_ = s.Add(rec("a", "c1"))
+	if ok, err := s.MarkStopped("a"); !ok || err != nil {
+		t.Fatalf("mark: %v %v", ok, err)
+	}
+	if ok, _ := s.MarkStopped("nope"); ok {
+		t.Fatal("an unknown id was marked")
+	}
+	reopened, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, ok := reopened.Get("a")
+	if !ok || !a.Stopped || !a.Hidden || a.Ended == nil || a.Lost {
+		t.Fatalf("a stopped session must stay recorded as stopped, not lost: %+v", a)
+	}
+}

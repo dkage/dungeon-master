@@ -32,6 +32,11 @@ type Record struct {
 	ExitCode int        `json:"exitCode"`
 	// Lost marks a session that was still running when Dungeon Master stopped.
 	Lost bool `json:"lost,omitempty"`
+	// Stopped marks a session the user closed while it was running; its
+	// outcome is "stopped by the user", not a completed run. Hidden records
+	// stay in the history but are no longer listed as sessions.
+	Stopped bool `json:"stopped,omitempty"`
+	Hidden  bool `json:"hidden,omitempty"`
 }
 
 type file struct {
@@ -124,6 +129,24 @@ func (s *Store) Finish(id string, code int) error {
 		}
 	}
 	return nil
+}
+
+// MarkStopped records that the user stopped a running session by closing it,
+// and hides it from the session list. It reports whether the record existed.
+func (s *Store) MarkStopped(id string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.recs {
+		if s.recs[i].ID == id {
+			if s.recs[i].Ended == nil {
+				t := s.now()
+				s.recs[i].Ended = &t
+			}
+			s.recs[i].Stopped, s.recs[i].Hidden = true, true
+			return true, s.saveLocked()
+		}
+	}
+	return false, nil
 }
 
 // Remove deletes one record and reports whether it existed.

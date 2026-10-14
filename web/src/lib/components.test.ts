@@ -208,6 +208,43 @@ describe('Sidebar', () => {
     expect(screen.queryByPlaceholderText('/absolute/path/to/project')).not.toBeInTheDocument()
   })
 
+  it('closes an idle or finished session at once, and asks before stopping one that is mid-work', async () => {
+    const s = store((st) => {
+      st.sessions = [
+        sess('idle', 'c1', { title: 'Idle one', activity: 'idle' }),
+        sess('busy', 'c1', { title: 'Busy one', activity: 'working' }),
+        sess('wait', 'c1', { title: 'Waiting one', activity: 'needs-you' }),
+      ]
+    })
+    const close = vi.spyOn(s, 'close').mockResolvedValue()
+    render(Sidebar, { store: s })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Close Idle one' }))
+    expect(close).toHaveBeenCalledWith('idle')
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Close Busy one' }))
+    expect(close).toHaveBeenCalledTimes(1) // not yet: it asked
+    const ask = screen.getByRole('group', { name: 'Confirm stopping Busy one' })
+    await fireEvent.click(within(ask).getByRole('button', { name: 'Keep running' }))
+    expect(close).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('group', { name: /Confirm stopping/ })).not.toBeInTheDocument()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Close Waiting one' }))
+    await fireEvent.click(within(screen.getByRole('group', { name: 'Confirm stopping Waiting one' })).getByRole('button', { name: 'Stop and close' }))
+    expect(close).toHaveBeenLastCalledWith('wait')
+  })
+
+  it('sends the stop request when the close button of a live session is confirmed', async () => {
+    const s = store((st) => { st.sessions = [sess('run', 'c1', { title: 'Runner', activity: 'working' })] })
+    const del = vi.fn(async () => {})
+    ;(s as unknown as { client: { deleteSession: typeof del } }).client.deleteSession = del
+    render(Sidebar, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: 'Close Runner' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Stop and close' }))
+    await tick()
+    expect(del).toHaveBeenCalledWith('run')
+  })
+
   it('nests expeditions under their campaign with accessible status', async () => {
     const s = store((st) => {
       st.sessions = [

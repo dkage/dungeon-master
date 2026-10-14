@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, type Page } from '@playwright/test'
-import { test } from './fixtures'
+import { confirmStop, test } from './fixtures'
 
 // Workspace focus (#64): every region expands and restores while the live session survives.
 
@@ -27,6 +27,7 @@ async function openSample(page: Page) {
   while ((await close.count()) > 0) {
     const before = await close.count()
     await close.first().click()
+    await confirmStop(page)
     await expect(close).toHaveCount(before - 1)
   }
 }

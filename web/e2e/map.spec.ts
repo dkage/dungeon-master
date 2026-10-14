@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, type Page } from '@playwright/test'
-import { setAppearance, test } from './fixtures'
+import { confirmStop, setAppearance, test } from './fixtures'
 
 // The map (M5a) on the sample project, whose shape is made to show it:
 // two epics with a line between them, a hall, a chain, strays for the
@@ -122,6 +122,7 @@ test('selects on the map and starts only from the footer; a locked quest cannot 
   await expect(map(page).getByRole('button', { name: /^#3 Build the signup form, In progress/ })).toBeVisible()
   // Close this session, so later tests see #3 as ready again.
   await nav(page).getByRole('button', { name: /^Close #3 Build the signup form/ }).click()
+  await confirmStop(page)
   await expect(map(page).getByRole('button', { name: /^#3 Build the signup form, Ready/ })).toBeVisible()
 })
 
@@ -145,6 +146,7 @@ test('keeps the chosen zoom while sessions refresh in the background', async ({ 
   expect(await width()).toBe(zoomed)
 
   await nav(page).getByRole('button', { name: /^Close #3 Build the signup form/ }).click()
+  await confirmStop(page)
   await expect(map(page).getByRole('button', { name: /^#3 Build the signup form, Ready/ })).toBeVisible()
 })
 

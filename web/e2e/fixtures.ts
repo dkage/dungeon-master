@@ -33,3 +33,9 @@ export const test = base.extend({
     await use(page)
   },
 })
+
+/** Closing a session that is mid-work asks first; answers that question when it is shown. */
+export async function confirmStop(page: Page) {
+  const stop = page.getByRole('button', { name: 'Stop and close' })
+  if (await stop.isVisible()) await stop.click()
+}
