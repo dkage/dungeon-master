@@ -1,10 +1,10 @@
 ---
 status: planned
 milestone: workspace usability
-github_issues: [63, 64, 65, 78, 84, 87, 88]
+github_issues: [63, 64, 65, 78, 84, 87, 88, 160, 163]
 tracking: in-gh-issues
 next: desktop-shell menu wiring for the shared actions; quick switcher decision (#146)
-verified: 2026-10-13
+verified: 2026-10-14
 ---
 
 # Workspace focus and shortcuts
@@ -33,6 +33,19 @@ click returns to the previous layout. This is application layout, not operating-
 - On narrow screens, expansion uses the same action and restores the previous responsive layout/drawer. It must not
   leave an invisible overlay blocking input. Start each fresh page in split mode so a remembered hidden region does
   not obscure onboarding; remember split dimensions independently when that geometry is implemented.
+
+Decision (#164, 2026-10-14): **every fresh page starts in split mode.** The reload restore (#84) keeps the project,
+issue, session and map view; the expanded panel is not remembered and is not part of a shared link. Probe: expanding the
+terminal, the projects panel and the map, then reloading, always returned to the split with the same session selected
+(`web/e2e/workspace.spec.ts`). Rejected: *remember the expanded panel* hides the other regions from a returning user who
+may not recall why they are gone, and a link to an issue would open into a half-hidden window; *remember it only for the
+terminal* has the same problem for the projects list and the issue detail the link points at, and the terminal is one
+shortcut press away (Ctrl+Shift+2) while the session and issue it needs are already restored. No follow-up code is
+needed. Reopen the question if users report re-expanding on every visit.
+
+Narrow layouts (#165): browser tests expand and restore all four regions at a drawer width (900 px) and at phone width
+(390 px); each restore returns the quests drawer to the state it had and leaves the terminal clickable and typeable.
+An open drawer covers the toolbar's Quests button, so it closes with its own × button.
 
 Implement a small typed workspace state (`expandedRegion`, saved split state), not a general split-pane tree. Buttons,
 shortcuts and future native menus call the same allowlisted semantic actions. Keep issue selection and terminal

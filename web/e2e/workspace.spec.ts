@@ -246,3 +246,73 @@ test('a shortcut can be tested: the keys arrive and nothing runs; keys that neve
   await dialog.getByRole('button', { name: 'Done' }).click()
   await expect(app(page)).not.toHaveAttribute('data-expanded')
 })
+
+// Narrow layouts (#165): at a drawer width and at phone width every region expands and restores, nothing
+// invisible is left over the page, and the quests drawer is as it was.
+for (const size of [{ name: 'drawer', width: 900, height: 800 }, { name: 'phone', width: 390, height: 800 }]) {
+  test(`every region expands and restores at ${size.name} width without leaving an overlay`, async ({ page }) => {
+    test.setTimeout(30_000)
+    await page.setViewportSize({ width: size.width, height: size.height })
+    await openSample(page)
+    await page.getByRole('button', { name: 'Shell', exact: true }).click()
+    const term = page.locator('.pane:not([hidden]) .xterm-rows')
+    await expect(term).toContainText(PROMPT, { timeout: 25_000 })
+
+    const drawer = page.locator('.quests')
+    const toggle = page.getByRole('button', { name: 'Quests', exact: true })
+    // An open drawer covers the toolbar's toggle, so it closes with its own button.
+    const closeDrawer = () => page.getByRole('button', { name: 'Close quests' }).and(page.locator(':visible')).first().click()
+    const drawerOpen = () => drawer.evaluate((e) => e.classList.contains('open'))
+    // The drawer opens from the toolbar; pick an issue so the detail region exists.
+    await toggle.click()
+    const world = panel(page).getByRole('group', { name: 'World map' })
+    await world.getByRole('button', { name: /^Dungeon #1 / }).dblclick()
+    await panel(page).getByRole('button', { name: /^#3 Build the signup form,/ }).click()
+    await expect(panel(page).getByRole('region', { name: 'Selected issue detail' })).toBeVisible()
+    await closeDrawer()
+    await expect.poll(drawerOpen).toBe(false)
+
+    const regions = [
+      ['projects', 'Expand projects', false],
+      ['terminal', 'Expand terminal', false],
+      ['map', 'Expand map and list', true],
+      ['detail', 'Expand issue detail', true],
+    ] as const
+    for (const [region, label, inDrawer] of regions) {
+      if (inDrawer && !(await drawerOpen())) await toggle.click()
+      const before = await drawerOpen()
+      await page.getByRole('button', { name: label }).first().click()
+      await expect(app(page)).toHaveAttribute('data-expanded', region)
+      // The expanded region fills the window: nothing else is left to take clicks.
+      await expect(page.getByRole('button', { name: 'Restore split' }).first()).toBeVisible()
+      await page.getByRole('button', { name: 'Restore split' }).first().click()
+      await expect(app(page)).not.toHaveAttribute('data-expanded')
+      expect(await drawerOpen()).toBe(before)
+      if (inDrawer && (await drawerOpen())) await closeDrawer() // close it the way a user does
+      await expect.poll(drawerOpen).toBe(false)
+
+      // No invisible overlay: the terminal takes a click (Playwright refuses a covered target) and keys.
+      await page.locator('.pane:not([hidden]) .xterm-screen').click()
+      await page.keyboard.type(`echo back-${region}`)
+      await page.keyboard.press('Enter')
+      await expect(term).toContainText(`back-${region}`)
+    }
+  })
+}
+
+// Decision #164: every fresh page starts in split mode, whichever region was expanded before.
+test('a reload starts in split mode even after a region was expanded, and keeps the session and issue', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await openSample(page)
+  await page.getByRole('button', { name: 'Shell', exact: true }).click()
+  await expect(page.locator('.pane:not([hidden]) .xterm-rows')).toContainText(PROMPT, { timeout: 25_000 })
+  for (const [region, label] of [['terminal', 'Expand terminal'], ['projects', 'Expand projects'], ['map', 'Expand map and list']] as const) {
+    await page.getByRole('button', { name: label }).first().click()
+    await expect(app(page)).toHaveAttribute('data-expanded', region)
+    await page.reload()
+    await expect(page.getByRole('button', { name: 'Expand terminal' })).toBeVisible()
+    await expect(app(page)).not.toHaveAttribute('data-expanded')
+    expect(await page.evaluate(() => location.hash)).not.toMatch(/expand|region/) // a shared link carries no layout (v= is the map or list view)
+    await expect(page.locator('.tabs [role="tab"]').first()).toHaveAttribute('aria-selected', 'true')
+  }
+})
