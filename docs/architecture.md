@@ -11,7 +11,7 @@ verified: 2026-10-13
 
 A local cockpit for steering Claude Code against GitHub issues, with an RPG presentation and a neutral alternative.
 The operator plans, chooses ready work, reviews launch context, steers a live terminal and inspects results. Current
-scope and rules are in `CLAUDE.md`; priority and evidence of delivery are in `docs/roadmap.md`.
+scope and rules are in `CLAUDE.md`; order is in `docs/roadmap.md` and status is in GitHub.
 
 ## 1. Product boundary
 
@@ -103,7 +103,7 @@ gh or network. Record dated manual probes separately; a test file is not evidenc
 
 ## 11. Delivery order
 
-`docs/roadmap.md` owns order and current status. Existing M-numbers identify history; new workspace/workflow increments
+`docs/roadmap.md` owns order; GitHub owns status. Existing M-numbers identify history; new workspace/workflow increments
 do not renumber existing issues. Validate local map work before declaring the map milestone delivered.
 
 ## 12. Open verification boundaries
