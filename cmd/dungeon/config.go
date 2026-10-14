@@ -22,6 +22,7 @@ import (
 	"github.com/dkage/dungeon-master/internal/quests/demo"
 	"github.com/dkage/dungeon-master/internal/quests/github"
 	"github.com/dkage/dungeon-master/internal/server"
+	"github.com/dkage/dungeon-master/internal/skillsource"
 	"github.com/dkage/dungeon-master/web"
 )
 
@@ -112,6 +113,11 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 	if err != nil {
 		return server.Config{}, err
 	}
+	skills, err := skillsource.Open(filepath.Join(dir, "skill-sources.json"),
+		skillsource.Options{Root: filepath.Join(dir, "skill-sources")})
+	if err != nil {
+		return server.Config{}, err
+	}
 	qsvc := quests.NewService(quests.ServiceOptions{
 		GitHub: github.New(github.Options{
 			Endpoint: endpoint,
@@ -138,8 +144,9 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 		Campaigns: campaigns,
 		History:   hist,
 
-		Appearance: appearance.Open(filepath.Join(dir, "appearance.json")),
-		Quests:     qsvc,
+		SkillSources: skills,
+		Appearance:   appearance.Open(filepath.Join(dir, "appearance.json")),
+		Quests:       qsvc,
 
 		Quartermaster: qm,
 		Gatekeeper:    gate,

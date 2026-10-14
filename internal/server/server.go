@@ -31,6 +31,7 @@ import (
 	"github.com/dkage/dungeon-master/internal/quests"
 	"github.com/dkage/dungeon-master/internal/quests/demo"
 	"github.com/dkage/dungeon-master/internal/session"
+	"github.com/dkage/dungeon-master/internal/skillsource"
 	"github.com/dkage/dungeon-master/internal/uploads"
 	"github.com/dkage/dungeon-master/internal/worktree"
 )
@@ -78,6 +79,9 @@ type Config struct {
 	History *history.Store
 	// Appearance keeps the look-and-feel choices; in memory when nil.
 	Appearance *appearance.Store
+	// SkillSources keeps the registered skill sources and their per-campaign
+	// mappings; in memory (folders only) when nil.
+	SkillSources *skillsource.Registry
 	// Quests supplies issues. When nil, only the demo quests are available.
 	Quests *quests.Service
 	// Quartermaster is the gatekeeper for GitHub traffic; its status is
@@ -224,6 +228,9 @@ func withDefaults(cfg Config) Config {
 	}
 	if cfg.Appearance == nil {
 		cfg.Appearance = appearance.Open("")
+	}
+	if cfg.SkillSources == nil {
+		cfg.SkillSources, _ = skillsource.Open("", skillsource.Options{}) // in-memory: cannot fail
 	}
 	if cfg.Gatekeeper != nil && cfg.Gatekeeper.Tokens == nil {
 		g := *cfg.Gatekeeper

@@ -56,6 +56,16 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /api/campaigns/{id}/quests/{number}/effort", s.handleEffortOverride)
 	mux.HandleFunc("POST /api/campaigns/{id}/quests/{number}/launch-preview", s.handleQuestLaunchPreview)
 
+	mux.HandleFunc("GET /api/skill-sources", s.handleSkillSources)
+	mux.HandleFunc("POST /api/skill-sources", s.handleSkillSourceAdd)
+	mux.HandleFunc("PUT /api/skill-sources/order", s.handleSkillSourceOrder)
+	mux.HandleFunc("PATCH /api/skill-sources/{id}", s.handleSkillSourceUpdate)
+	mux.HandleFunc("DELETE /api/skill-sources/{id}", s.handleSkillSourceRemove)
+	mux.HandleFunc("POST /api/skill-sources/{id}/refresh", s.handleSkillSourceRefresh)
+	mux.HandleFunc("GET /api/campaigns/{id}/skill-sources", s.handleCampaignSkillSources)
+	mux.HandleFunc("PUT /api/campaigns/{id}/skill-sources", s.handleCampaignSkillSourcesSet)
+	mux.HandleFunc("GET /api/campaigns/{id}/skills", s.handleCampaignSkills)
+
 	mux.HandleFunc("POST /api/sessions", s.handleCreate)
 	mux.HandleFunc("DELETE /api/sessions/{id}", s.handleDelete)
 	mux.HandleFunc("GET /api/sessions/{id}/term", s.handleTerm)
@@ -426,6 +436,7 @@ func (s *Server) handleCampaignRemove(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	_ = s.cfg.History.RemoveCampaign(id)
+	_ = s.cfg.SkillSources.ForgetCampaign(id)
 	w.WriteHeader(http.StatusNoContent)
 }
 
