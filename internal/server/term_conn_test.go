@@ -230,23 +230,23 @@ func readAttach(t *testing.T, c *websocket.Conn) attachFrame {
 // receives only the bytes it missed: no gap and no repeat.
 func TestTermReattachReplaysOnlyWhatWasMissed(t *testing.T) {
 	e, _ := connServer(t, time.Hour, time.Hour)
-	sj := e.create(map[string]any{"shell": true})
+	// The fake claude answers each line with "echo:<line>", so the output differs from the typed text.
+	sj := e.create(map[string]any{"hero": "opus"})
 	c := e.dialFrom(t, sj.ID, -1)
 	first := readAttach(t, c)
 	if first.Resume {
 		t.Fatal("a fresh attach must not claim to resume")
 	}
-	send(t, c, "echo before-cut\n")
-	// The output line, not the echo of the typed command (which also holds the word).
-	seen := readUntil(t, c, "\r\nbefore-cut\r\n")
+	send(t, c, "before-cut\n")
+	seen := readUntil(t, c, "echo:before-cut")
 	pos := first.Start + uint64(len(seen))
 	c.CloseNow()
 
 	// Output the page misses while it is away.
 	c2 := e.dialFrom(t, sj.ID, -1)
 	readAttach(t, c2)
-	send(t, c2, "echo while-away\n")
-	readUntil(t, c2, "\r\nwhile-away\r\n")
+	send(t, c2, "while-away\n")
+	readUntil(t, c2, "echo:while-away")
 	c2.CloseNow()
 
 	c3 := e.dialFrom(t, sj.ID, int64(pos))
@@ -255,8 +255,8 @@ func TestTermReattachReplaysOnlyWhatWasMissed(t *testing.T) {
 	if !f.Resume || f.Start != pos {
 		t.Fatalf("attach frame %+v, want a resume at %d", f, pos)
 	}
-	got := readUntil(t, c3, "while-away")
-	if strings.Contains(got, "before-cut") {
+	got := readUntil(t, c3, "echo:while-away")
+	if strings.Contains(got, "echo:before-cut") || strings.Contains(got, "FAKE-CLAUDE") {
 		t.Errorf("replay repeats output the page already had: %q", got)
 	}
 
@@ -266,5 +266,5 @@ func TestTermReattachReplaysOnlyWhatWasMissed(t *testing.T) {
 	if f := readAttach(t, c4); f.Resume {
 		t.Errorf("an unknown position must not resume: %+v", f)
 	}
-	readUntil(t, c4, "before-cut")
+	readUntil(t, c4, "echo:before-cut")
 }
