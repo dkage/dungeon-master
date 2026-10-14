@@ -470,3 +470,20 @@ func TestEmptyListsAreEmptyNotNil(t *testing.T) {
 		t.Fatal("List is nil")
 	}
 }
+
+func TestDiscoveryChoicesPersistAndStartOff(t *testing.T) {
+	r, path := open(t, &fakeFetcher{})
+	if d := r.Discovery(); d != (Discovery{}) {
+		t.Fatalf("default = %+v", d)
+	}
+	if err := r.SetDiscovery(Discovery{Project: true, Plugins: true}); err != nil {
+		t.Fatal(err)
+	}
+	again, err := Open(path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d := again.Discovery(); d != (Discovery{Project: true, Plugins: true}) {
+		t.Fatalf("reopened = %+v", d)
+	}
+}

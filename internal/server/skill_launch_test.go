@@ -267,3 +267,34 @@ func TestDirectionAndSkillTextAreNotShellSyntax(t *testing.T) {
 		t.Fatal("the direction was altered on its way into the briefing")
 	}
 }
+
+func TestASkillFoundInTheProjectCanBeChosenAndTheReviewShowsItsOriginAndNotes(t *testing.T) {
+	s := skillLaunchServer(t)
+	if err := s.reg.SetDiscovery(skillsource.Discovery{Project: true}); err != nil {
+		t.Fatal(err)
+	}
+	skillDir := filepath.Join(s.dir, ".claude", "skills", "publish")
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("---\nname: publish\n---\nOpen it with gh issue create.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, p := s.preview(t, map[string]any{"skill": "project-claude/publish"})
+	if code != http.StatusOK || !p.CanStart || p.Method == nil {
+		t.Fatalf("preview = %d %+v", code, p)
+	}
+	if p.Method.Origin != "project" || len(p.Method.Notes) != 1 || !strings.Contains(p.Method.Notes[0], "GitHub") {
+		t.Fatalf("method = %+v", p.Method)
+	}
+	if !strings.Contains(p.Content, "Open it with gh issue create.") {
+		t.Fatal("the skill text is not in the briefing")
+	}
+	// Turning the place off after the review ends in a conflict, like a disabled source.
+	if err := s.reg.SetDiscovery(skillsource.Discovery{}); err != nil {
+		t.Fatal(err)
+	}
+	if resp, out := s.start(t, p.BriefingID); resp.StatusCode != http.StatusConflict || !strings.Contains(string(out), "method_unavailable") {
+		t.Fatalf("start: %d %s", resp.StatusCode, out)
+	}
+}

@@ -265,3 +265,76 @@ func TestEmptyRegistryAnswersWithEmptyListsNeverNull(t *testing.T) {
 		}
 	}
 }
+
+func TestSupplementaryPlacesAreOffUntilTurnedOnAndShowWhereSkillsWereFound(t *testing.T) {
+	home := t.TempDir()
+	dir := t.TempDir()
+	reg, err := skillsource.Open("", skillsource.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := startServer(t, func(c *Config) { c.SkillSources = reg; c.UserHome = home })
+	put := func(base, name string) {
+		p := filepath.Join(base, name)
+		if err := os.MkdirAll(p, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(p, "SKILL.md"), []byte("---\nname: "+name+"\ndescription: found\n---\nBody. Run gh issue create.\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put(filepath.Join(e.dir, ".claude", "skills"), "from-project")
+	put(filepath.Join(home, ".claude", "skills"), "from-user")
+	_ = dir
+
+	names := func() []string {
+		cat := decodeJSON[skillcatalog.Catalog](t, getBody(t, e, "/api/campaigns/"+e.campaign+"/skills"))
+		var out []string
+		for _, en := range cat.Entries {
+			out = append(out, en.Origin+":"+en.Name)
+		}
+		return out
+	}
+	if got := names(); len(got) != 0 {
+		t.Fatalf("off by default, got %v", got)
+	}
+	if d := decodeJSON[skillSourcesResp](t, getBody(t, e, "/api/skill-sources")).Discovery; d.Project || d.User || d.Plugins {
+		t.Fatalf("discovery = %+v", d)
+	}
+
+	resp, out := e.req("PUT", "/api/skill-sources/discovery", map[string]any{"project": true}, nil)
+	if resp.StatusCode != http.StatusOK || !decodeJSON[skillSourcesResp](t, out).Discovery.Project {
+		t.Fatalf("turn on: %d %s", resp.StatusCode, out)
+	}
+	if got := strings.Join(names(), ","); got != "project:from-project" {
+		t.Fatalf("project only = %s", got)
+	}
+	e.req("PUT", "/api/skill-sources/discovery", map[string]any{"project": true, "user": true}, nil)
+	if got := strings.Join(names(), ","); got != "project:from-project,user:from-user" {
+		t.Fatalf("project and user = %s", got)
+	}
+	cat := decodeJSON[skillcatalog.Catalog](t, getBody(t, e, "/api/campaigns/"+e.campaign+"/skills"))
+	var rep *skillcatalog.SourceReport
+	for i := range cat.Reports {
+		if cat.Reports[i].SourceID == "user-claude" {
+			rep = &cat.Reports[i]
+		}
+	}
+	if rep == nil || rep.Origin != "user" || rep.Count != 1 || len(rep.Flagged) != 1 || len(rep.Flagged[0].Notes) != 1 {
+		t.Fatalf("report = %+v", rep)
+	}
+	// Unknown fields are refused like every other write.
+	if resp, _ := e.req("PUT", "/api/skill-sources/discovery", map[string]any{"everything": true}, nil); resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unknown field: %d", resp.StatusCode)
+	}
+}
+
+func TestWithoutAHomeDirectoryUserDiscoveryFindsNothing(t *testing.T) {
+	reg, _ := skillsource.Open("", skillsource.Options{})
+	e := startServer(t, func(c *Config) { c.SkillSources = reg }) // UserHome left empty, as in every test
+	e.req("PUT", "/api/skill-sources/discovery", map[string]any{"user": true, "plugins": true}, nil)
+	cat := decodeJSON[skillcatalog.Catalog](t, getBody(t, e, "/api/campaigns/"+e.campaign+"/skills"))
+	if len(cat.Entries) != 0 {
+		t.Fatalf("entries = %+v", cat.Entries)
+	}
+}

@@ -20,13 +20,20 @@ var (
 	errMethodChanged = errors.New("the chosen skill changed after it was reviewed")
 )
 
-// projectCatalog is the catalog a campaign sees: its enabled sources in its
-// own order.
+// projectCatalog is the catalog a campaign sees: its enabled registered
+// sources in its own order, then the supplementary places the user turned on
+// (the project's own folders, the user's, installed plugins). Registered
+// sources win a name; the others stay selectable by their qualified id.
 func (s *Server) projectCatalog(campaignID string) skillcatalog.Catalog {
 	eff := s.cfg.SkillSources.ForCampaign(campaignID)
 	in := make([]skillcatalog.Source, 0, len(eff))
 	for _, e := range eff {
 		in = append(in, catalogSource(e.Source, e.Enabled))
+	}
+	d := s.cfg.SkillSources.Discovery()
+	if c, ok := s.cfg.Campaigns.Get(campaignID); ok {
+		in = append(in, skillcatalog.Supplementary(skillcatalog.Discovery{Project: d.Project, User: d.User, Plugins: d.Plugins},
+			[]string{c.Dir, c.GitRoot}, s.cfg.UserHome)...)
 	}
 	return skillcatalog.Build(in)
 }
@@ -78,6 +85,10 @@ type methodJSON struct {
 	Dir        string `json:"dir"`
 	File       string `json:"file"`
 	Delivery   string `json:"delivery"`
+	// Origin says where the skill was found (registered, project, user or
+	// plugin); Notes are compatibility hints from inspecting it.
+	Origin string   `json:"origin"`
+	Notes  []string `json:"notes"`
 	// Truncated says only the start of the skill text was copied into the
 	// briefing; the whole file stays readable at File.
 	Truncated bool `json:"truncated,omitempty"`
@@ -85,5 +96,6 @@ type methodJSON struct {
 
 func (m resolvedMethod) json(truncated bool) *methodJSON {
 	return &methodJSON{ID: m.entry.ID, Name: m.entry.Name, SourceName: m.entry.SourceName, Revision: m.entry.Revision,
-		Dir: m.entry.Dir, File: m.entry.File, Delivery: deliveryBriefing, Truncated: truncated}
+		Dir: m.entry.Dir, File: m.entry.File, Delivery: deliveryBriefing, Truncated: truncated,
+		Origin: m.entry.Origin, Notes: m.entry.Notes}
 }

@@ -145,6 +145,7 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 		History:   hist,
 
 		SkillSources: skills,
+		UserHome:     userHome(),
 		Appearance:   appearance.Open(filepath.Join(dir, "appearance.json")),
 		Quests:       qsvc,
 
@@ -158,4 +159,13 @@ func buildConfig(ctx context.Context, addr, token string) (server.Config, error)
 		cfg.Claude = path
 	}
 	return cfg, nil
+}
+
+// userHome is where Claude keeps its own skill folders and plugins; empty when unknown.
+func userHome() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return home
 }

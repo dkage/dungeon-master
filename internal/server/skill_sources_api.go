@@ -20,6 +20,8 @@ type skillSourcesResp struct {
 	// Reports say how many skills each source holds and why one is empty or
 	// partly skipped; scanning is what the Rescan button repeats.
 	Reports []skillcatalog.SourceReport `json:"reports"`
+	// Discovery says which supplementary places are turned on.
+	Discovery skillsource.Discovery `json:"discovery"`
 }
 
 func (s *Server) skillSourcesView() skillSourcesResp {
@@ -28,7 +30,7 @@ func (s *Server) skillSourcesView() skillSourcesResp {
 	for _, src := range srcs {
 		in = append(in, catalogSource(src, src.Enabled))
 	}
-	return skillSourcesResp{Sources: srcs, Suggestions: skillsource.Suggestions(), Reports: skillcatalog.Build(in).Reports}
+	return skillSourcesResp{Sources: srcs, Suggestions: skillsource.Suggestions(), Reports: skillcatalog.Build(in).Reports, Discovery: s.cfg.SkillSources.Discovery()}
 }
 
 // catalogSource says where a source's files are: the folder itself, or the
@@ -196,4 +198,17 @@ func skillSourceReply(w http.ResponseWriter, ok int, src skillsource.Source, err
 		httpErr(w, http.StatusInternalServerError, "could not save the skill sources")
 	}
 	return false
+}
+
+// handleSkillDiscovery saves which supplementary places to look in.
+func (s *Server) handleSkillDiscovery(w http.ResponseWriter, r *http.Request) {
+	var in skillsource.Discovery
+	if !decode(w, r, &in) {
+		return
+	}
+	if err := s.cfg.SkillSources.SetDiscovery(in); err != nil {
+		httpErr(w, http.StatusInternalServerError, "could not save the skill sources")
+		return
+	}
+	writeJSON(w, http.StatusOK, s.skillSourcesView())
 }

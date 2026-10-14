@@ -121,9 +121,19 @@ func Suggestions() []Suggested {
 	}}
 }
 
+// Discovery turns on the optional supplementary places to look for skills:
+// a project's own skill folders, the user's, and installed plugins. All are
+// off until the user chooses; registered sources stay the primary model.
+type Discovery struct {
+	Project bool `json:"project"`
+	User    bool `json:"user"`
+	Plugins bool `json:"plugins"`
+}
+
 type file struct {
-	Version int      `json:"version"`
-	Sources []Source `json:"sources"`
+	Version   int       `json:"version"`
+	Discovery Discovery `json:"discovery"`
+	Sources   []Source  `json:"sources"`
 	// Campaigns maps a campaign id to its own ordered source list.
 	Campaigns map[string][]Mapping `json:"campaigns,omitempty"`
 }
@@ -386,6 +396,26 @@ func (r *Registry) Reorder(ids []string) error {
 	r.data.Sources = next
 	if err := r.saveLocked(); err != nil {
 		r.data.Sources = old
+		return err
+	}
+	return nil
+}
+
+// Discovery returns which supplementary places are turned on.
+func (r *Registry) Discovery() Discovery {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.data.Discovery
+}
+
+// SetDiscovery saves the supplementary choices.
+func (r *Registry) SetDiscovery(d Discovery) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	old := r.data.Discovery
+	r.data.Discovery = d
+	if err := r.saveLocked(); err != nil {
+		r.data.Discovery = old
 		return err
 	}
 	return nil

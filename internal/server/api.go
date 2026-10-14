@@ -59,6 +59,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/skill-sources", s.handleSkillSources)
 	mux.HandleFunc("POST /api/skill-sources", s.handleSkillSourceAdd)
 	mux.HandleFunc("PUT /api/skill-sources/order", s.handleSkillSourceOrder)
+	mux.HandleFunc("PUT /api/skill-sources/discovery", s.handleSkillDiscovery)
 	mux.HandleFunc("PATCH /api/skill-sources/{id}", s.handleSkillSourceUpdate)
 	mux.HandleFunc("DELETE /api/skill-sources/{id}", s.handleSkillSourceRemove)
 	mux.HandleFunc("POST /api/skill-sources/{id}/refresh", s.handleSkillSourceRefresh)

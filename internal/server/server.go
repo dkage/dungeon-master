@@ -82,6 +82,10 @@ type Config struct {
 	// SkillSources keeps the registered skill sources and their per-campaign
 	// mappings; in memory (folders only) when nil.
 	SkillSources *skillsource.Registry
+	// UserHome is the user's home directory, where Claude keeps its own skill
+	// folders and plugins. Empty turns user and plugin discovery off, which is
+	// what tests want: they never read the real home.
+	UserHome string
 	// Quests supplies issues. When nil, only the demo quests are available.
 	Quests *quests.Service
 	// Quartermaster is the gatekeeper for GitHub traffic; its status is
