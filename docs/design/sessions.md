@@ -70,7 +70,7 @@ Decision for #173: the browser reattaches (close code 1013 reattaches at once, w
 keeping a slow viewer attached, because the server's bounded subscription buffer protects memory and the replay already
 restores everything. A footer note shows when the API or any terminal cannot reach the backend (a 4 s heartbeat detects
 a stopped backend). Browser tests simulate drops and a changed token with Playwright websocket and request routing;
-restarting the shared test server under an open page is not done.
+`web/e2e/restart.spec.ts` also restarts a real backend (its own, on a spare port, with its own state directory) under an open page: a crash and restart shows the session is gone, and a restart with `--new-token` shows the sign-in message.
 
 Reattach by position (#178): the session counts every byte it has produced. Each connection opens with a text frame
 `{"type":"attach","start":N,"resume":B}`; the page counts the bytes it receives and reconnects with `?from=<position>`.
