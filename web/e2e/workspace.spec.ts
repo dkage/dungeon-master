@@ -218,3 +218,31 @@ test('removing the current project leaves a clean default place after a reload',
   await expect(panel(page).getByRole('region', { name: 'Selected issue detail' })).toHaveCount(0)
   expect(await page.evaluate(() => location.hash)).not.toMatch(/q=\d+|s=/)
 })
+
+test('a shortcut can be tested: the keys arrive and nothing runs; keys that never arrive show the warning', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.setViewportSize({ width: 1600, height: 1000 })
+  await openSample(page)
+  await page.getByRole('button', { name: '⚙ Settings' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  const row = dialog.getByRole('row', { name: /^Expand terminal/ })
+
+  // The keys arrive: the page says so, and the terminal is not expanded.
+  await dialog.getByRole('button', { name: 'Test shortcut for Expand terminal' }).click()
+  await expect(row.getByRole('status')).toContainText('Nothing will run')
+  await page.keyboard.press('Control+Shift+2')
+  await expect(row.getByRole('status')).toContainText('The page received these keys')
+  await expect(app(page)).not.toHaveAttribute('data-expanded')
+
+  // Other keys are named, so a user can tell the shortcut was not what arrived.
+  await dialog.getByRole('button', { name: 'Test shortcut for Expand terminal' }).click()
+  await page.keyboard.press('Control+Shift+3')
+  await expect(row.getByRole('status')).toContainText(/received (Ctrl|Control)\+Shift\+3/)
+
+  // Keys the browser or system swallow never reach the page: nothing arrives and it says so.
+  await dialog.getByRole('button', { name: 'Test shortcut for Expand terminal' }).click()
+  await expect(row.getByRole('status')).toContainText('Nothing arrived', { timeout: 15_000 })
+  await expect(row.getByRole('status')).toContainText('choose another shortcut')
+  await dialog.getByRole('button', { name: 'Done' }).click()
+  await expect(app(page)).not.toHaveAttribute('data-expanded')
+})

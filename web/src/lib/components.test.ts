@@ -6,6 +6,7 @@ import Toolbar from './Toolbar.svelte'
 import Sidebar from './Sidebar.svelte'
 import SessionTabs from './SessionTabs.svelte'
 import StopConfirm from './StopConfirm.svelte'
+import ShortcutsSettings from './ShortcutsSettings.svelte'
 import { AppStore } from './store.svelte'
 import type { Campaign, Quest, QuestDetail as QuestDetailT, QuestResult, SessionInfo } from './api'
 import QuestsPanel from './QuestsPanel.svelte'
@@ -180,6 +181,56 @@ describe('first-run terminology and appearance', () => {
       heroes: [expect.objectContaining({ id: 'opus', args: ['--model', 'claude-opus-5-5'], env: ['API_KEY='] })],
     }))
     expect(screen.queryByRole('group', { name: 'Edit Opus' })).not.toBeInTheDocument()
+  })
+})
+
+describe('ShortcutsSettings test step', () => {
+  const press = (over: Partial<KeyboardEventInit> = {}) => ({ key: '@', code: 'Digit2', ctrlKey: true, shiftKey: true, ...over })
+
+  it('says received when the keys arrive, and runs nothing', async () => {
+    const s = store()
+    const run = vi.spyOn(s, 'runAction')
+    render(ShortcutsSettings, { store: s })
+    await fireEvent.click(screen.getByRole('button', { name: 'Test shortcut for Expand terminal' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Nothing will run')
+    await fireEvent.keyDown(screen.getByLabelText('Press the shortcut for Expand terminal to test it'), press())
+    expect(screen.getByRole('status')).toHaveTextContent('The page received these keys')
+    expect(run).not.toHaveBeenCalled()
+    expect(s.workspace.expanded).toBeNull()
+  })
+
+  it('names the keys that arrived when they differ, and a bare Escape cancels', async () => {
+    render(ShortcutsSettings, { store: store() })
+    await fireEvent.click(screen.getByRole('button', { name: 'Test shortcut for Expand terminal' }))
+    const input = screen.getByLabelText('Press the shortcut for Expand terminal to test it')
+    await fireEvent.keyDown(input, press({ key: '#', code: 'Digit3' }))
+    expect(screen.getByRole('status')).toHaveTextContent('received Ctrl+Shift+3, not this shortcut')
+    await fireEvent.click(screen.getByRole('button', { name: 'Test shortcut for Expand terminal' }))
+    await fireEvent.keyDown(screen.getByLabelText('Press the shortcut for Expand terminal to test it'), { key: 'Escape', code: 'Escape' })
+    expect(screen.getByRole('status')).toHaveTextContent('Test cancelled')
+  })
+
+  it('says nothing arrived when no keys come, and cancels when the field loses focus', async () => {
+    vi.useFakeTimers()
+    try {
+      render(ShortcutsSettings, { store: store() })
+      await fireEvent.click(screen.getByRole('button', { name: 'Test shortcut for Expand terminal' }))
+      await vi.advanceTimersByTimeAsync(8100)
+      expect(screen.getByRole('status')).toHaveTextContent('Nothing arrived')
+      expect(screen.getByRole('status')).toHaveTextContent('choose another shortcut')
+      await fireEvent.click(screen.getByRole('button', { name: 'Test shortcut for Expand map and list' }))
+      await fireEvent.blur(screen.getByLabelText('Press the shortcut for Expand map and list to test it'))
+      expect(screen.getByRole('status')).toHaveTextContent('Test cancelled')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('has no test for a disabled shortcut', async () => {
+    const s = store()
+    s.setShortcut('expand-terminal', null)
+    render(ShortcutsSettings, { store: s })
+    expect(screen.getByRole('button', { name: 'Test shortcut for Expand terminal' })).toBeDisabled()
   })
 })
 

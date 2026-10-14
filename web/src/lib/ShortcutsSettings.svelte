@@ -1,10 +1,34 @@
 <script lang="ts">
   import type { AppStore } from './store.svelte'
   import { ACTIONS, effective, formatBinding, fromEvent, labelOf, parseBinding, type ActionId } from './shortcuts'
+  import { judge, testMessage, TEST_WAIT_MS, type TestState } from './shortcutTest'
 
   let { store }: { store: AppStore } = $props()
   let capturing = $state<ActionId | null>(null)
   let errors = $state<Partial<Record<ActionId, string>>>({})
+  // The "test it" step: asks for the keys again and says whether the page received them. It runs nothing.
+  let testing = $state<{ id: ActionId; state: TestState } | null>(null)
+  let testTimer: ReturnType<typeof setTimeout> | undefined
+  function stopTest(state?: TestState) {
+    clearTimeout(testTimer)
+    if (testing && state) testing = { id: testing.id, state }
+    else if (!state) testing = null
+  }
+  function beginTest(id: ActionId) {
+    clearTimeout(testTimer)
+    capturing = null
+    testing = { id, state: { kind: 'waiting' } }
+    testTimer = setTimeout(() => stopTest({ kind: 'not-received' }), TEST_WAIT_MS)
+  }
+  function testKey(event: KeyboardEvent, id: ActionId) {
+    if (event.key === 'Tab') return
+    event.preventDefault()
+    event.stopPropagation()
+    const expected = current(id)
+    if (!expected) return
+    const result = judge(expected, event, platform)
+    if (result) stopTest(result)
+  }
 
   const platform = $derived(store.platform)
   const defaultOf = (id: ActionId) => {
@@ -28,6 +52,7 @@
   }
   function begin(id: ActionId) {
     errors = { ...errors, [id]: undefined }
+    testing = null
     capturing = id
   }
   function capture(event: KeyboardEvent, id: ActionId) {
@@ -75,11 +100,18 @@
               <kbd>{labelOf(current(a.id), platform)}</kbd>
             {/if}
             {#if errors[a.id]}<p role="alert" class="serror">{errors[a.id]}</p>{/if}
+            {#if testing?.id === a.id}
+              {#if testing.state.kind === 'waiting'}
+                <input readonly use:focusNow aria-label={`Press the shortcut for ${a.label} to test it`} placeholder="Press the shortcut…" onkeydown={(e) => testKey(e, a.id)} onblur={() => testing?.state.kind === 'waiting' && stopTest({ kind: 'cancelled' })} />
+              {/if}
+              <p role="status" class="stest" data-kind={testing.state.kind}>{testMessage(testing.state)}</p>
+            {/if}
           </td>
           <td>{labelOf(defaultOf(a.id), platform)}</td>
           <td>{why || 'Ready'}</td>
           <td class="sactions">
             <button type="button" aria-label={`Change shortcut for ${a.label}`} onclick={() => begin(a.id)}>Change</button>
+            <button type="button" aria-label={`Test shortcut for ${a.label}`} disabled={current(a.id) === null} onclick={() => beginTest(a.id)}>Test</button>
             <button type="button" aria-label={`Disable shortcut for ${a.label}`} disabled={current(a.id) === null} onclick={() => store.setShortcut(a.id, null)}>Disable</button>
             <button type="button" aria-label={`Reset shortcut for ${a.label}`} disabled={!isCustom(a.id)} onclick={() => reset(a.id)}>Reset</button>
           </td>
@@ -101,6 +133,8 @@
   .sactions { white-space: nowrap; }
   .sactions button { padding: 2px 8px; margin-right: 4px; }
   .serror { color: var(--error); margin: 4px 0 0; }
+  .stest { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+  .stest[data-kind='not-received'], .stest[data-kind='different'] { color: var(--warn); }
   .shint { color: var(--muted); margin-top: 8px; font-size: 12px; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
