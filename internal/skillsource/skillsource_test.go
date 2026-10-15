@@ -487,3 +487,78 @@ func TestDiscoveryChoicesPersistAndStartOff(t *testing.T) {
 		t.Fatalf("reopened = %+v", d)
 	}
 }
+
+func envValue(env []string, key string) string {
+	for i := len(env) - 1; i >= 0; i-- {
+		if v, ok := strings.CutPrefix(env[i], key+"="); ok {
+			return v
+		}
+	}
+	return "<unset>"
+}
+
+func TestGitEnvNeverPromptsAndAddsBatchModeToTheUsersSSHCommand(t *testing.T) {
+	never := func() string { t.Fatal("core.sshCommand read for a remote that does not use ssh"); return "" }
+	for _, loc := range []string{"https://example.test/a.git", "/some/local/repo"} {
+		env := gitEnv([]string{"PATH=/bin"}, loc, never)
+		if envValue(env, "GIT_TERMINAL_PROMPT") != "0" || envValue(env, "GIT_ASKPASS") != "true" || envValue(env, "SSH_ASKPASS_REQUIRE") != "never" {
+			t.Errorf("%s: prompts are not off: %v", loc, env)
+		}
+		if envValue(env, "GIT_SSH_COMMAND") != "<unset>" {
+			t.Errorf("%s: ssh settings touched for a remote that does not use ssh", loc)
+		}
+	}
+	for _, loc := range []string{"ssh://git@example.test/a.git", "git@example.test:team/a.git"} {
+		if got := envValue(gitEnv(nil, loc, func() string { return "" }), "GIT_SSH_COMMAND"); got != "ssh -o BatchMode=yes" {
+			t.Errorf("%s: GIT_SSH_COMMAND = %q", loc, got)
+		}
+	}
+	loc := "ssh://git@example.test/a.git"
+	cases := map[string]struct {
+		environ    []string
+		configured string
+		want       string
+	}{
+		"user env command":   {[]string{"GIT_SSH_COMMAND=ssh -i /k/id"}, "ignored", "ssh -i /k/id -o BatchMode=yes"},
+		"git ssh program":    {[]string{"GIT_SSH=/opt/my ssh"}, "", "'/opt/my ssh' -o BatchMode=yes"},
+		"core.sshCommand":    {nil, "ssh -F /c/config", "ssh -F /c/config -o BatchMode=yes"},
+		"env beats the file": {[]string{"GIT_SSH_COMMAND=plink"}, "ssh -F /c/config", "plink -o BatchMode=yes"},
+		"quote in a program": {[]string{"GIT_SSH=/it's/ssh"}, "", `'/it'\''s/ssh' -o BatchMode=yes`},
+	}
+	for name, c := range cases {
+		if got := envValue(gitEnv(c.environ, loc, func() string { return c.configured }), "GIT_SSH_COMMAND"); got != c.want {
+			t.Errorf("%s: %q, want %q", name, got, c.want)
+		}
+	}
+}
+
+// A fake ssh stands in for the network: git runs it, it records how, and it refuses.
+func TestSSHRemotesAreFetchedInBatchModeThroughTheRealFetcher(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a shell script as ssh")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	bin := t.TempDir()
+	log := filepath.Join(t.TempDir(), "ssh-args")
+	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + log + "\nexit 255\n"
+	if err := os.WriteFile(filepath.Join(bin, "ssh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("GIT_SSH_COMMAND", "")
+	t.Setenv("GIT_SSH", "")
+	r, _ := Open("", Options{Root: t.TempDir()})
+	_, err := r.Add(context.Background(), Input{Name: "x", Kind: Git, Location: "ssh://git@example.test/team/skills.git", Pin: "main"})
+	if err == nil {
+		t.Fatal("the fake ssh refuses, so the fetch must fail")
+	}
+	b, rerr := os.ReadFile(log)
+	if rerr != nil || !strings.Contains(string(b), "BatchMode=yes") || !strings.Contains(string(b), "example.test") {
+		t.Fatalf("ssh was not run in batch mode: %q, %v", b, rerr)
+	}
+	if len(r.List()) != 0 {
+		t.Fatal("a failed fetch registered the source")
+	}
+}
