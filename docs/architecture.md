@@ -73,10 +73,12 @@ infer issue completion from session exit or PR presence. Method and effort are s
 
 ## 7. Skills
 
-`docs/design/skills.md` is the contract. Planned sources are registered local folders or pinned Git repositories,
-mapped/enabled per campaign. Optional project/user/plugin discovery supplements them. Source-qualified selection and
-explicit precedence are independent of verified Claude invocation; external caching does not establish slash-command
-registration. Skill launches retain the briefing and supporting-file context. No repository mirrors or setup files.
+Sources are registered local folders or pinned Git repositories, mapped and enabled per campaign
+(`internal/skillsource`); `internal/skillcatalog` builds the source-qualified catalog. Optional project/user/plugin
+discovery supplements it and stays off until turned on. Selection and explicit precedence are independent of Claude's
+native invocation: a chosen skill is delivered in the reviewed briefing, with its directory added for reading, and
+external caching does not establish slash-command registration (probe on #66). Skill launches retain the briefing and
+supporting-file context. No repository mirrors or setup files. The delivery history is in #43 and git.
 
 ## 8. Briefings and review
 

@@ -202,9 +202,13 @@ Done:
 - A user-invoked skill runs from a positional prompt (`claude "/skill args"`) in the interactive TUI. (M1)
 - `--add-dir` and `--append-system-prompt` work as launch flags; the Gatekeeper rule uses the latter. (M1, M3.5)
 - GitHub sub-issues, blocked-by edges, assignees and linked PRs come from one GraphQL query on the user's repos. (M3)
+- A chosen skill reaches the agent through the reviewed briefing with its directory added by `--add-dir`; without that
+  flag the agent cannot read it. Skills in a project's, the user's or a plugin directory run as native commands; a
+  skill in an arbitrary directory does not. Print mode, CLI 2.1.300, macOS, 2026-10-15. (M5b, #66)
 
 Still open:
 
+- The M5b delivery probe in the interactive terminal UI (it used print mode); a failure is filed as a new bug.
 - Hook settings injection (`--settings`) for session state. (M7)
 - Camp and secondary-limit refusal against the real GitHub; only the fake has exercised it. (M3.5)
 - Windows runtime fixes (executable extensions, `gh.exe` copies, bounded socket paths, native shells, private state

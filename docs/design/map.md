@@ -342,7 +342,7 @@ then shows a meaningful map within seconds, before any GitHub setup.
 - `docs/design/experience.md` §3 and §7.5: launch controls move into the detail footer with a hero/model combo, a skill combo
   defaulted to the recommendation or None, and Start. None gives a plain quest session without a skill.
 - `docs/design/experience.md` §7.4: point to this file for the map design.
-- `docs/design/skills.md` §6: the spell strip becomes the footer's skill combo, not a separate strip.
+- The spell strip became the footer's skill combo, not a separate strip (delivered with #50).
 - `GLOSSARY.md`: "dungeon" now means an epic and "Tavern" the place for quests with no epic (plain: "No epic").
   "hall" and "outskirts" are drawing terms, not new vocabulary; if shown at all, they appear as plain "group" and
   "other epics" in the popover.

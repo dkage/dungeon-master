@@ -244,7 +244,7 @@ Milestone: M3.6 for the table and dialog, because the starter heroes become edit
 
 ### 6.2 Spells and buttons
 
-Three parts, matching `docs/design/skills.md`:
+Three parts. The sources part is delivered (#43); recommendation rules and presets are not built:
 
 1. **Sources**: discovered sources (the project's skills folder, the user's, installed plugins) listed read-only with a
    skill count; registered sources (a folder or a git URL pinned to a commit) with enable, order (drag), refresh,
@@ -256,9 +256,9 @@ Three parts, matching `docs/design/skills.md`:
    (`/research` + "focus on security"). Presets appear as entries in the skill combo. This is how new skills become
    launch choices without code.
 
-Milestone: M5b (spells). Registered folder/Git sources with per-project mappings are the primary source model.
-Project/user/plugin discovery supplements it. Source pins, availability and verified invocation follow
-`docs/design/skills.md`; fetching a repository never implies native skill registration.
+Milestone: M5b (spells). Registered folder/Git sources with per-project mappings are the primary source model and are
+delivered (#43), as is the skill combo. Project/user/plugin discovery supplements them. Fetching a repository never
+implies native skill registration.
 
 ### 6.3 Local files
 
@@ -405,7 +405,8 @@ fullscreen is distinct from expanding an application panel. Avoid arbitrary-scri
 - **M5a**: the sprite-backed graph in the map area established in M3.6; stable per-issue creature assignment from
   known effort tiers, separate state markers, Map / List behavior, expand, and the three levels (world map of
   dungeons, dungeon view, the Tavern) with the breadcrumb (`docs/design/map.md`).
-- **M5b**: Spells settings (sources, recommendation rules, skill presets) and the populated skill combo.
+- **M5b**: Spells settings (sources, recommendation rules, skill presets) and the populated skill combo. Sources and the
+  combo are delivered (#43); rules and presets are not built.
 - **R1** (release): native menus with Settings on ⌘, and the standard Edit menu (§7.1), window state.
 - **Later**: automatic titles for free sessions, art for hero crests.
 - **Later visual-system work**: add full pack/palette abstractions and contrast/completeness checks only when a second

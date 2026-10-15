@@ -11,8 +11,8 @@ already set.
 > settings, and quest-to-session launch flow (M4) are complete. M4.5 adds session attention signals; the dependency
 > graph with creature sprites follows in M5a. The 15-creature roster and prototype sheets in `design/quest-encounters/` are
 > the planned art inputs for that first renderer.
-> See [docs/design/experience.md](docs/design/experience.md) for the current experience and milestone order, [docs/design/skills.md](docs/design/skills.md)
-> for how skills fit in, [release/](release/README.md) for the release plan, and [docs/ideas.md](docs/ideas.md) for ideas
+> See [docs/design/experience.md](docs/design/experience.md) for the current experience and milestone order,
+> [release/](release/README.md) for the release plan, and [docs/ideas.md](docs/ideas.md) for ideas
 > that are not in v1.
 
 - v1 targets Claude Code only; other agents come later.
