@@ -59,10 +59,16 @@ function scope(css, root) {
 }
 
 // Component-scoped rules first (as the app loads them), then app.css so its theme overrides win.
+// QuestDetail stays unscoped (the app's theme rules target its classes directly), except for the few names the app
+// also uses elsewhere: those get a parent so they cannot reach the toolbar's .where or the scope picker's .opt.
+const QUALIFY = { 'lib/QuestDetail.svelte': { '.where': '.brief-dialog', '.opt': '.launch-footer' } };
+const qualify = (css, map) => Object.entries(map).reduce((s, [name, parent]) =>
+  s.replace(new RegExp(`(^|[\\s,}])\\${name}(?![\\w-])`, 'g'), `$1${parent} ${name}`), css);
 const scoped = [];
-for (const [f, root] of [['lib/QuestDetail.svelte', null], ['lib/QuestMap.svelte', '.map']]) {
+for (const [f, root] of [['lib/QuestDetail.svelte', null], ['lib/QuestMap.svelte', '.map'], ['lib/SessionTabs.svelte', '.tabs'],
+  ['lib/SkillChips.svelte', '.chips'], ['lib/StopConfirm.svelte', '.stop-confirm']]) {
   const m = /<style>([\s\S]*?)<\/style>/.exec(readFileSync(join(SRC, f), 'utf8'));
-  if (m) scoped.push(`/* from ${basename(f)} */\n${root ? scope(m[1], root) : m[1].trim()}`);
+  if (m) scoped.push(`/* from ${basename(f)} */\n${root ? scope(m[1], root) : qualify(m[1].trim(), QUALIFY[f] ?? {})}`);
 }
 const app = readFileSync(join(SRC, 'app.css'), 'utf8').replaceAll("url('./assets/fonts/", "url('./fonts/");
 writeFileSync(join(OUT, '_ds_bundle.css'), `${scoped.join('\n\n')}\n\n/* from app.css */\n${app}`);

@@ -1,0 +1,42 @@
+<div class="detail" style="display:block">
+<dialog open class="brief-dialog" aria-labelledby="brief-title" style="position:static;margin:0 auto">
+  <header>
+    <div><p class="eyebrow">#3 · Opus</p><h2 id="brief-title">Review launch plan</h2></div>
+    <button type="button" class="close" aria-label="Close briefing">×</button>
+  </header>
+  <p class="brief-summary">Prepared from 1 of 1 comments.</p>
+  <dl class="plan-meta">
+    <dt>Working directory</dt><dd>a new working copy in ~/.local/state/dungeon/copies</dd>
+    <dt>Private briefing</dt><dd>~/.local/state/dungeon/briefings/3.md</dd>
+    <dt>Opening instruction</dt><dd>Read the briefing file and work on the issue it describes.</dd>
+    <dt>Method</dt><dd>tdd · mattpocock-skills @ 4f2a9c1e0b7d</dd>
+    <dt>Delivery</dt><dd>Added to the briefing: the skill's instructions and its directory</dd>
+    <dt>Additional direction</dt><dd>Keep the legend collapsible.</dd>
+  </dl>
+  <fieldset class="where" aria-label="Where the session runs">
+    <legend>Where the session runs</legend>
+    <label><input type="radio" name="where" value="copy" checked><span>Its own working copy</span></label>
+    <label><input type="radio" name="where" value="main"><span>The project's main working tree</span></label>
+    <dl class="plan-meta">
+      <dt>Branch</dt><dd><code>dungeon/3-map-legend</code></dd>
+      <dt>Starts from</dt><dd>master at <code>53fc2de</code></dd>
+      <dt>Copies live in</dt><dd>~/.local/state/dungeon/copies (outside the repository)</dd>
+    </dl>
+    <p class="where-note" role="status">The main working tree has 2 uncommitted or untracked paths. A copy starts from the last commit and does not include them.</p>
+    <h3 class="brief-label">Bring from the main working tree</h3>
+    <ul class="carry">
+      <li><code>.env</code><span class="hint">ignored by Git</span><select><option>Leave out</option><option>Copy it</option><option>Link to the original</option></select></li>
+      <li><code>node_modules/</code><span class="hint">ignored by Git</span><select><option>Link to the original</option></select></li>
+    </ul>
+  </fieldset>
+  <details class="command"><summary>Command and agent instruction</summary></details>
+  <h3 class="brief-label">Task briefing sent to the agent</h3>
+  <pre class="brief-content"># Issue #3: Add the map legend
+
+Show a legend that explains each creature and state on the map.</pre>
+  <footer class="dialog-actions">
+    <button type="button" class="cancel">Cancel</button>
+    <button type="button" class="launch-button">Start expedition</button>
+  </footer>
+</dialog>
+</div>

@@ -25,5 +25,6 @@ Left panel: brand header, search, campaign cards with their sessions, footer but
 </aside>
 ```
 
+A session in its own working copy adds `<span className="badge branch">⎇ 3-map-legend</span>` after `.stitle`.
 Selected campaign: `campaign selected`; active session: `session active`. A sample project gets
 `<span className="campaign-badge">Sample</span>` inside `.cline`.

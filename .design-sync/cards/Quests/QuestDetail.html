@@ -1,14 +1,25 @@
 <aside class="quests open" style="display:block;position:static;transform:none;box-shadow:none;width:440px;border-left:0">
   <div class="detail">
-    <header class="qhead"><button class="back">← Quests</button></header>
+    <header class="qhead"><button type="button" class="back">← Quests</button></header>
     <article>
       <div class="titlecard"><h2 class="dtitle"><span class="num">#3</span> Add the map legend</h2></div>
       <p class="dmeta"><span class="pill open">Open</span><span class="pill effort-chip">Medium</span><span>opened by @octocat</span><span>updated 2h ago</span><a href="#">Open on GitHub</a></p>
       <p class="meta"><span class="label" style="--gh:#0e8a16"><i class="swatch"></i>tracked</span><span class="chip">milestone: M5</span></p>
+      <section class="rel effort-row" aria-label="Effort"><h3>Effort</h3><p><strong>Medium</strong> <span class="hint">(label)</span></p><label class="effort-set"><span>Set here</span><select><option>From labels</option></select></label><details class="effort-map"><summary>Effort labels for this project</summary></details></section>
       <section class="rel"><h3>Blocked by</h3><ul><li><button class="link"><span class="mark done">✓</span>#1 Scaffold the server</button></li><li><button class="link"><span class="mark">○</span>#2 Draw the map tiles</button></li></ul></section>
       <section class="md"><p>Show a legend that explains each creature and state on the map.</p><pre><code>effort:medium</code></pre></section>
       <section class="comments"><h3>Comments (1)</h3><div class="comment"><p class="who"><strong>@octocat</strong> <span>1h ago</span></p><div class="md"><p>Keep it collapsible.</p></div></div></section>
     </article>
-    <footer class="launch-footer"><label class="hero-label">Hero</label><select><option>Opus</option></select><button class="launch-button">Review launch</button><p class="launch-note">Assigned to @octocat.</p></footer>
+    <footer class="launch-footer">
+      <label class="dir-label" for="quest-direction">Additional direction <span class="opt">Optional</span></label>
+      <textarea id="quest-direction" class="dir" rows="2" placeholder="Add context for the agent…"></textarea>
+      <label class="hero-label" for="quest-hero">Hero</label>
+      <select id="quest-hero" class="hero-select"><option>Opus</option></select>
+      <label class="skill-label" for="quest-skill">Method</label>
+      <select id="quest-skill" class="skill-select"><option>Automatic</option></select>
+      <span class="settings-links"><button type="button" class="link">Heroes…</button><button type="button" class="link">Spell sources…</button></span>
+      <button type="button" class="launch-button">Review launch</button>
+      <p class="launch-note">Assigned to @octocat.</p>
+    </footer>
   </div>
 </aside>
