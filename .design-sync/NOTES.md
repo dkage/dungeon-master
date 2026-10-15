@@ -7,6 +7,16 @@
   (`.badge`, `.num`, `.link`, `.gem`, `.empty`), so `build.mjs` prefixes each of its selectors with `.map`; match the
   root as a whole class (`.maptools` and `.plain-dot` are not the root). If other component-scoped styles become part
   of the visual baseline, add their files to the list in `build.mjs`, scoped the same way when they reuse names.
+  SessionTabs (`.tabs`), SkillChips (`.chips`) and StopConfirm (`.stop-confirm`) are scoped that way too. QuestDetail
+  stays unscoped (app.css theme rules target its classes), but the names it shares with the app get a parent through
+  `QUALIFY` in `build.mjs` (`.where` -> `.brief-dialog .where`, `.opt` -> `.launch-footer .opt`); add to it when a new
+  QuestDetail class collides.
+- Scoping only adds rules; app-wide rules still reach component markup in the real app. Two visible cases the cards
+  reproduce faithfully: `.app[data-theme='dungeon'] .label` (GitHub labels) restyles the session tab buttons
+  (`.tabs .label`), and the toolbar's global `.where { display: flex }` lays out the launch dialog's "Where the session
+  runs" fieldset. Fix them in the app, not in the cards.
+- A `url()` inside a custom property (the map's `--floor`) resolves against the stylesheet that uses it, so captured
+  `--x: url(ASSETS/...)` is rewritten to `assets/...` (stylesheet-relative), not `../../../assets/...`.
 - The map cards are not hand-written: `capture/run.sh` renders the real `QuestMap` against fixtures in jsdom (copied
   into a temporary `web/src/ds-capture-tmp/` because vitest needs `web/node_modules`, removed on exit) and the build
   inserts the HTML at `<!-- capture:map-dungeon -->` / `<!-- capture:map-world -->`. Image URLs come out as
