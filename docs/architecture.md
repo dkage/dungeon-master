@@ -50,7 +50,7 @@ Layout never owns or changes process identity. Existing prototypes supply appear
 | `internal/platform` | Cross-platform filesystem/path/process conventions |
 | `web` | Svelte 5/TypeScript, xterm.js, shared issue views and local UI state |
 
-Planned skill discovery/source registration belongs behind a small `spells` seam. The optional `cmd/shell` native
+Skill sources and discovery live in `internal/skillsource` and `internal/skillcatalog`. The optional `cmd/shell` native
 webview is release work; persistent-process ownership is an investigation before changing session architecture.
 
 ## 5. Agent launch
