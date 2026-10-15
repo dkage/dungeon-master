@@ -30,7 +30,9 @@ for (const [dir, name] of Object.entries(REFS)) {
 const CAP = join(OUT, '.capture');
 mkdirSync(CAP, { recursive: true });
 execFileSync('.design-sync/capture/run.sh', [CAP], { stdio: 'ignore' });
-const captured = (name) => readFileSync(join(CAP, `${name}.html`), 'utf8').replaceAll(' class=""', '').replaceAll('ASSETS/', '../../../assets/');
+// A url() inside a custom property (--floor) resolves against the stylesheet that uses it, which sits at the root.
+const captured = (name) => readFileSync(join(CAP, `${name}.html`), 'utf8').replaceAll(' class=""', '')
+  .replace(/(--[\w-]+:\s*url\()ASSETS\//g, '$1assets/').replaceAll('ASSETS/', '../../../assets/');
 
 // Svelte scopes component styles with a hashed class; bundled raw they would leak onto the app's own classes
 // (.badge, .num, .link, ...), so prefix every selector with the component's root class instead.
